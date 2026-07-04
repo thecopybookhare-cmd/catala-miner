@@ -12,14 +12,24 @@ from . import config
 _BIDIX_PATH = config.MODELS_DIR / "apertium-spa-cat.dix"
 
 
-def _side_text(el) -> str:
-    """Text of <l>/<r>: <b/> is a space; <s n=..> are grammar symbols."""
-    parts = [el.text or ""]
+def _collect(el, parts: list[str]):
+    parts.append(el.text or "")
     for child in el:
-        if child.tag == "b":
+        if child.tag in ("b", "j"):
             parts.append(" ")
+        elif child.tag in ("s", "v", "par"):
+            pass
+        else:
+            _collect(child, parts)
         parts.append(child.tail or "")
-    return "".join(parts).strip()
+
+
+def _side_text(el) -> str:
+    """Text of <l>/<r>: <b/>/<j/> are spaces; <s>/<v> are grammar symbols
+    (no surface text); <g> groups nest and are recursed into."""
+    parts: list[str] = []
+    _collect(el, parts)
+    return " ".join("".join(parts).split())
 
 
 def _first_symbol(el) -> str:

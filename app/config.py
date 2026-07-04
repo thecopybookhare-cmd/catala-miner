@@ -24,8 +24,10 @@ WHISPER_MODELS = {
 DEFAULT_WHISPER = "catala-large"
 
 TRANSLATE_REPO = "softcatala/translate-cat-spa"
+# Bilingual dictionary: the repo ships it as .metadix (same XML structure
+# with a few extra tags: <g>, <j/>, <v>) — we parse it directly.
 BIDIX_URL = ("https://raw.githubusercontent.com/apertium/apertium-spa-cat/"
-             "master/apertium-spa-cat.spa-cat.dix")
+             "master/apertium-spa-cat.spa-cat.metadix")
 
 NOTE_TYPE = "CatalaMiner"
 NOTE_FIELDS = ["Paraula", "ParaulaES", "Frase", "FraseES",

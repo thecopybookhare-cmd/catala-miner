@@ -102,9 +102,12 @@ function renderSegs() {
   if (!SEGS.length) { el.innerHTML = '<p class="dim">Sense transcripció encara — prem 🎙️ Transcriure.</p>'; return; }
   el.innerHTML = SEGS.map((seg, i) => {
     const toks = (seg.tokens && seg.tokens.length)
-      ? seg.tokens.map((t) => t.is_word
-          ? `<span class="t ${KNOWN.has(t.lemma) ? "known" : ""} freq-${badge(t.zipf)}" data-l="${t.lemma}">${t.t}</span>`
-          : `<span>${t.t}</span>`).join(" ")
+      ? seg.tokens.map((t, k) => {
+          const html = t.is_word
+            ? `<span class="t ${KNOWN.has(t.lemma) ? "known" : ""} freq-${badge(t.zipf)}" data-l="${t.lemma}">${t.t}</span>`
+            : `<span>${t.t}</span>`;
+          return (k > 0 && t.is_word ? " " : "") + html;  // no space before punctuation
+        }).join("")
       : seg.text;
     const low = seg.logprob < -1.0 ? " lowconf" : "";
     return `<div class="seg${low}" id="seg-${i}" data-i="${i}">
