@@ -36,3 +36,11 @@ def test_invoke_ok_and_error(post):
 def test_is_up_false_when_down(post):
     post.side_effect = ConnectionError()
     assert anki.is_up() is False
+
+
+@patch("app.anki.requests.post")
+def test_is_up_false_when_port_squatted(post):
+    m = MagicMock()
+    m.json.return_value = {"detail": "invalid bearer token"}
+    post.return_value = m
+    assert anki.is_up() is False

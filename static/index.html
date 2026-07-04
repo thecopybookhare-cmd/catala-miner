@@ -1,1 +1,71 @@
-<h1>CatalaMiner</h1>
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<title>CatalàMiner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1 id="brand">🐈 CatalàMiner</h1>
+  <div id="anki-badge" class="badge">Anki…</div>
+</header>
+
+<main id="home">
+  <section class="new-session">
+    <label class="filebtn">📁 Obrir arxiu local
+      <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
+    </label>
+    <div class="yt">
+      <input type="url" id="yt-url" placeholder="Enganxa URL de YouTube…">
+      <button id="yt-btn">⬇️ Importar</button>
+    </div>
+  </section>
+  <section>
+    <h2>Sessions</h2>
+    <ul id="session-list"></ul>
+  </section>
+</main>
+
+<main id="player" hidden>
+  <button id="back">← Sessions</button>
+  <video id="video" controls playsinline></video>
+  <div id="transcribe-bar">
+    <select id="model-select">
+      <option value="catala-large">Whisper large-v3 català (AINA) — màxima qualitat</option>
+      <option value="large-v3">Whisper large-v3 genèric</option>
+      <option value="small">Whisper small — ràpid</option>
+    </select>
+    <button id="transcribe-btn">🎙️ Transcriure</button>
+    <button id="sidecar-btn" hidden>📜 Usar .srt existent</button>
+    <progress id="job-progress" max="1" value="0" hidden></progress>
+    <span id="job-msg"></span>
+  </div>
+  <div id="subs"></div>
+</main>
+
+<aside id="card-panel" hidden>
+  <h3>Nova targeta</h3>
+  <div class="row"><label>Paraula</label><input id="c-paraula"></div>
+  <div class="row"><label>Paraula ES</label><input id="c-paraula-es"></div>
+  <div id="senses"></div>
+  <div class="row"><label>Frase</label><textarea id="c-frase" rows="2"></textarea></div>
+  <div class="row"><label>Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
+  <div class="row meta"><span id="c-meta"></span></div>
+  <div class="row">
+    <audio id="c-audio" controls></audio>
+    <button id="pad-before" title="Incloure segment anterior">⏪+</button>
+    <button id="pad-after" title="Incloure segment següent">+⏩</button>
+  </div>
+  <img id="c-image" alt="">
+  <div class="row actions">
+    <button id="c-cancel">Cancel·lar</button>
+    <button id="c-send" class="primary">➕ Afegir a Anki (⏎)</button>
+  </div>
+</aside>
+
+<div id="toast" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>

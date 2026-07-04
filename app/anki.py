@@ -15,6 +15,10 @@ def invoke(action: str, **params):
                       json={"action": action, "version": 6, "params": params},
                       timeout=10)
     data = r.json()
+    # AnkiConnect always returns both keys; anything else on this port
+    # is a different service squatting on 8765.
+    if not (isinstance(data, dict) and "result" in data and "error" in data):
+        raise AnkiError("port 8765 is not AnkiConnect")
     if data.get("error"):
         raise AnkiError(data["error"])
     return data.get("result")
