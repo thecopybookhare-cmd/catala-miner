@@ -75,8 +75,24 @@ def tokenize(text: str) -> list[dict]:
     return toks
 
 
-def analyze_selection(text: str) -> tuple[str, str]:
-    """Return (lemma, pos) for a selected word/expression."""
+def analyze_selection(text: str, context: str = "") -> tuple[str, str]:
+    """Return (lemma, pos) for a selected word/expression.
+
+    When `context` (the full sentence) is given, the selection is located
+    inside it and lemma/POS are taken from the in-context analysis — an
+    isolated "gos" gets mis-lemmatized as the verb "gosar", but inside
+    "El gos corre" spaCy tags it correctly as a noun.
+    """
+    target = [t["t"].lower() for t in tokenize(text) if t["is_word"]]
+    if context and target:
+        ctx = [t for t in tokenize(context) if t["is_word"]]
+        n = len(target)
+        for i in range(len(ctx) - n + 1):
+            if [w["t"].lower() for w in ctx[i:i + n]] == target:
+                span = ctx[i:i + n]
+                if n == 1:
+                    return span[0]["lemma"], span[0]["pos"]
+                return " ".join(w["lemma"] for w in span), "EXPR"
     words = [t for t in tokenize(text) if t["is_word"]]
     if not words:
         return text.lower(), ""

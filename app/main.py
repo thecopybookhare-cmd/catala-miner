@@ -161,6 +161,61 @@ def job_status(jid: str):
     return j
 
 
+@app.post("/api/sessions/{sid}/subtitles")
+async def attach_subtitles(sid: str, file: UploadFile = File(...)):
+    """User-provided .srt/.vtt — replaces the transcript, no Whisper needed."""
+    s = db.get_session(CON, sid)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    from .transcribe import tokens_for_existing
+    text = (await file.read()).decode("utf-8", errors="replace")
+    segs = tokens_for_existing(subs.parse_subtitles(text))
+    if not segs:
+        return JSONResponse({"error": "no s'han trobat subtítols al fitxer"},
+                            status_code=400)
+    db.update_transcript(CON, sid, json.dumps(segs), "-", "srt")
+    return {"segments": len(segs)}
+
+
+# ---------- dictionary popup ----------
+
+class LookupReq(BaseModel):
+    selection: str
+    sentence: str = ""
+
+
+@app.post("/api/lookup")
+def lookup(req: LookupReq):
+    """Instant word info for the Migaku-style popup (no media generated)."""
+    lemma, pos = nlp.analyze_selection(req.selection, req.sentence)
+    z = nlp.zipf(req.selection)
+    senses = _dict().lookup(req.selection) or _dict().lookup(lemma)
+    return {
+        "selection": req.selection,
+        "lemma": lemma, "pos": pos,
+        "zipf": z, "freq_rank": nlp.freq_badge(z),
+        "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
+        "word_es": translate.translate(req.selection),
+        "sentence_es": translate.translate(req.sentence) if req.sentence else "",
+    }
+
+
+@app.post("/api/sessions/{sid}/segments/{idx}/translate")
+def translate_segment(sid: str, idx: int):
+    """Dual-subtitle line (Language Reactor style), cached in the transcript."""
+    s = db.get_session(CON, sid)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    segs = json.loads(s["transcript_json"])
+    if not 0 <= idx < len(segs):
+        return JSONResponse({"error": "bad index"}, status_code=400)
+    if not segs[idx].get("text_es"):
+        segs[idx]["text_es"] = translate.translate(segs[idx]["text"])
+        db.update_transcript(CON, sid, json.dumps(segs),
+                             s["model_size"], s["srt_source"])
+    return {"index": idx, "text_es": segs[idx]["text_es"]}
+
+
 # ---------- cards ----------
 
 class PreviewReq(BaseModel):
@@ -195,7 +250,7 @@ def card_preview(req: PreviewReq):
     except Exception:
         image_ok = False
 
-    lemma, pos = nlp.analyze_selection(req.selection)
+    lemma, pos = nlp.analyze_selection(req.selection, seg["text"])
     z = nlp.zipf(req.selection)
     senses = _dict().lookup(req.selection) or _dict().lookup(lemma)
     return {
