@@ -1,0 +1,69 @@
+import json
+from unittest.mock import patch
+from fastapi.testclient import TestClient
+import app.main as main
+
+SRT = """1
+00:00:01,000 --> 00:00:02,500
+Hola món
+
+2
+00:00:03,000 --> 00:00:04,000
+Adeu amic
+"""
+
+
+def client(tmp_path):
+    main.CON = main.db.connect(tmp_path / "t.db")
+    return TestClient(main.app)
+
+
+def _session(tmp_path, transcript="[]"):
+    return main.db.create_session(
+        main.CON, title="V", source_type="local", media_path="/x.mp4",
+        srt_source="none", model_size="-", duration_secs=10,
+        transcript_json=transcript)
+
+
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_lookup_returns_senses_and_translations(_tr, tmp_path):
+    c = client(tmp_path)
+    main._DICT = main.dictionary.Dictionary({"gos": [("perro", "n")]})
+    r = c.post("/api/lookup", json={"selection": "gos",
+                                    "sentence": "El gos corre"}).json()
+    assert r["senses"] == [{"es": "perro", "pos": "n"}]
+    assert r["word_es"] == "ES:gos"
+    assert r["sentence_es"] == "ES:El gos corre"
+    assert r["lemma"] == "gos"
+    assert "freq_rank" in r and "zipf" in r
+
+
+def test_attach_subtitles_tokenizes_and_saves(tmp_path):
+    c = client(tmp_path)
+    sid = _session(tmp_path)
+    r = c.post(f"/api/sessions/{sid}/subtitles",
+               files={"file": ("v.srt", SRT.encode(), "text/plain")}).json()
+    assert r["segments"] == 2
+    s = main.db.get_session(main.CON, sid)
+    segs = json.loads(s["transcript_json"])
+    assert segs[0]["text"] == "Hola món"
+    assert segs[0]["tokens"]  # tokenized
+    assert s["srt_source"] == "srt"
+
+
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_segment_translate_caches(_tr, tmp_path):
+    c = client(tmp_path)
+    segs = [{"start": 0, "end": 1, "text": "Hola món", "words": [],
+             "logprob": 0.0, "tokens": []}]
+    sid = _session(tmp_path, json.dumps(segs))
+    r = c.post(f"/api/sessions/{sid}/segments/0/translate").json()
+    assert r["text_es"] == "ES:Hola món"
+    # cached in DB now
+    s = main.db.get_session(main.CON, sid)
+    assert json.loads(s["transcript_json"])[0]["text_es"] == "ES:Hola món"
+    # second call served from cache (translate not called again)
+    with patch("app.main.translate.translate") as tr2:
+        r2 = c.post(f"/api/sessions/{sid}/segments/0/translate").json()
+        assert r2["text_es"] == "ES:Hola món"
+        tr2.assert_not_called()

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=0.2.0">
 </head>
 <body>
 <header>
@@ -30,7 +30,13 @@
 
 <main id="player" hidden>
   <button id="back">← Sessions</button>
-  <video id="video" controls playsinline></video>
+  <div id="video-wrap">
+    <video id="video" controls playsinline></video>
+    <div id="overlay-sub">
+      <div id="overlay-ca"></div>
+      <div id="overlay-es" hidden></div>
+    </div>
+  </div>
   <div id="transcribe-bar">
     <select id="model-select">
       <option value="catala-large">Whisper large-v3 català (AINA) — màxima qualitat</option>
@@ -38,12 +44,31 @@
       <option value="small">Whisper small — ràpid</option>
     </select>
     <button id="transcribe-btn">🎙️ Transcriure</button>
-    <button id="sidecar-btn" hidden>📜 Usar .srt existent</button>
+    <label class="filebtn small">📎 Adjuntar .srt
+      <input type="file" id="subs-input" accept=".srt,.vtt">
+    </label>
+    <button id="dual-btn" class="toggle" title="Subtítol dual català + espanyol (d)">🇪🇸 Dual</button>
+    <button id="autopause-btn" class="toggle" title="Pausa al final de cada frase (p)">⏯️ Auto-pausa</button>
     <progress id="job-progress" max="1" value="0" hidden></progress>
     <span id="job-msg"></span>
   </div>
   <div id="subs"></div>
 </main>
+
+<div id="word-pop" hidden>
+  <div class="wp-head">
+    <span id="wp-word"></span>
+    <span id="wp-meta"></span>
+    <button id="wp-close">✕</button>
+  </div>
+  <div id="wp-senses"></div>
+  <div id="wp-word-es" class="wp-line"></div>
+  <div id="wp-sentence-es" class="wp-line dim"></div>
+  <div class="wp-actions">
+    <button id="wp-replay">🔊 Repetir (a)</button>
+    <button id="wp-card" class="primary">➕ Crear targeta</button>
+  </div>
+</div>
 
 <aside id="card-panel" hidden>
   <h3>Nova targeta</h3>
@@ -66,6 +91,6 @@
 </aside>
 
 <div id="toast" hidden></div>
-<script src="/app.js?v=0.1.1"></script>
+<script src="/app.js?v=0.2.0"></script>
 </body>
 </html>
