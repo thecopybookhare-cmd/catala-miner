@@ -12,6 +12,10 @@ const toast = (msg, cls = "ok") => {
 };
 
 let SESSION = null, SEGS = [], KNOWN = new Set(), CARD = null, PAD = { b: 0, a: 0 };
+let CUR = -1;                 // current segment index
+let DUAL = false, AUTOPAUSE = false;
+let POP = null;               // {segIndex, selection} shown in word popup
+const ES_CACHE = {};          // segIndex -> spanish line
 
 // ---------- Anki badge ----------
 async function refreshAnki() {
@@ -41,7 +45,6 @@ $("file-input").onchange = async (e) => {
   toast("Pujant arxiu…");
   const r = await fetch("/api/sessions/upload", { method: "POST", body: fd }).then((x) => x.json());
   await openSession(r.session_id);
-  if (r.has_sidecar_subs) $("sidecar-btn").hidden = false;
 };
 
 $("yt-btn").onclick = async () => {
@@ -70,11 +73,15 @@ async function pollJob(jid, label) {
 async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; KNOWN = new Set(s.known_lemmas);
+  CUR = -1; POP = null; $("word-pop").hidden = true;
+  for (const k in ES_CACHE) delete ES_CACHE[k];
+  SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
   $("video").src = s.media_url;
   renderSegs();
+  renderOverlay();
 }
-$("back").onclick = () => { $("player").hidden = true; $("home").hidden = false; $("card-panel").hidden = true; loadSessions(); };
+$("back").onclick = () => { $("player").hidden = true; $("home").hidden = false; $("card-panel").hidden = true; $("word-pop").hidden = true; loadSessions(); };
 
 $("transcribe-btn").onclick = async () => {
   const model = $("model-select").value;
@@ -83,12 +90,31 @@ $("transcribe-btn").onclick = async () => {
   const res = await pollJob(job_id, "Transcrivint… (la primera vegada descarrega el model)");
   if (res) openSession(SESSION.id);
 };
-$("sidecar-btn").onclick = async () => {
-  const { job_id } = await api(`/api/sessions/${SESSION.id}/transcribe`,
-    { method: "POST", body: JSON.stringify({ use_sidecar: true }) });
-  const res = await pollJob(job_id, "Carregant subtítols…");
-  if (res) openSession(SESSION.id);
+
+$("subs-input").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f);
+  const r = await fetch(`/api/sessions/${SESSION.id}/subtitles`, { method: "POST", body: fd }).then((x) => x.json());
+  if (r.error) { toast(r.error, "err"); return; }
+  toast(`📜 ${r.segments} subtítols carregats`);
+  openSession(SESSION.id);
 };
+
+$("dual-btn").onclick = () => setDual(!DUAL);
+$("autopause-btn").onclick = () => setAutopause(!AUTOPAUSE);
+
+function setDual(v) {
+  DUAL = v;
+  $("dual-btn").classList.toggle("on", v);
+  $("overlay-es").hidden = !v;
+  if (v) fillDual(CUR);
+}
+function setAutopause(v) {
+  AUTOPAUSE = v;
+  $("autopause-btn").classList.toggle("on", v);
+}
 
 function fmtTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
@@ -97,59 +123,163 @@ function fmtTime(t) {
 
 const badge = (z) => (z >= 5 ? "common" : z >= 3.3 ? "medium" : "rare");
 
+function tokenHtml(seg) {
+  if (!(seg.tokens && seg.tokens.length)) return seg.text;
+  return seg.tokens.map((t, k) => {
+    const html = t.is_word
+      ? `<span class="t ${KNOWN.has(t.lemma) ? "known" : ""} freq-${badge(t.zipf)}" data-l="${t.lemma}">${t.t}</span>`
+      : `<span>${t.t}</span>`;
+    return (k > 0 && t.is_word ? " " : "") + html;  // no space before punctuation
+  }).join("");
+}
+
+function bindTokenClicks(container, segIndex) {
+  for (const tok of container.querySelectorAll(".t"))
+    tok.onclick = (ev) => {
+      ev.stopPropagation();
+      const sel = window.getSelection().toString().trim();
+      openPopup(segIndex, sel || tok.textContent, tok);
+    };
+}
+
 function renderSegs() {
   const el = $("subs");
-  if (!SEGS.length) { el.innerHTML = '<p class="dim">Sense transcripció encara — prem 🎙️ Transcriure.</p>'; return; }
+  if (!SEGS.length) { el.innerHTML = '<p class="dim">Sense transcripció — prem 🎙️ Transcriure o 📎 adjunta un .srt.</p>'; return; }
   el.innerHTML = SEGS.map((seg, i) => {
-    const toks = (seg.tokens && seg.tokens.length)
-      ? seg.tokens.map((t, k) => {
-          const html = t.is_word
-            ? `<span class="t ${KNOWN.has(t.lemma) ? "known" : ""} freq-${badge(t.zipf)}" data-l="${t.lemma}">${t.t}</span>`
-            : `<span>${t.t}</span>`;
-          return (k > 0 && t.is_word ? " " : "") + html;  // no space before punctuation
-        }).join("")
-      : seg.text;
     const low = seg.logprob < -1.0 ? " lowconf" : "";
     return `<div class="seg${low}" id="seg-${i}" data-i="${i}">
-      <span class="time">${fmtTime(seg.start)}</span>${toks}</div>`;
+      <span class="time">${fmtTime(seg.start)}</span>${tokenHtml(seg)}</div>`;
   }).join("");
   for (const div of el.querySelectorAll(".seg")) {
     const i = +div.dataset.i;
     div.querySelector(".time").onclick = () => { $("video").currentTime = SEGS[i].start; $("video").play(); };
-    for (const tok of div.querySelectorAll(".t"))
-      tok.onclick = () => mine(i, window.getSelection().toString().trim() || tok.textContent);
+    bindTokenClicks(div, i);
   }
 }
 
-$("video").addEventListener("timeupdate", () => {
-  const t = $("video").currentTime;
-  const i = SEGS.findIndex((s) => t >= s.start && t <= s.end);
-  document.querySelectorAll(".seg.active").forEach((d) => d.classList.remove("active"));
-  if (i >= 0) {
-    const div = $("seg-" + i);
-    div.classList.add("active");
-    div.scrollIntoView({ block: "center", behavior: "smooth" });
-  }
-});
+// ---------- overlay subtitle (inside the player, Migaku/LR style) ----------
+function renderOverlay() {
+  const ca = $("overlay-ca");
+  if (CUR < 0 || !SEGS[CUR]) { ca.innerHTML = ""; $("overlay-es").textContent = ""; return; }
+  const long = SEGS[CUR].text.length > 140;
+  ca.classList.toggle("longtext", long);
+  $("overlay-es").classList.toggle("longtext", long);
+  ca.innerHTML = tokenHtml(SEGS[CUR]);
+  bindTokenClicks(ca, CUR);
+  if (DUAL) fillDual(CUR);
+}
 
-document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
-    if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
+async function fillDual(i) {
+  const es = $("overlay-es");
+  if (i < 0 || !SEGS[i]) { es.textContent = ""; return; }
+  if (ES_CACHE[i] === undefined) {
+    ES_CACHE[i] = "";  // in-flight marker
+    const r = await api(`/api/sessions/${SESSION.id}/segments/${i}/translate`, { method: "POST" });
+    ES_CACHE[i] = r.text_es || "";
+  }
+  if (i === CUR) es.textContent = ES_CACHE[i];
+  // prefetch next two lines so playback never waits
+  for (const j of [i + 1, i + 2])
+    if (j < SEGS.length && ES_CACHE[j] === undefined) {
+      ES_CACHE[j] = "";
+      api(`/api/sessions/${SESSION.id}/segments/${j}/translate`, { method: "POST" })
+        .then((r) => { ES_CACHE[j] = r.text_es || ""; if (j === CUR) es.textContent = ES_CACHE[j]; });
+    }
+}
+
+$("video").addEventListener("timeupdate", () => {
+  const v = $("video");
+  const t = v.currentTime;
+  const i = SEGS.findIndex((s) => t >= s.start && t <= s.end);
+  if (AUTOPAUSE && !v.paused && CUR >= 0 && i !== CUR) {
+    v.pause();
+    v.currentTime = Math.max(SEGS[CUR].end - 0.02, SEGS[CUR].start);
     return;
   }
-  if ($("player").hidden) return;
-  const v = $("video");
-  const cur = SEGS.findIndex((s) => v.currentTime >= s.start && v.currentTime <= s.end);
-  if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
-  if (e.key === "ArrowLeft") { e.preventDefault(); v.currentTime = SEGS[Math.max(0, cur - 1)]?.start ?? 0; }
-  if (e.key === "ArrowRight") { e.preventDefault(); v.currentTime = SEGS[Math.min(SEGS.length - 1, cur + 1)]?.start ?? v.currentTime; }
-  if (e.key === "a" && cur >= 0) { v.currentTime = SEGS[cur].start; v.play(); }
-  if (e.key === "Enter" && !$("card-panel").hidden) sendCard();
-  if (e.key === "Escape") $("card-panel").hidden = true;
+  if (i !== CUR) {
+    CUR = i;
+    document.querySelectorAll(".seg.active").forEach((d) => d.classList.remove("active"));
+    if (i >= 0) {
+      const div = $("seg-" + i);
+      if (div) {
+        div.classList.add("active");
+        div.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
+    renderOverlay();
+  }
 });
 
-// ---------- mining ----------
-async function mine(segIndex, selection, padB = 0, padA = 0) {
+// ---------- word popup (Migaku-style dictionary) ----------
+async function openPopup(segIndex, selection, anchorEl) {
+  const v = $("video");
+  v.pause();
+  // clicking the same word again closes the popup (Migaku behavior)
+  if (POP && !$("word-pop").hidden && POP.selection === selection && POP.segIndex === segIndex) {
+    closePopup();
+    return;
+  }
+  POP = { segIndex, selection };
+  $("wp-word").textContent = selection;
+  $("wp-meta").textContent = "…";
+  $("wp-senses").innerHTML = "";
+  $("wp-word-es").textContent = "";
+  $("wp-sentence-es").textContent = "";
+  positionPopup(anchorEl);
+  $("word-pop").hidden = false;
+
+  const r = await api("/api/lookup", {
+    method: "POST",
+    body: JSON.stringify({ selection, sentence: SEGS[segIndex].text }),
+  });
+  if (!POP || POP.selection !== selection) return;  // popup changed meanwhile
+  POP.lookup = r;
+  $("wp-meta").textContent = `${r.lemma} · ${r.pos || "?"} · ${r.freq_rank} (zipf ${r.zipf.toFixed(1)})`;
+  $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
+    .map((s) => `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
+    || '<span class="dim" style="font-size:13px">— sense entrada al diccionari —</span>';
+  for (const sp of $("wp-senses").querySelectorAll(".sense"))
+    sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
+  $("wp-word-es").textContent = r.word_es ? `→ ${r.word_es}` : "";
+  $("wp-sentence-es").textContent = r.sentence_es || "";
+}
+
+function positionPopup(anchorEl) {
+  const pop = $("word-pop");
+  const rect = anchorEl.getBoundingClientRect();
+  pop.hidden = false;                       // measurable
+  const w = 300, h = pop.offsetHeight || 220;
+  let x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 8);
+  let y = rect.top - h - 10;
+  if (y < 8) y = Math.min(rect.bottom + 10, window.innerHeight - h - 8);
+  pop.style.left = x + "px";
+  pop.style.top = y + "px";
+}
+
+function closePopup() { $("word-pop").hidden = true; POP = null; }
+$("wp-close").onclick = closePopup;
+document.addEventListener("click", (e) => {
+  if (!$("word-pop").hidden && !$("word-pop").contains(e.target) && !e.target.classList?.contains("t"))
+    closePopup();
+});
+
+$("wp-replay").onclick = () => {
+  if (!POP) return;
+  const v = $("video");
+  v.currentTime = SEGS[POP.segIndex].start;
+  v.play();
+};
+$("wp-card").onclick = () => mineFromPopup();
+
+function mineFromPopup() {
+  if (!POP) return;
+  const { segIndex, selection, chosen, lookup } = POP;
+  closePopup();
+  mine(segIndex, selection, 0, 0, { chosen, lookup });
+}
+
+// ---------- mining (card panel) ----------
+async function mine(segIndex, selection, padB = 0, padA = 0, extra = {}) {
   $("video").pause();
   PAD = { b: padB, a: padA };
   toast("Creant targeta…");
@@ -160,7 +290,7 @@ async function mine(segIndex, selection, padB = 0, padA = 0) {
   });
   CARD = { ...p, session_id: SESSION.id, segment_index: segIndex };
   $("c-paraula").value = p.paraula;
-  $("c-paraula-es").value = p.paraula_es;
+  $("c-paraula-es").value = extra.chosen || p.paraula_es;
   $("c-frase").value = p.frase;
   $("c-frase-es").value = p.frase_es;
   $("c-meta").textContent = `${p.lema} · ${p.pos} · ${p.freq_rank} (zipf ${p.freq_zipf.toFixed(1)}) · ${p.font}`;
@@ -192,10 +322,29 @@ async function sendCard() {
   $("card-panel").hidden = true;
   KNOWN.add(CARD.lema);
   renderSegs();
+  renderOverlay();
   refreshAnki();
   toast(r.sent_now ? "✅ Targeta afegida a Anki" : "🕓 Targeta en cua (obre Anki per enviar-la)", r.sent_now ? "ok" : "err");
 }
 $("c-send").onclick = sendCard;
+
+// ---------- keyboard ----------
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+    if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
+    return;
+  }
+  if ($("player").hidden) return;
+  const v = $("video");
+  if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); v.currentTime = SEGS[Math.max(0, CUR - 1)]?.start ?? 0; v.play(); }
+  if (e.key === "ArrowRight") { e.preventDefault(); v.currentTime = SEGS[Math.min(SEGS.length - 1, CUR + 1)]?.start ?? v.currentTime; v.play(); }
+  if (e.key === "a" && CUR >= 0) { v.currentTime = SEGS[CUR].start; v.play(); }
+  if (e.key === "d") setDual(!DUAL);
+  if (e.key === "p") setAutopause(!AUTOPAUSE);
+  if (e.key === "Enter" && !$("card-panel").hidden) sendCard();
+  if (e.key === "Escape") { closePopup(); $("card-panel").hidden = true; }
+});
 
 // ---------- init ----------
 loadSessions();
