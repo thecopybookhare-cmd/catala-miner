@@ -11,14 +11,16 @@ const toast = (msg, cls = "ok") => {
   setTimeout(() => (t.hidden = true), 2600);
 };
 
-let SESSION = null, SEGS = [], KNOWN = new Set(), CARD = null, PAD = { b: 0, a: 0 };
+let SESSION = null, SEGS = [], CARD = null, PAD = { b: 0, a: 0 };
+let STATUS = {};              // lemma -> learning|known|ignored|tracking (absent = unknown)
 let CUR = -1;
 let DUAL = false, AUTOPAUSE = false, HIDE_CA = false, HIDE_ES = false;
-let POP = null;               // word popup state
-let HOVER = null;             // {segIndex, text} of token under mouse (for Q)
+let POP = null, HOVER = null;
 const ES_CACHE = {};
+const SPEEDS = [1, 1.25, 1.5, 0.75];
+let SPEED_IX = 0;
 
-// ---------- Anki badge with diagnosis ----------
+// ---------- Anki badge ----------
 async function refreshAnki() {
   const s = await api("/api/anki/status");
   const b = $("anki-badge");
@@ -40,7 +42,22 @@ $("anki-badge").onclick = async () => {
   toast(r.port ? `✅ AnkiConnect trobat al port ${r.port}` : "Encara no trobo AnkiConnect", r.port ? "ok" : "err");
   refreshAnki();
 };
-setInterval(async () => { await api("/api/anki/flush", { method: "POST" }).catch(() => {}); refreshAnki(); }, 15000);
+setInterval(async () => {
+  await api("/api/anki/flush", { method: "POST" }).catch(() => {});
+  refreshAnki();
+}, 15000);
+
+// Migaku-style: statuses follow your real Anki progress (interval >= 21d -> known)
+async function syncStatuses() {
+  const r = await api("/api/anki/sync-statuses", { method: "POST" }).catch(() => null);
+  if (r && r.synced > 0 && SESSION) {
+    const s = await api("/api/sessions/" + SESSION.id);
+    STATUS = s.word_statuses || {};
+    renderSegs(); renderOverlay(); updateComp();
+    toast(`🔄 ${r.synced} paraules actualitzades des d'Anki`);
+  }
+}
+setInterval(syncStatuses, 60000);
 
 // ---------- home ----------
 async function loadSessions() {
@@ -87,7 +104,7 @@ async function pollJob(jid, label) {
 // ---------- session ----------
 async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
-  SESSION = s; SEGS = s.transcript; KNOWN = new Set(s.known_lemmas);
+  SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
   CUR = -1; POP = null; HOVER = null; $("word-pop").hidden = true;
   for (const k in ES_CACHE) delete ES_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
@@ -95,11 +112,15 @@ async function openSession(sid) {
   $("video").src = s.media_url;
   renderSegs();
   renderOverlay();
+  updateComp();
+  syncStatuses();
 }
 $("back").onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();
+  $("video-col").classList.remove("fake-fs");
   $("player").hidden = true; $("home").hidden = false;
   $("card-panel").hidden = true; $("word-pop").hidden = true;
+  $("comp-chip").hidden = true;
   loadSessions();
 };
 
@@ -122,11 +143,55 @@ $("subs-input").onchange = async (e) => {
   openSession(SESSION.id);
 };
 
+// ---------- word statuses ----------
+function stOf(lemma) { return STATUS[lemma] || "unknown"; }
+
+async function setStatus(lemma, status) {
+  if (!lemma) return;
+  const r = await api("/api/words/status", {
+    method: "POST", body: JSON.stringify({ lemma, status }),
+  });
+  if (r.error) { toast(r.error, "err"); return; }
+  if (status === "unknown") delete STATUS[r.lemma];
+  else STATUS[r.lemma] = status;
+  renderSegs(); renderOverlay(); updateComp();
+  if (POP && POP.lemma === r.lemma) markStatusButtons(status);
+  const labels = { unknown: "nova", learning: "aprenent", known: "coneguda", ignored: "ignorada", tracking: "seguiment" };
+  toast(`"${r.lemma}" → ${labels[status]}`);
+}
+
+// comprehension score, Migaku-style: % of word tokens you already know
+function updateComp() {
+  const chip = $("comp-chip");
+  if (!SEGS.length) { chip.hidden = true; return; }
+  let total = 0, known = 0;
+  const newLemmas = new Set();
+  for (const seg of SEGS)
+    for (const t of (seg.tokens || []))
+      if (t.is_word && t.lemma) {
+        const st = stOf(t.lemma);
+        if (st === "ignored") continue;
+        total++;
+        if (st === "known") known++;
+        else if (st === "unknown") newLemmas.add(t.lemma);
+      }
+  if (!total) { chip.hidden = true; return; }
+  const pct = Math.round((known / total) * 100);
+  chip.textContent = `📊 ${pct}% conegut · ${newLemmas.size} paraules noves`;
+  chip.hidden = false;
+  chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
+}
+
 // ---------- toggles ----------
 $("dual-btn").onclick = () => setDual(!DUAL);
 $("autopause-btn").onclick = () => setAutopause(!AUTOPAUSE);
 $("browser-btn").onclick = () => toggleBrowser();
 $("fs-btn").onclick = () => toggleFullscreen();
+$("speed-btn").onclick = () => {
+  SPEED_IX = (SPEED_IX + 1) % SPEEDS.length;
+  $("video").playbackRate = SPEEDS[SPEED_IX];
+  $("speed-btn").textContent = SPEEDS[SPEED_IX] + "×";
+};
 
 function setDual(v) {
   DUAL = v;
@@ -150,7 +215,6 @@ function toggleFullscreen() {
   if (col.classList.contains("fake-fs")) { col.classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; return; }
   const p = col.requestFullscreen ? col.requestFullscreen() : Promise.reject();
   Promise.resolve(p).catch(() => {
-    // environment blocks native fullscreen: fill the window instead
     col.classList.add("fake-fs");
     $("fs-btn").textContent = "🗗";
   });
@@ -164,13 +228,12 @@ function fmtTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-const badge = (z) => (z >= 5 ? "common" : z >= 3.3 ? "medium" : "rare");
 
 function tokenHtml(seg) {
   if (!(seg.tokens && seg.tokens.length)) return seg.text;
   return seg.tokens.map((t, k) => {
     const html = t.is_word
-      ? `<span class="t ${KNOWN.has(t.lemma) ? "known" : ""} freq-${badge(t.zipf)}" data-l="${t.lemma}">${t.t}</span>`
+      ? `<span class="t st-${stOf(t.lemma)}" data-l="${t.lemma}">${t.t}</span>`
       : `<span>${t.t}</span>`;
     return (k > 0 && t.is_word ? " " : "") + html;
   }).join("");
@@ -183,7 +246,7 @@ function bindTokenEvents(container, segIndex) {
       const sel = window.getSelection().toString().trim();
       openPopup(segIndex, sel || tok.textContent, tok);
     };
-    tok.onmouseenter = () => { HOVER = { segIndex, text: tok.textContent, el: tok }; };
+    tok.onmouseenter = () => { HOVER = { segIndex, text: tok.textContent, lemma: tok.dataset.l, el: tok }; };
     tok.onmouseleave = () => { if (HOVER && HOVER.el === tok) HOVER = null; };
   }
 }
@@ -193,7 +256,7 @@ function renderSegs() {
   if (!SEGS.length) { el.innerHTML = '<p class="dim">Sense transcripció — 🎙️ Transcriu o 📎 adjunta un .srt.</p>'; return; }
   el.innerHTML = SEGS.map((seg, i) => {
     const low = seg.logprob < -1.0 ? " lowconf" : "";
-    return `<div class="seg${low}" id="seg-${i}" data-i="${i}">
+    return `<div class="seg${low}${i === CUR ? " active" : ""}" id="seg-${i}" data-i="${i}">
       <span class="time">${fmtTime(seg.start)}</span>${tokenHtml(seg)}</div>`;
   }).join("");
   for (const div of el.querySelectorAll(".seg")) {
@@ -232,7 +295,6 @@ async function fillDual(i) {
     }
 }
 
-// scroll INSIDE the browser panel only — never the page (user complaint)
 function scrollBrowserTo(i) {
   const panel = $("side-panel");
   if (panel.hidden || i < 0) return;
@@ -291,18 +353,24 @@ V.addEventListener("timeupdate", () => {
 });
 
 // ---------- word popup ----------
+function markStatusButtons(st) {
+  for (const b of $("wp-status").querySelectorAll("button"))
+    b.classList.toggle("on", b.dataset.st === st);
+}
+
 async function openPopup(segIndex, selection, anchorEl) {
   V.pause();
   if (POP && !$("word-pop").hidden && POP.selection === selection && POP.segIndex === segIndex) {
     closePopup();
     return;
   }
-  POP = { segIndex, selection };
+  POP = { segIndex, selection, lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
   $("wp-word").textContent = selection;
   $("wp-meta").textContent = "…";
   $("wp-senses").innerHTML = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
+  markStatusButtons(stOf(POP.lemma));
   positionPopup(anchorEl);
   $("word-pop").hidden = false;
 
@@ -312,6 +380,8 @@ async function openPopup(segIndex, selection, anchorEl) {
   });
   if (!POP || POP.selection !== selection) return;
   POP.lookup = r;
+  POP.lemma = r.lemma;
+  markStatusButtons(stOf(r.lemma));
   $("wp-meta").textContent = `${r.lemma} · ${r.pos || "?"} · ${r.freq_rank} (zipf ${r.zipf.toFixed(1)})`;
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
     .map((s) => `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
@@ -322,11 +392,14 @@ async function openPopup(segIndex, selection, anchorEl) {
   $("wp-sentence-es").textContent = r.sentence_es || "";
 }
 
+for (const b of $("wp-status").querySelectorAll("button"))
+  b.onclick = () => { if (POP) setStatus(POP.lemma, b.dataset.st); };
+
 function positionPopup(anchorEl) {
   const pop = $("word-pop");
   const rect = anchorEl.getBoundingClientRect();
   pop.hidden = false;
-  const w = 300, h = pop.offsetHeight || 220;
+  const w = 300, h = pop.offsetHeight || 240;
   let x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 8);
   let y = rect.top - h - 10;
   if (y < 8) y = Math.min(rect.bottom + 10, window.innerHeight - h - 8);
@@ -392,17 +465,18 @@ async function sendCard() {
   };
   const r = await api("/api/cards", { method: "POST", body: JSON.stringify(body) });
   $("card-panel").hidden = true;
-  KNOWN.add(CARD.lema);
+  if (r.word_status) STATUS[CARD.lema] = r.word_status;
   renderSegs();
   renderOverlay();
+  updateComp();
   refreshAnki();
   toast(r.sent_now ? "✅ Targeta afegida a Anki" : "🕓 Targeta en cua", r.sent_now ? "ok" : "err");
 }
 $("c-send").onclick = sendCard;
 
-// ---------- Migaku keyboard map ----------
+// ---------- keyboard (Migaku map + status keys) ----------
 // A/← prev · D/→ next · S/↓ replay · W/↑ hide subs · shift+W hide ES ·
-// G browser · C copy · Q mine hovered word · E dual · P auto-pause · F fullscreen
+// G browser · C copy · Q mine · 1-4 word status · E dual · P auto-pause · F fs
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") {
     if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
@@ -410,8 +484,14 @@ document.addEventListener("keydown", (e) => {
   }
   if ($("player").hidden) return;
   const k = e.key.toLowerCase();
+  const statusKeys = { "1": "unknown", "2": "learning", "3": "known", "4": "ignored", "5": "tracking" };
   if (e.key === " ") { e.preventDefault(); V.paused ? V.play() : V.pause(); return; }
-  if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR - 1); }
+  if (statusKeys[e.key]) {
+    const lemma = (POP && !$("word-pop").hidden) ? POP.lemma : HOVER?.lemma;
+    if (lemma) setStatus(lemma, statusKeys[e.key]);
+    else toast("Passa el ratolí per una paraula i prem " + e.key, "err");
+  }
+  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR - 1); }
   else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR + 1); }
   else if (k === "s" || e.key === "ArrowDown") { e.preventDefault(); replaySeg(); }
   else if (k === "w" || e.key === "ArrowUp") {

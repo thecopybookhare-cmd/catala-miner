@@ -46,15 +46,25 @@ video { width:100%; max-height:52vh; background:#000; border-radius:8px;
 #overlay-es.longtext { font-size:13px; }
 #overlay-ca .t { cursor:pointer; border-radius:4px; padding:0 2px; }
 #overlay-ca .t:hover { background:#ffffff2e; }
-#overlay-ca .t.known { background:var(--known); }
-#overlay-ca .t.freq-rare { border-bottom:2px dotted var(--err); }
-#overlay-ca .t.freq-medium { border-bottom:2px dotted var(--acc); }
+
+/* Migaku word learning statuses (default/absent = unknown) */
+.t.st-unknown { border-bottom:2px solid #e0564d; }
+.t.st-learning { border-bottom:2px solid #e5a04c; background:#e5a04c1f; }
+.t.st-known { border-bottom:2px solid transparent; }
+.t.st-tracking { border-bottom:2px solid #b678f0; background:#b678f024; }
+.t.st-ignored { opacity:.45; border-bottom:2px solid transparent; }
 .filebtn.small { padding:8px 12px; font-size:14px; }
 button.toggle.on { background:var(--acc); color:#222; font-weight:700; }
 #word-pop { position:fixed; z-index:30; width:300px; background:#23262e;
   border:1px solid #444; border-radius:12px; padding:12px;
   box-shadow:0 8px 30px #000a; }
 #word-pop .wp-head { display:flex; align-items:baseline; gap:8px; }
+#wp-status { display:flex; gap:4px; margin:8px 0 2px; }
+#wp-status button { flex:1; font-size:12px; padding:5px 4px; background:#2a2e36; }
+#wp-status button.on[data-st="unknown"] { background:#e0564d; color:#fff; }
+#wp-status button.on[data-st="learning"] { background:#e5a04c; color:#222; }
+#wp-status button.on[data-st="known"] { background:#57c07d; color:#12291a; }
+#wp-status button.on[data-st="ignored"] { background:#666; color:#eee; }
 #wp-word { font-size:22px; font-weight:700; color:var(--acc); }
 #wp-meta { font-size:12px; color:var(--dim); flex:1; }
 #wp-close { padding:2px 8px; font-size:13px; background:transparent; }
@@ -107,9 +117,6 @@ button.toggle.on { background:var(--acc); color:#222; font-weight:700; }
 .seg.lowconf { opacity:.55; font-style:italic; }
 .seg .t { cursor:pointer; border-radius:4px; padding:1px 2px; }
 .seg .t:hover { background:#3a3f4a; }
-.seg .t.known { background:var(--known); }
-.seg .t.freq-rare { border-bottom:2px dotted var(--err); }
-.seg .t.freq-medium { border-bottom:2px dotted var(--acc); }
 .seg .time { font-size:12px; color:#666; margin-right:8px; cursor:pointer; }
 #card-panel { position:fixed; top:0; right:0; width:340px; height:100vh;
   overflow-y:auto; background:var(--panel); padding:16px;

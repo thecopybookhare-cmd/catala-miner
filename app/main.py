@@ -64,7 +64,7 @@ def session_detail(sid: str):
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
     s["transcript"] = json.loads(s.pop("transcript_json"))
-    s["known_lemmas"] = sorted(db.known_lemmas(CON))
+    s["word_statuses"] = db.word_statuses(CON)
     s["media_url"] = "/media-file/" + sid
     return s
 
@@ -176,6 +176,49 @@ async def attach_subtitles(sid: str, file: UploadFile = File(...)):
                             status_code=400)
     db.update_transcript(CON, sid, json.dumps(segs), "-", "srt")
     return {"segments": len(segs)}
+
+
+# ---------- word statuses (Migaku-style) ----------
+
+class WordStatusReq(BaseModel):
+    lemma: str
+    status: str
+
+
+@app.post("/api/words/status")
+def set_word_status(req: WordStatusReq):
+    if req.status not in db.WORD_STATUSES:
+        return JSONResponse({"error": "bad status"}, status_code=400)
+    db.set_word_status(CON, req.lemma, req.status)
+    return {"ok": True, "lemma": req.lemma.strip().lower(),
+            "status": req.status}
+
+
+@app.post("/api/anki/sync-statuses")
+def sync_statuses():
+    """Migaku-style: Anki interval >= 21 days -> known, else learning."""
+    if not anki.is_up(_settings().get("anki_port")):
+        return {"synced": 0}
+    try:
+        anki.ensure_note_type()  # keeps card template in sync with app version
+    except Exception:
+        pass
+    pairs = db.cards_with_notes(CON)
+    intervals = anki.note_intervals([p["anki_note_id"] for p in pairs])
+    statuses = db.word_statuses(CON)
+    n = 0
+    for p in pairs:
+        iv = intervals.get(p["anki_note_id"])
+        if iv is None:
+            continue
+        target = "known" if iv >= 21 else "learning"
+        current = statuses.get(p["lema"])
+        if current in ("ignored",):
+            continue
+        if current != target:
+            db.set_word_status(CON, p["lema"], target)
+            n += 1
+    return {"synced": n}
 
 
 # ---------- dictionary popup ----------
@@ -291,9 +334,12 @@ def create_card(req: CardReq):
                          frase=req.frase, frase_es=req.frase_es,
                          freq_rank=req.freq_rank, audio_file=req.audio_file,
                          image_file=req.image_file, font=req.font)
+    if req.lema:
+        db.mark_learning_if_new(CON, req.lema)
     sent = _flush()
     return {"card_id": cid, "sent_now": sent,
-            "pending": len(db.pending_cards(CON))}
+            "pending": len(db.pending_cards(CON)),
+            "word_status": db.word_statuses(CON).get(req.lema.strip().lower())}
 
 
 def _flush() -> int:
@@ -306,6 +352,11 @@ def _flush() -> int:
             note_id = anki.send_card(card, deck)
             db.mark_card_sent(CON, card["id"], note_id)
             n += 1
+        except anki.AnkiError as e:
+            if "duplicate" in str(e).lower():
+                db.mark_card_duplicate(CON, card["id"])
+                continue
+            break
         except Exception:
             break
     return n

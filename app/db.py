@@ -18,7 +18,13 @@ CREATE TABLE IF NOT EXISTS cards (
   freq_rank TEXT, audio_file TEXT, image_file TEXT, font TEXT,
   anki_note_id INTEGER, status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS word_status (
+  lemma TEXT PRIMARY KEY,
+  status TEXT NOT NULL,          -- learning | known | ignored | tracking
+  updated_at TEXT NOT NULL);     -- absent row = unknown (Migaku default)
 """
+
+WORD_STATUSES = {"unknown", "learning", "known", "ignored", "tracking"}
 
 
 def _now() -> str:
@@ -30,6 +36,12 @@ def connect(path: Path) -> sqlite3.Connection:
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(SCHEMA)
+    # backfill: lemmas mined before word_status existed become 'learning'
+    con.execute(
+        "INSERT OR IGNORE INTO word_status "
+        "SELECT DISTINCT lema, 'learning', ? FROM cards WHERE lema != ''",
+        (_now(),))
+    con.commit()
     return con
 
 
@@ -82,6 +94,12 @@ def mark_card_sent(con, cid, anki_note_id):
     con.commit()
 
 
+def mark_card_duplicate(con, cid):
+    """Anki refused it as duplicate — drop from queue, don't retry forever."""
+    con.execute("UPDATE cards SET status='duplicate' WHERE id=?", (cid,))
+    con.commit()
+
+
 def pending_cards(con):
     rs = con.execute("SELECT * FROM cards WHERE status='pending'").fetchall()
     return [dict(r) for r in rs]
@@ -90,3 +108,38 @@ def pending_cards(con):
 def known_lemmas(con) -> set[str]:
     rs = con.execute("SELECT DISTINCT lema FROM cards").fetchall()
     return {r["lema"] for r in rs}
+
+
+def set_word_status(con, lemma: str, status: str):
+    lemma = lemma.strip().lower()
+    if not lemma:
+        return
+    if status == "unknown":
+        con.execute("DELETE FROM word_status WHERE lemma=?", (lemma,))
+    else:
+        con.execute(
+            "INSERT INTO word_status VALUES (?,?,?) "
+            "ON CONFLICT(lemma) DO UPDATE SET status=excluded.status, "
+            "updated_at=excluded.updated_at",
+            (lemma, status, _now()))
+    con.commit()
+
+
+def word_statuses(con) -> dict[str, str]:
+    rs = con.execute("SELECT lemma, status FROM word_status").fetchall()
+    return {r["lemma"]: r["status"] for r in rs}
+
+
+def mark_learning_if_new(con, lemma: str):
+    """Card created -> lemma becomes 'learning' unless already known/ignored."""
+    cur = con.execute("SELECT status FROM word_status WHERE lemma=?",
+                      (lemma.strip().lower(),)).fetchone()
+    if cur is None or cur["status"] == "tracking":
+        set_word_status(con, lemma, "learning")
+
+
+def cards_with_notes(con) -> list[dict]:
+    rs = con.execute(
+        "SELECT lema, anki_note_id FROM cards WHERE anki_note_id IS NOT NULL"
+    ).fetchall()
+    return [dict(r) for r in rs]

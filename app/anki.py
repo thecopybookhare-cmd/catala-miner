@@ -78,21 +78,45 @@ text-align: center; color: #222; background: #fdfdfd; }
 .font { color: #999; font-size: 13px; margin-top: 10px; }
 img { max-width: 90%; border-radius: 8px; margin-top: 10px; }"""
 
-FRONT = '<div class="front">{{Paraula}}</div>'
+# Migaku-style: full context (sentence + image + audio) on the FRONT
+FRONT = """<div class="front">{{Paraula}}</div>
+<div class="frase">{{Frase}}</div>
+{{Imatge}}<br>{{Audio}}"""
 BACK = """{{FrontSide}}<hr id=answer>
 <div class="es">{{ParaulaES}}</div>
-<div class="frase">{{Frase}}</div>
 <div class="es">{{FraseES}}</div>
-{{Imatge}}<br>{{Audio}}
 <div class="font">{{Font}} · {{Freq}}</div>"""
 
 
 def ensure_note_type():
-    if config.NOTE_TYPE in invoke("modelNames"):
+    """Create the note type, or sync its templates/styling if it exists
+    (so template improvements reach decks created by older versions)."""
+    if config.NOTE_TYPE not in invoke("modelNames"):
+        invoke("createModel", modelName=config.NOTE_TYPE,
+               inOrderFields=config.NOTE_FIELDS, css=CARD_CSS,
+               cardTemplates=[{"Name": "Card 1", "Front": FRONT, "Back": BACK}])
         return
-    invoke("createModel", modelName=config.NOTE_TYPE,
-           inOrderFields=config.NOTE_FIELDS, css=CARD_CSS,
-           cardTemplates=[{"Name": "Card 1", "Front": FRONT, "Back": BACK}])
+    invoke("updateModelTemplates",
+           model={"name": config.NOTE_TYPE,
+                  "templates": {"Card 1": {"Front": FRONT, "Back": BACK}}})
+    invoke("updateModelStyling",
+           model={"name": config.NOTE_TYPE, "css": CARD_CSS})
+
+
+def note_intervals(note_ids: list[int]) -> dict[int, int]:
+    """Max card interval (days) per note id, for status sync."""
+    if not note_ids:
+        return {}
+    card_ids = invoke("findCards",
+                      query=f'"note:{config.NOTE_TYPE}"')
+    infos = invoke("cardsInfo", cards=card_ids) or []
+    out: dict[int, int] = {}
+    wanted = set(note_ids)
+    for info in infos:
+        nid = info.get("note")
+        if nid in wanted:
+            out[nid] = max(out.get(nid, 0), int(info.get("interval") or 0))
+    return out
 
 
 def build_note(card: dict, deck: str) -> dict:

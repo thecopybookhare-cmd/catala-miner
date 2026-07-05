@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.3.1">
+<link rel="stylesheet" href="/style.css?v=0.4.0">
 </head>
 <body>
 <header>
   <h1 id="brand">🐈 CatalàMiner</h1>
+  <div id="comp-chip" class="badge" hidden title="Percentatge de paraules que ja coneixes en aquest contingut"></div>
   <div id="anki-badge" class="badge" title="Clica per configurar el port d'AnkiConnect">Anki…</div>
 </header>
 
@@ -63,12 +64,56 @@
         <span id="time-cur" class="tlabel">0:00</span>
         <input type="range" id="seek" min="0" max="1000" value="0">
         <span id="time-dur" class="tlabel">0:00</span>
+        <button class="icon" id="speed-btn" title="Velocitat de reproducció">1×</button>
         <button class="icon toggle" id="dual-btn" title="Subtítol dual espanyol (E)">🇪🇸</button>
         <button class="icon toggle" id="autopause-btn" title="Auto-pausa per frase (P)">⏯</button>
         <button class="icon toggle" id="browser-btn" title="Navegador de subtítols (G)">📜</button>
         <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q crear targeta (paraula sota el cursor) · W amaga subs · E dual · G transcripció · C copiar · F pantalla completa</div>
+      <div id="help-line">A/D frase · S repetir · Q targeta · 1-4 estat paraula (1 nova · 2 aprenent · 3 coneguda · 4 ignora) · W subs · E dual · G transcripció · F pantalla completa</div>
+
+      <aside id="card-panel" hidden>
+        <h3>Nova targeta</h3>
+        <div class="row"><label>Paraula</label><input id="c-paraula"></div>
+        <div class="row"><label>Paraula ES</label><input id="c-paraula-es"></div>
+        <div id="senses"></div>
+        <div class="row"><label>Frase</label><textarea id="c-frase" rows="2"></textarea></div>
+        <div class="row"><label>Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
+        <div class="row meta"><span id="c-meta"></span></div>
+        <div class="row">
+          <audio id="c-audio" controls></audio>
+          <button id="pad-before" title="Incloure segment anterior">⏪+</button>
+          <button id="pad-after" title="Incloure segment següent">+⏩</button>
+        </div>
+        <img id="c-image" alt="">
+        <div class="row actions">
+          <button id="c-cancel">Cancel·lar</button>
+          <button id="c-send" class="primary">➕ Afegir a Anki (⏎)</button>
+        </div>
+      </aside>
+
+      <div id="word-pop" hidden>
+        <div class="wp-head">
+          <span id="wp-word"></span>
+          <span id="wp-meta"></span>
+          <button id="wp-close">✕</button>
+        </div>
+        <div id="wp-status">
+          <button data-st="unknown" title="1">Nova</button>
+          <button data-st="learning" title="2">Aprenent</button>
+          <button data-st="known" title="3">Coneguda</button>
+          <button data-st="ignored" title="4">Ignora</button>
+        </div>
+        <div id="wp-senses"></div>
+        <div id="wp-word-es" class="wp-line"></div>
+        <div id="wp-sentence-es" class="wp-line dim"></div>
+        <div class="wp-actions">
+          <button id="wp-replay">🔊 Repetir (S)</button>
+          <button id="wp-card" class="primary">➕ Crear targeta (Q)</button>
+        </div>
+      </div>
+
+      <div id="toast" hidden></div>
     </div>
     <aside id="side-panel" hidden>
       <div id="subs"></div>
@@ -76,42 +121,6 @@
   </div>
 </main>
 
-<aside id="card-panel" hidden>
-  <h3>Nova targeta</h3>
-  <div class="row"><label>Paraula</label><input id="c-paraula"></div>
-  <div class="row"><label>Paraula ES</label><input id="c-paraula-es"></div>
-  <div id="senses"></div>
-  <div class="row"><label>Frase</label><textarea id="c-frase" rows="2"></textarea></div>
-  <div class="row"><label>Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
-  <div class="row meta"><span id="c-meta"></span></div>
-  <div class="row">
-    <audio id="c-audio" controls></audio>
-    <button id="pad-before" title="Incloure segment anterior">⏪+</button>
-    <button id="pad-after" title="Incloure segment següent">+⏩</button>
-  </div>
-  <img id="c-image" alt="">
-  <div class="row actions">
-    <button id="c-cancel">Cancel·lar</button>
-    <button id="c-send" class="primary">➕ Afegir a Anki (⏎)</button>
-  </div>
-</aside>
-
-<div id="word-pop" hidden>
-  <div class="wp-head">
-    <span id="wp-word"></span>
-    <span id="wp-meta"></span>
-    <button id="wp-close">✕</button>
-  </div>
-  <div id="wp-senses"></div>
-  <div id="wp-word-es" class="wp-line"></div>
-  <div id="wp-sentence-es" class="wp-line dim"></div>
-  <div class="wp-actions">
-    <button id="wp-replay">🔊 Repetir (S)</button>
-    <button id="wp-card" class="primary">➕ Crear targeta (Q)</button>
-  </div>
-</div>
-
-<div id="toast" hidden></div>
-<script src="/app.js?v=0.3.1"></script>
+<script src="/app.js?v=0.4.0"></script>
 </body>
 </html>

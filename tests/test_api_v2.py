@@ -51,6 +51,25 @@ def test_attach_subtitles_tokenizes_and_saves(tmp_path):
     assert s["srt_source"] == "srt"
 
 
+@patch("app.main.anki.send_card")
+@patch("app.main.anki.is_up", return_value=True)
+def test_flush_skips_duplicates_and_continues(_up, send, tmp_path):
+    from app import anki as anki_mod, db as db_mod
+    c = client(tmp_path)
+    sid = _session(tmp_path)
+    for w in ("u", "dos"):
+        db_mod.create_card(main.CON, session_id=sid, segment_index=0,
+                           paraula=w, lema=w, pos="", paraula_es="",
+                           frase="f", frase_es="", freq_rank="",
+                           audio_file="", image_file="", font="")
+    send.side_effect = [anki_mod.AnkiError("cannot create note because it is a duplicate"), 42]
+    r = c.post("/api/anki/flush").json()
+    assert r["sent"] == 1 and r["pending"] == 0
+    statuses = {x["paraula"]: x["status"] for x in main.CON.execute(
+        "SELECT paraula,status FROM cards").fetchall()}
+    assert statuses == {"u": "duplicate", "dos": "sent"}
+
+
 @patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
 def test_segment_translate_caches(_tr, tmp_path):
     c = client(tmp_path)
