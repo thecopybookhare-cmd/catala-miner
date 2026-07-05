@@ -34,3 +34,14 @@ def test_cards_and_known_lemmas(tmp_path):
                           freq_rank="common", audio_file="b.mp3",
                           image_file="j.jpg", font="V @ 0:02")
     assert [c["id"] for c in db.pending_cards(con)] == [cid2]
+
+
+def test_tok_version_column_and_update(tmp_path):
+    con = db.connect(tmp_path / "t.db")
+    sid = db.create_session(
+        con, title="V", source_type="local", media_path="/x.mp4",
+        srt_source="whisper", model_size="small", duration_secs=10,
+        transcript_json="[]")
+    assert db.get_session(con, sid)["tok_version"] == 0
+    db.update_transcript(con, sid, "[]", "small", "whisper", tok_version=3)
+    assert db.get_session(con, sid)["tok_version"] == 3

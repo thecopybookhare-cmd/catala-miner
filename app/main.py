@@ -101,6 +101,13 @@ def session_detail(sid: str):
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
     s["transcript"] = json.loads(s.pop("transcript_json"))
+    if s["transcript"] and (s.get("tok_version") or 0) < nlp.TOK_VERSION:
+        for seg in s["transcript"]:
+            seg["tokens"] = nlp.tokenize(seg["text"])
+        db.update_transcript(CON, sid, json.dumps(s["transcript"]),
+                             s["model_size"], s["srt_source"],
+                             nlp.TOK_VERSION)
+        s["tok_version"] = nlp.TOK_VERSION
     s["word_statuses"] = db.word_statuses(CON)
     s["media_url"] = "/media-file/" + sid
     return s
@@ -157,7 +164,7 @@ def youtube_import(req: YoutubeReq):
             segs = subs.parse_subtitles(Path(info["subtitles"]).read_text())
             db.update_transcript(CON, sid,
                                  json.dumps(tokens_for_existing(segs)),
-                                 "-", "youtube_subs")
+                                 "-", "youtube_subs", nlp.TOK_VERSION)
         return {"session_id": sid}
 
     return {"job_id": jobs.start(work, label="youtube")}
@@ -180,12 +187,13 @@ def do_transcribe(sid: str, req: TranscribeReq):
         if req.use_sidecar and sidecar:
             segs = T.tokens_for_existing(
                 subs.parse_subtitles(sidecar.read_text(errors="replace")))
-            db.update_transcript(CON, sid, json.dumps(segs), "-", "srt")
+            db.update_transcript(CON, sid, json.dumps(segs), "-", "srt",
+                                 nlp.TOK_VERSION)
         else:
             segs = T.transcribe(jid, s["media_path"], req.model,
                                 s["duration_secs"] or 0)
             db.update_transcript(CON, sid, json.dumps(segs), req.model,
-                                 "whisper")
+                                 "whisper", nlp.TOK_VERSION)
         return {"segments": len(segs)}
 
     return {"job_id": jobs.start(work, label="transcribe")}
@@ -211,7 +219,8 @@ async def attach_subtitles(sid: str, file: UploadFile = File(...)):
     if not segs:
         return JSONResponse({"error": "no s'han trobat subtítols al fitxer"},
                             status_code=400)
-    db.update_transcript(CON, sid, json.dumps(segs), "-", "srt")
+    db.update_transcript(CON, sid, json.dumps(segs), "-", "srt",
+                         nlp.TOK_VERSION)
     return {"segments": len(segs)}
 
 
@@ -293,7 +302,8 @@ def translate_segment(sid: str, idx: int):
     if not segs[idx].get("text_es"):
         segs[idx]["text_es"] = translate.translate(segs[idx]["text"])
         db.update_transcript(CON, sid, json.dumps(segs),
-                             s["model_size"], s["srt_source"])
+                             s["model_size"], s["srt_source"],
+                             s.get("tok_version") or 0)
     return {"index": idx, "text_es": segs[idx]["text_es"]}
 
 

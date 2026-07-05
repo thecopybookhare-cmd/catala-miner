@@ -36,6 +36,11 @@ def connect(path: Path) -> sqlite3.Connection:
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(SCHEMA)
+    # migración: versión del tokenizador con que se guardó la transcripción
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(sessions)")}
+    if "tok_version" not in cols:
+        con.execute("ALTER TABLE sessions ADD COLUMN tok_version "
+                    "INTEGER NOT NULL DEFAULT 0")
     # backfill: lemmas mined before word_status existed become 'learning'
     con.execute(
         "INSERT OR IGNORE INTO word_status "
@@ -49,18 +54,21 @@ def create_session(con, *, title, source_type, media_path, srt_source,
                    model_size, duration_secs, transcript_json) -> str:
     sid = uuid.uuid4().hex[:12]
     con.execute(
-        "INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO sessions (id, title, source_type, media_path, srt_source,"
+        " language, model_size, duration_secs, transcript_json, created_at,"
+        " updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (sid, title, source_type, media_path, srt_source, "ca",
          model_size, duration_secs, transcript_json, _now(), _now()))
     con.commit()
     return sid
 
 
-def update_transcript(con, sid, transcript_json, model_size, srt_source):
+def update_transcript(con, sid, transcript_json, model_size, srt_source,
+                      tok_version=0):
     con.execute(
         "UPDATE sessions SET transcript_json=?, model_size=?, srt_source=?, "
-        "updated_at=? WHERE id=?",
-        (transcript_json, model_size, srt_source, _now(), sid))
+        "tok_version=?, updated_at=? WHERE id=?",
+        (transcript_json, model_size, srt_source, tok_version, _now(), sid))
     con.commit()
 
 
