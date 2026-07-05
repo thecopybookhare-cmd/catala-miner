@@ -86,3 +86,17 @@ def test_segment_translate_caches(_tr, tmp_path):
         r2 = c.post(f"/api/sessions/{sid}/segments/0/translate").json()
         assert r2["text_es"] == "ES:Hola món"
         tr2.assert_not_called()
+
+
+def test_session_detail_retokenizes_old_transcripts(tmp_path):
+    c = client(tmp_path)
+    sid = main.db.create_session(
+        main.CON, title="V", source_type="local", media_path="/x.mp4",
+        srt_source="srt", model_size="-", duration_secs=10,
+        transcript_json=json.dumps([{"start": 0.0, "end": 1.0,
+                                     "text": "El gos corre", "words": [],
+                                     "logprob": 0.0, "tokens": []}]))
+    body = c.get("/api/sessions/" + sid).json()
+    assert body["tok_version"] == main.nlp.TOK_VERSION
+    words = [t["t"] for t in body["transcript"][0]["tokens"] if t["is_word"]]
+    assert "gos" in words

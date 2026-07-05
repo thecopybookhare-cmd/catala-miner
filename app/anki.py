@@ -103,6 +103,16 @@ def ensure_note_type():
            model={"name": config.NOTE_TYPE, "css": CARD_CSS})
 
 
+def find_cards(query: str) -> list[int]:
+    return invoke("findCards", query=query) or []
+
+
+def cards_info(card_ids: list[int]) -> list[dict]:
+    if not card_ids:
+        return []
+    return invoke("cardsInfo", cards=card_ids) or []
+
+
 def note_intervals(note_ids: list[int]) -> dict[int, int]:
     """Max card interval (days) per note id, for status sync."""
     if not note_ids:

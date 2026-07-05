@@ -30,8 +30,14 @@ Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
 ## Uso
 
 ```bash
-./run.sh          # abre http://localhost:8977
+./run.sh          # modo navegador: abre http://localhost:8977
 ```
+
+**App de escritorio (macOS):** `./make-app.sh` crea `~/Applications/CatalàMiner.app`
+— doble clic la abre en una ventana nativa (WKWebView) con icono en el Dock, sin
+navegador ni terminal. `./install.sh` ya la genera al final. El modo `./run.sh` sigue
+disponible como alternativa. `espeak-ng` (se instala con `install.sh`) habilita la
+pronunciación IPA en el popup.
 
 1. Abre un archivo local (mp4/mkv/mp3…) o pega una URL de YouTube.
 2. Pulsa **🎙️ Transcriure** (el modelo catalán ≈3 GB se descarga la primera vez;
@@ -41,7 +47,8 @@ Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
 4. Revisa/edita la tarjeta en el panel y pulsa **⏎**.
 
 **Atajos (mapa Migaku):** `A`/`←` frase anterior · `D`/`→` siguiente · `S`/`↓` repetir ·
-`Q` crear tarjeta (palabra bajo el cursor o popup abierto) · `1-4` estado de palabra
+`Q` crear tarjeta en segundo plano (palabra bajo el cursor o popup abierto) · `⇧Q` abrir el
+editor de tarjeta · `1-4` estado de palabra
 (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · `W` ocultar subtítulos ·
 `Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
 `P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.

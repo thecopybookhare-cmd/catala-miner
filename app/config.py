@@ -30,6 +30,10 @@ TRANSLATE_REPO = "softcatala/translate-cat-spa"
 # with a few extra tags: <g>, <j/>, <v>) — we parse it directly.
 BIDIX_URL = ("https://raw.githubusercontent.com/apertium/apertium-spa-cat/"
              "master/apertium-spa-cat.spa-cat.metadix")
+# Diccionario de formas flexionadas de Softcatalà (LanguageTool):
+# 1,3M líneas "forma lema ETIQUETA" — form->lemma para corregir a spaCy.
+FORMS_URL = ("https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/"
+             "master/resultats/lt/diccionari.txt")
 
 NOTE_TYPE = "CatalaMiner"
 NOTE_FIELDS = ["Paraula", "ParaulaES", "Frase", "FraseES",

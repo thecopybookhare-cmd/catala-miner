@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.5.0">
+<link rel="stylesheet" href="/style.css?v=0.6.0">
 </head>
 <body>
 <header>
   <h1 id="brand"><span class="brand-dot"></span>CatalàMiner</h1>
   <div class="header-right">
     <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
+    <div id="stats-btn" class="badge" title="Estadísticas">📊</div>
     <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
   </div>
 </header>
@@ -75,7 +76,7 @@
         <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">📜</button>
         <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q tarjeta · 1-4 estado (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · W subs · E dual · G transcripción · F pantalla completa</div>
+      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar tarjeta · 1-4 estado (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · W subs · E dual · G transcripción · F pantalla completa</div>
 
       <aside id="card-panel" hidden>
         <h3>Nueva tarjeta</h3>
@@ -99,22 +100,29 @@
 
       <div id="word-pop" hidden>
         <div class="wp-head">
-          <span id="wp-word"></span>
-          <span id="wp-meta"></span>
+          <span id="wp-word"></span><span id="wp-ipa"></span>
           <button id="wp-close">✕</button>
         </div>
+        <div class="wp-chips">
+          <span id="wp-level" class="wp-chip"></span>
+          <span id="wp-meta"></span>
+        </div>
+        <div class="wp-icons">
+          <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)">🔊</button>
+          <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)">➕</button>
+          <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)">✏️</button>
+        </div>
+        <div id="wp-ctx">
+          <div id="wp-sentence-es"></div>
+          <div id="wp-sentence-ca"></div>
+        </div>
+        <div id="wp-senses"></div>
+        <div id="wp-foot"><span id="wp-word-es"></span></div>
         <div id="wp-status">
           <button data-st="unknown" title="Atajo: 1">Nueva</button>
           <button data-st="learning" title="Atajo: 2">Aprendiendo</button>
           <button data-st="known" title="Atajo: 3">Conocida</button>
           <button data-st="ignored" title="Atajo: 4">Ignorar</button>
-        </div>
-        <div id="wp-senses"></div>
-        <div id="wp-word-es" class="wp-line"></div>
-        <div id="wp-sentence-es" class="wp-line dim"></div>
-        <div class="wp-actions">
-          <button id="wp-replay">🔊 Repetir (S)</button>
-          <button id="wp-card" class="primary">➕ Crear tarjeta (Q)</button>
         </div>
       </div>
 
@@ -126,6 +134,26 @@
   </div>
 </main>
 
-<script src="/app.js?v=0.5.0"></script>
+<div id="stats-view" hidden>
+  <div id="stats-box">
+    <div class="stats-head"><h2>📊 Estadísticas</h2><button id="stats-close">✕</button></div>
+    <div id="stats-body"></div>
+  </div>
+</div>
+
+<dialog id="port-dlg">
+  <form method="dialog">
+    <h3>Puerto de AnkiConnect</h3>
+    <p id="port-msg" class="dim"></p>
+    <input id="port-input" type="number" min="1" max="65535"
+           placeholder="vacío = automático (8765/8766/8767)">
+    <div class="row actions">
+      <button value="cancel" type="submit">Cancelar</button>
+      <button value="ok" type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/app.js?v=0.6.0"></script>
 </body>
 </html>

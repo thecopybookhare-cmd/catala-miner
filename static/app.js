@@ -16,7 +16,9 @@ let STATUS = {};              // lemma -> learning|known|ignored|tracking (ausen
 let CUR = -1;
 let DUAL = false, AUTOPAUSE = false, HIDE_CA = false, HIDE_ES = false;
 let POP = null, HOVER = null;
+let PINNED = false, RESUME = false, HOVER_TIMER = null, CLOSE_TIMER = null;
 const ES_CACHE = {};
+const LOOKUP_CACHE = {};
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 let SPEED_IX = 0;
 
@@ -30,18 +32,22 @@ async function refreshAnki() {
   else { b.textContent = q + "Anki cerrado"; b.className = s.pending > 0 ? "badge pending" : "badge"; }
   b.dataset.reason = s.reason || "";
 }
-$("anki-badge").onclick = async () => {
+$("anki-badge").onclick = () => {
   const reason = $("anki-badge").dataset.reason;
-  let msg = "Puerto de AnkiConnect (vacío = automático 8765/8766/8767):";
-  if (reason === "squatted")
-    msg = "Otro servicio ocupa los puertos 8765/8766 en este Mac.\n\nSolución: en Anki → Herramientas → Complementos → AnkiConnect → Configuración, pon \"webBindPort\": 8767 y reinicia Anki. La app lo detectará sola (o escribe 8767 aquí abajo).\n\nPuerto de AnkiConnect:";
-  const v = prompt(msg);
-  if (v === null) return;
-  const port = v.trim() === "" ? null : parseInt(v.trim(), 10);
+  $("port-msg").textContent = reason === "squatted"
+    ? "Otro servicio ocupa los puertos 8765/8766. En Anki → Herramientas → Complementos → AnkiConnect → Configuración pon \"webBindPort\": 8767 y reinicia Anki (o escribe 8767 aquí)."
+    : "Déjalo vacío para detectarlo automáticamente.";
+  $("port-input").value = "";
+  $("port-dlg").showModal();
+};
+$("port-dlg").addEventListener("close", async () => {
+  if ($("port-dlg").returnValue !== "ok") return;
+  const v = $("port-input").value.trim();
+  const port = v === "" ? null : parseInt(v, 10);
   const r = await api("/api/anki/port", { method: "POST", body: JSON.stringify({ port }) });
   toast(r.port ? `✅ AnkiConnect encontrado en el puerto ${r.port}` : "Aún no encuentro AnkiConnect", r.port ? "ok" : "err");
   refreshAnki();
-};
+});
 setInterval(async () => {
   await api("/api/anki/flush", { method: "POST" }).catch(() => {});
   refreshAnki();
@@ -126,8 +132,9 @@ async function pollJob(jid, label) {
 async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
-  CUR = -1; POP = null; HOVER = null; $("word-pop").hidden = true;
+  CUR = -1; POP = null; HOVER = null; PINNED = false; $("word-pop").hidden = true;
   for (const k in ES_CACHE) delete ES_CACHE[k];
+  for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
   $("video").src = s.media_url;
@@ -261,11 +268,27 @@ function bindTokenEvents(container, segIndex) {
     tok.onclick = (ev) => {
       ev.stopPropagation();
       const sel = window.getSelection().toString().trim();
-      openPopup(segIndex, sel || tok.textContent, tok);
+      openPopup(segIndex, sel || tok.textContent, tok, true);
     };
-    tok.onmouseenter = () => { HOVER = { segIndex, text: tok.textContent, lemma: tok.dataset.l, el: tok }; };
-    tok.onmouseleave = () => { if (HOVER && HOVER.el === tok) HOVER = null; };
+    tok.onmouseenter = () => {
+      HOVER = { segIndex, text: tok.textContent, lemma: tok.dataset.l, el: tok };
+      clearTimeout(CLOSE_TIMER);
+      if (PINNED) return;
+      clearTimeout(HOVER_TIMER);
+      HOVER_TIMER = setTimeout(
+        () => openPopup(segIndex, tok.textContent, tok, false), 180);
+    };
+    tok.onmouseleave = () => {
+      if (HOVER && HOVER.el === tok) HOVER = null;
+      clearTimeout(HOVER_TIMER);
+      if (!PINNED && !$("word-pop").hidden) scheduleClose();
+    };
   }
+}
+
+function scheduleClose() {
+  clearTimeout(CLOSE_TIMER);
+  CLOSE_TIMER = setTimeout(() => { if (!PINNED) closePopup(); }, 250);
 }
 
 function renderSegs() {
@@ -323,19 +346,35 @@ function scrollBrowserTo(i) {
 // ---------- video ----------
 const V = $("video");
 V.addEventListener("click", () => { V.paused ? V.play() : V.pause(); });
-V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; });
+V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; RESUME = false; });
 V.addEventListener("pause", () => { $("play-btn").textContent = "▶"; });
 V.addEventListener("loadedmetadata", () => { $("time-dur").textContent = fmtTime(V.duration || 0); });
 $("play-btn").onclick = () => { V.paused ? V.play() : V.pause(); };
-$("prev-btn").onclick = () => gotoSeg(CUR - 1);
-$("next-btn").onclick = () => gotoSeg(CUR + 1);
+$("prev-btn").onclick = () => prevSeg();
+$("next-btn").onclick = () => nextSeg();
 $("replay-btn").onclick = () => replaySeg();
 
 function gotoSeg(i) {
   if (!SEGS.length) return;
-  const j = Math.min(SEGS.length - 1, Math.max(0, i < 0 && CUR < 0 ? 0 : i));
+  const j = Math.min(SEGS.length - 1, Math.max(0, i));
   V.currentTime = SEGS[j].start + 0.01;
   V.play();
+}
+// En huecos entre subtítulos CUR = -1: navegar por tiempo, nunca al segmento 0.
+function nextSeg() {
+  if (!SEGS.length) return;
+  if (CUR >= 0) { gotoSeg(CUR + 1); return; }
+  const t = V.currentTime;
+  for (let i = 0; i < SEGS.length; i++)
+    if (SEGS[i].start > t + 0.05) { gotoSeg(i); return; }
+}
+function prevSeg() {
+  if (!SEGS.length) return;
+  if (CUR >= 0) { gotoSeg(CUR - 1); return; }
+  const t = V.currentTime;
+  for (let i = SEGS.length - 1; i >= 0; i--)
+    if (SEGS[i].end < t) { gotoSeg(i); return; }
+  gotoSeg(0);
 }
 function replaySeg() {
   if (CUR < 0) return;
@@ -375,38 +414,61 @@ function markStatusButtons(st) {
     b.classList.toggle("on", b.dataset.st === st);
 }
 
-async function openPopup(segIndex, selection, anchorEl) {
-  V.pause();
-  if (POP && !$("word-pop").hidden && POP.selection === selection && POP.segIndex === segIndex) {
+async function openPopup(segIndex, selection, anchorEl, pin) {
+  if (pin && POP && !$("word-pop").hidden &&
+      POP.selection === selection && POP.segIndex === segIndex) {
     closePopup();
     return;
   }
-  POP = { segIndex, selection, lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
+  if (!V.paused) { V.pause(); RESUME = !pin; }
+  PINNED = !!pin;
+  POP = { segIndex, selection,
+          lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
   $("wp-word").textContent = selection;
+  $("wp-ipa").textContent = "";
   $("wp-meta").textContent = "…";
+  $("wp-level").textContent = "";
   $("wp-senses").innerHTML = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
+  $("wp-sentence-ca").textContent = SEGS[segIndex].text;
   markStatusButtons(stOf(POP.lemma));
   positionPopup(anchorEl);
   $("word-pop").hidden = false;
 
-  const r = await api("/api/lookup", {
-    method: "POST",
-    body: JSON.stringify({ selection, sentence: SEGS[segIndex].text }),
-  });
-  if (!POP || POP.selection !== selection) return;
+  const key = segIndex + ":" + selection;
+  let r = LOOKUP_CACHE[key];
+  if (!r) {
+    r = await api("/api/lookup", {
+      method: "POST",
+      body: JSON.stringify({ selection, sentence: SEGS[segIndex].text,
+        session_id: SESSION.id, segment_index: segIndex }),
+    });
+    LOOKUP_CACHE[key] = r;
+  }
+  if (!POP || POP.selection !== selection || POP.segIndex !== segIndex) return;
   POP.lookup = r;
   POP.lemma = r.lemma;
   markStatusButtons(stOf(r.lemma));
-  $("wp-meta").textContent = `${r.lemma} · ${r.pos || "?"} · ${r.freq_rank} (zipf ${r.zipf.toFixed(1)})`;
+  renderPopupLookup(r);
+}
+
+const LEVEL_LABEL = { 5: "muy frecuente", 4: "frecuente", 3: "media", 2: "poco común", 1: "rara" };
+function zipfLevel(z) { return z >= 5.5 ? 5 : z >= 5 ? 4 : z >= 4.3 ? 3 : z >= 3.3 ? 2 : 1; }
+
+function renderPopupLookup(r) {
+  $("wp-ipa").textContent = r.ipa || "";
+  const lvl = zipfLevel(r.zipf);
+  $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
+  $("wp-meta").textContent = `${r.lemma}${r.pos ? " · " + r.pos : ""}`;
+  $("wp-sentence-es").textContent = r.sentence_es || "";
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
-    .map((s) => `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
+    .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
     || '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>';
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
+  if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
   $("wp-word-es").textContent = r.word_es ? `→ ${r.word_es}` : "";
-  $("wp-sentence-es").textContent = r.sentence_es || "";
 }
 
 for (const b of $("wp-status").querySelectorAll("button"))
@@ -424,20 +486,51 @@ function positionPopup(anchorEl) {
   pop.style.top = y + "px";
 }
 
-function closePopup() { $("word-pop").hidden = true; POP = null; }
+function closePopup() {
+  $("word-pop").hidden = true;
+  POP = null; PINNED = false;
+  clearTimeout(HOVER_TIMER); clearTimeout(CLOSE_TIMER);
+  if (RESUME) { RESUME = false; V.play(); }
+}
 $("wp-close").onclick = closePopup;
+const WP = $("word-pop");
+WP.onmouseenter = () => clearTimeout(CLOSE_TIMER);
+WP.onmouseleave = () => { if (!PINNED) scheduleClose(); };
 document.addEventListener("click", (e) => {
   if (!$("word-pop").hidden && !$("word-pop").contains(e.target) && !e.target.classList?.contains("t"))
     closePopup();
 });
 $("wp-replay").onclick = () => { if (POP) { V.currentTime = SEGS[POP.segIndex].start; V.play(); } };
 $("wp-card").onclick = () => mineFromPopup();
+$("wp-edit").onclick = () => editFromPopup();
 
 function mineFromPopup() {
   if (!POP) return;
-  const { segIndex, selection, chosen, lookup } = POP;
+  const { segIndex, selection, chosen } = POP;
   closePopup();
-  mine(segIndex, selection, 0, 0, { chosen, lookup });
+  mineQuick(segIndex, selection, chosen || "");
+}
+
+function editFromPopup() {
+  if (!POP) return;
+  const { segIndex, selection } = POP;
+  closePopup();
+  mine(segIndex, selection);
+}
+
+// minado en segundo plano: crea + envía a Anki sin panel ni pausa
+async function mineQuick(segIndex, selection, paraula_es = "") {
+  toast("⛏️ Creando tarjeta…");
+  const r = await api("/api/cards/mine", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION.id, segment_index: segIndex,
+      selection, paraula_es }),
+  });
+  if (r.error) { toast(r.error, "err"); return; }
+  if (r.word_status) STATUS[r.lema] = r.word_status;
+  renderSegs(); renderOverlay(); updateComp(); refreshAnki();
+  toast(r.sent_now ? `✅ «${r.paraula}» → Anki` : `🕓 «${r.paraula}» en cola`,
+        r.sent_now ? "ok" : "err");
 }
 
 // ---------- minado ----------
@@ -510,8 +603,8 @@ document.addEventListener("keydown", (e) => {
     if (lemma) setStatus(lemma, statusKeys[e.key]);
     else toast("Pasa el ratón por una palabra y pulsa " + e.key, "err");
   }
-  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR - 1); }
-  else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR + 1); }
+  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); prevSeg(); }
+  else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); nextSeg(); }
   else if (k === "s" || e.key === "ArrowDown") { e.preventDefault(); replaySeg(); }
   else if (k === "w" || e.key === "ArrowUp") {
     e.preventDefault();
@@ -521,19 +614,94 @@ document.addEventListener("keydown", (e) => {
   else if (k === "g") toggleBrowser();
   else if (k === "c" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiado")); }
   else if (k === "q") {
-    if (POP && !$("word-pop").hidden) mineFromPopup();
-    else if (HOVER) mine(HOVER.segIndex, HOVER.text);
-    else toast("Pasa el ratón por una palabra y pulsa Q", "err");
+    const inPop = POP && !$("word-pop").hidden;
+    const seg = inPop ? POP.segIndex : HOVER?.segIndex;
+    const sel = inPop ? POP.selection : HOVER?.text;
+    if (sel === undefined) { toast("Pasa el ratón por una palabra y pulsa Q", "err"); return; }
+    const chosen = inPop ? (POP.chosen || "") : "";
+    if (inPop) closePopup();
+    if (e.shiftKey) mine(seg, sel);
+    else mineQuick(seg, sel, chosen);
   }
   else if (k === "e") setDual(!DUAL);
   else if (k === "p") setAutopause(!AUTOPAUSE);
   else if (k === "f") toggleFullscreen();
   else if (e.key === "Enter" && !$("card-panel").hidden) sendCard();
   else if (e.key === "Escape") {
-    closePopup(); $("card-panel").hidden = true;
+    closePopup(); $("card-panel").hidden = true; $("stats-view").hidden = true;
     if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
   }
 });
+
+// ---------- estadísticas ----------
+const ST_COLORS = { learning: "#e5a04c", known: "#4fc383", ignored: "#6b6b7c", tracking: "#8b7cf8" };
+
+function svgBars(data, color = "#8b7cf8") {  // data: [[label, value], ...]
+  const max = Math.max(1, ...data.map((d) => d[1]));
+  const bw = 34, gap = 12, h = 120;
+  const w = data.length * (bw + gap) + gap;
+  const bars = data.map(([lab, v], i) => {
+    const bh = Math.round((v / max) * (h - 34));
+    const x = gap + i * (bw + gap), y = h - 18 - bh;
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="6" fill="${color}"/>
+      <text x="${x + bw / 2}" y="${y - 4}" text-anchor="middle" class="sv">${v}</text>
+      <text x="${x + bw / 2}" y="${h - 4}" text-anchor="middle" class="sl">${lab}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w * 1.4}px">${bars}</svg>`;
+}
+
+function svgDonut(counts) {  // {status: n}
+  const entries = Object.entries(counts).filter(([, v]) => v > 0);
+  const total = entries.reduce((a, [, v]) => a + v, 0);
+  if (!total) return '<p class="dim">Sin palabras marcadas aún.</p>';
+  let a0 = -Math.PI / 2, paths = "";
+  for (const [st, v] of entries) {
+    const a1 = a0 + (v / total) * Math.PI * 2;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (a) => `${60 + 46 * Math.cos(a)},${60 + 46 * Math.sin(a)}`;
+    paths += `<path d="M ${p(a0)} A 46 46 0 ${large} 1 ${p(a1)}" stroke="${ST_COLORS[st] || "#888"}"
+      stroke-width="16" fill="none"/>`;
+    a0 = a1;
+  }
+  const legend = entries.map(([st, v]) =>
+    `<span class="leg"><i style="background:${ST_COLORS[st] || "#888"}"></i>${ST_LABEL[st] || st}: ${v}</span>`).join("");
+  return `<div class="donut-row"><svg viewBox="0 0 120 120" width="120">${paths}
+    <text x="60" y="66" text-anchor="middle" class="sv">${total}</text></svg>
+    <div class="legend">${legend}</div></div>`;
+}
+
+async function openStats() {
+  $("stats-view").hidden = false;
+  $("stats-body").innerHTML = '<p class="dim">Cargando…</p>';
+  const s = await api("/api/stats");
+  const months = Object.entries(s.by_month).slice(-8)
+    .map(([m, v]) => [m.slice(2).replace("-", "/"), v]);
+  let html = `
+    <section><h3>Minado</h3>
+      <p><b>${s.total_cards}</b> tarjetas minadas en <b>${s.sessions}</b> sesiones.</p>
+      ${months.length ? svgBars(months) : '<p class="dim">Aún no has minado tarjetas.</p>'}
+    </section>
+    <section><h3>Palabras por estado</h3>
+      <p class="dim" title="Estados que asignas al minar/marcar; se sincronizan con Anki (intervalo ≥ 21 días → conocida)">ⓘ cómo se calcula</p>
+      ${svgDonut(s.status_counts)}
+    </section>`;
+  if (s.anki) {
+    html += `
+    <section><h3>En Anki (mazo de minado)</h3>
+      <p><b>${s.anki.total}</b> tarjetas · <b>${s.anki.mature}</b> maduras (≥ 21 días)
+      ${s.anki.retention !== null ? ` · retención <b>${s.anki.retention}%</b>` : ""}</p>
+      <p class="dim" title="retención = 1 − fallos/repasos, sobre todas las tarjetas del mazo">ⓘ retención = 1 − fallos/repasos</p>
+      ${svgBars([["hoy", s.anki.due_today], ["7 días", s.anki.due_7d], ["30 días", s.anki.due_30d]], "#e5a04c")}
+      <p class="dim">Tarjetas que te tocará repasar (carga futura).</p>
+    </section>`;
+  } else {
+    html += '<section><h3>En Anki</h3><p class="dim">Abre Anki para ver retención y pronóstico de repasos.</p></section>';
+  }
+  $("stats-body").innerHTML = html;
+}
+$("stats-btn").onclick = openStats;
+$("stats-close").onclick = () => { $("stats-view").hidden = true; };
+$("stats-view").onclick = (e) => { if (e.target === $("stats-view")) $("stats-view").hidden = true; };
 
 // ---------- init ----------
 loadSessions();
