@@ -99,22 +99,29 @@
 
       <div id="word-pop" hidden>
         <div class="wp-head">
-          <span id="wp-word"></span>
-          <span id="wp-meta"></span>
+          <span id="wp-word"></span><span id="wp-ipa"></span>
           <button id="wp-close">✕</button>
         </div>
+        <div class="wp-chips">
+          <span id="wp-level" class="wp-chip"></span>
+          <span id="wp-meta"></span>
+        </div>
+        <div class="wp-icons">
+          <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)">🔊</button>
+          <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)">➕</button>
+          <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)">✏️</button>
+        </div>
+        <div id="wp-ctx">
+          <div id="wp-sentence-es"></div>
+          <div id="wp-sentence-ca"></div>
+        </div>
+        <div id="wp-senses"></div>
+        <div id="wp-foot"><span id="wp-word-es"></span></div>
         <div id="wp-status">
           <button data-st="unknown" title="Atajo: 1">Nueva</button>
           <button data-st="learning" title="Atajo: 2">Aprendiendo</button>
           <button data-st="known" title="Atajo: 3">Conocida</button>
           <button data-st="ignored" title="Atajo: 4">Ignorar</button>
-        </div>
-        <div id="wp-senses"></div>
-        <div id="wp-word-es" class="wp-line"></div>
-        <div id="wp-sentence-es" class="wp-line dim"></div>
-        <div class="wp-actions">
-          <button id="wp-replay">🔊 Repetir (S)</button>
-          <button id="wp-card" class="primary">➕ Crear tarjeta (Q)</button>
         </div>
       </div>
 

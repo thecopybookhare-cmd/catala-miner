@@ -16,7 +16,9 @@ let STATUS = {};              // lemma -> learning|known|ignored|tracking (ausen
 let CUR = -1;
 let DUAL = false, AUTOPAUSE = false, HIDE_CA = false, HIDE_ES = false;
 let POP = null, HOVER = null;
+let PINNED = false, RESUME = false, HOVER_TIMER = null, CLOSE_TIMER = null;
 const ES_CACHE = {};
+const LOOKUP_CACHE = {};
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 let SPEED_IX = 0;
 
@@ -126,8 +128,9 @@ async function pollJob(jid, label) {
 async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
-  CUR = -1; POP = null; HOVER = null; $("word-pop").hidden = true;
+  CUR = -1; POP = null; HOVER = null; PINNED = false; $("word-pop").hidden = true;
   for (const k in ES_CACHE) delete ES_CACHE[k];
+  for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
   $("video").src = s.media_url;
@@ -261,11 +264,27 @@ function bindTokenEvents(container, segIndex) {
     tok.onclick = (ev) => {
       ev.stopPropagation();
       const sel = window.getSelection().toString().trim();
-      openPopup(segIndex, sel || tok.textContent, tok);
+      openPopup(segIndex, sel || tok.textContent, tok, true);
     };
-    tok.onmouseenter = () => { HOVER = { segIndex, text: tok.textContent, lemma: tok.dataset.l, el: tok }; };
-    tok.onmouseleave = () => { if (HOVER && HOVER.el === tok) HOVER = null; };
+    tok.onmouseenter = () => {
+      HOVER = { segIndex, text: tok.textContent, lemma: tok.dataset.l, el: tok };
+      clearTimeout(CLOSE_TIMER);
+      if (PINNED) return;
+      clearTimeout(HOVER_TIMER);
+      HOVER_TIMER = setTimeout(
+        () => openPopup(segIndex, tok.textContent, tok, false), 180);
+    };
+    tok.onmouseleave = () => {
+      if (HOVER && HOVER.el === tok) HOVER = null;
+      clearTimeout(HOVER_TIMER);
+      if (!PINNED && !$("word-pop").hidden) scheduleClose();
+    };
   }
+}
+
+function scheduleClose() {
+  clearTimeout(CLOSE_TIMER);
+  CLOSE_TIMER = setTimeout(() => { if (!PINNED) closePopup(); }, 250);
 }
 
 function renderSegs() {
@@ -323,7 +342,7 @@ function scrollBrowserTo(i) {
 // ---------- video ----------
 const V = $("video");
 V.addEventListener("click", () => { V.paused ? V.play() : V.pause(); });
-V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; });
+V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; RESUME = false; });
 V.addEventListener("pause", () => { $("play-btn").textContent = "▶"; });
 V.addEventListener("loadedmetadata", () => { $("time-dur").textContent = fmtTime(V.duration || 0); });
 $("play-btn").onclick = () => { V.paused ? V.play() : V.pause(); };
@@ -391,38 +410,61 @@ function markStatusButtons(st) {
     b.classList.toggle("on", b.dataset.st === st);
 }
 
-async function openPopup(segIndex, selection, anchorEl) {
-  V.pause();
-  if (POP && !$("word-pop").hidden && POP.selection === selection && POP.segIndex === segIndex) {
+async function openPopup(segIndex, selection, anchorEl, pin) {
+  if (pin && POP && !$("word-pop").hidden &&
+      POP.selection === selection && POP.segIndex === segIndex) {
     closePopup();
     return;
   }
-  POP = { segIndex, selection, lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
+  if (!V.paused) { V.pause(); RESUME = !pin; }
+  PINNED = !!pin;
+  POP = { segIndex, selection,
+          lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
   $("wp-word").textContent = selection;
+  $("wp-ipa").textContent = "";
   $("wp-meta").textContent = "…";
+  $("wp-level").textContent = "";
   $("wp-senses").innerHTML = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
+  $("wp-sentence-ca").textContent = SEGS[segIndex].text;
   markStatusButtons(stOf(POP.lemma));
   positionPopup(anchorEl);
   $("word-pop").hidden = false;
 
-  const r = await api("/api/lookup", {
-    method: "POST",
-    body: JSON.stringify({ selection, sentence: SEGS[segIndex].text }),
-  });
-  if (!POP || POP.selection !== selection) return;
+  const key = segIndex + ":" + selection;
+  let r = LOOKUP_CACHE[key];
+  if (!r) {
+    r = await api("/api/lookup", {
+      method: "POST",
+      body: JSON.stringify({ selection, sentence: SEGS[segIndex].text,
+        session_id: SESSION.id, segment_index: segIndex }),
+    });
+    LOOKUP_CACHE[key] = r;
+  }
+  if (!POP || POP.selection !== selection || POP.segIndex !== segIndex) return;
   POP.lookup = r;
   POP.lemma = r.lemma;
   markStatusButtons(stOf(r.lemma));
-  $("wp-meta").textContent = `${r.lemma} · ${r.pos || "?"} · ${r.freq_rank} (zipf ${r.zipf.toFixed(1)})`;
+  renderPopupLookup(r);
+}
+
+const LEVEL_LABEL = { 5: "muy frecuente", 4: "frecuente", 3: "media", 2: "poco común", 1: "rara" };
+function zipfLevel(z) { return z >= 5.5 ? 5 : z >= 5 ? 4 : z >= 4.3 ? 3 : z >= 3.3 ? 2 : 1; }
+
+function renderPopupLookup(r) {
+  $("wp-ipa").textContent = r.ipa || "";
+  const lvl = zipfLevel(r.zipf);
+  $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
+  $("wp-meta").textContent = `${r.lemma}${r.pos ? " · " + r.pos : ""}`;
+  $("wp-sentence-es").textContent = r.sentence_es || "";
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
-    .map((s) => `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
+    .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
     || '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>';
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
+  if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
   $("wp-word-es").textContent = r.word_es ? `→ ${r.word_es}` : "";
-  $("wp-sentence-es").textContent = r.sentence_es || "";
 }
 
 for (const b of $("wp-status").querySelectorAll("button"))
@@ -440,14 +482,23 @@ function positionPopup(anchorEl) {
   pop.style.top = y + "px";
 }
 
-function closePopup() { $("word-pop").hidden = true; POP = null; }
+function closePopup() {
+  $("word-pop").hidden = true;
+  POP = null; PINNED = false;
+  clearTimeout(HOVER_TIMER); clearTimeout(CLOSE_TIMER);
+  if (RESUME) { RESUME = false; V.play(); }
+}
 $("wp-close").onclick = closePopup;
+const WP = $("word-pop");
+WP.onmouseenter = () => clearTimeout(CLOSE_TIMER);
+WP.onmouseleave = () => { if (!PINNED) scheduleClose(); };
 document.addEventListener("click", (e) => {
   if (!$("word-pop").hidden && !$("word-pop").contains(e.target) && !e.target.classList?.contains("t"))
     closePopup();
 });
 $("wp-replay").onclick = () => { if (POP) { V.currentTime = SEGS[POP.segIndex].start; V.play(); } };
 $("wp-card").onclick = () => mineFromPopup();
+$("wp-edit").onclick = () => editFromPopup();
 
 function mineFromPopup() {
   if (!POP) return;
