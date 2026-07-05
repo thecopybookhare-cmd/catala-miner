@@ -376,3 +376,23 @@ dialog {
 dialog::backdrop { background: rgba(0,0,0,.55); }
 dialog h3 { margin: 0 0 8px; }
 dialog input { width: 100%; margin: 10px 0; }
+
+/* ---------- estadisticas ---------- */
+#stats-view {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center; z-index: 60;
+}
+#stats-box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+  padding: 20px 24px; width: min(680px, 92vw); max-height: 86vh; overflow: auto;
+}
+.stats-head { display: flex; justify-content: space-between; align-items: center; }
+.stats-head button { background: transparent; border-color: transparent; font-size: 15px; }
+#stats-box section { margin: 14px 0; }
+#stats-box h3 { margin: 0 0 6px; }
+#stats-box .sv { fill: var(--fg); font-size: 12px; font-weight: 700; }
+#stats-box .sl { fill: var(--dim); font-size: 10px; }
+.donut-row { display: flex; gap: 18px; align-items: center; }
+.legend .leg { display: block; font-size: 13px; margin: 2px 0; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+#stats-btn { cursor: pointer; }

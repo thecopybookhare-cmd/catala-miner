@@ -11,6 +11,7 @@
   <h1 id="brand"><span class="brand-dot"></span>CatalàMiner</h1>
   <div class="header-right">
     <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
+    <div id="stats-btn" class="badge" title="Estadísticas">📊</div>
     <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
   </div>
 </header>
@@ -132,6 +133,13 @@
     </aside>
   </div>
 </main>
+
+<div id="stats-view" hidden>
+  <div id="stats-box">
+    <div class="stats-head"><h2>📊 Estadísticas</h2><button id="stats-close">✕</button></div>
+    <div id="stats-body"></div>
+  </div>
+</div>
 
 <dialog id="port-dlg">
   <form method="dialog">

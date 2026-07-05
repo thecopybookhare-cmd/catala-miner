@@ -628,10 +628,80 @@ document.addEventListener("keydown", (e) => {
   else if (k === "f") toggleFullscreen();
   else if (e.key === "Enter" && !$("card-panel").hidden) sendCard();
   else if (e.key === "Escape") {
-    closePopup(); $("card-panel").hidden = true;
+    closePopup(); $("card-panel").hidden = true; $("stats-view").hidden = true;
     if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
   }
 });
+
+// ---------- estadísticas ----------
+const ST_COLORS = { learning: "#e5a04c", known: "#4fc383", ignored: "#6b6b7c", tracking: "#8b7cf8" };
+
+function svgBars(data, color = "#8b7cf8") {  // data: [[label, value], ...]
+  const max = Math.max(1, ...data.map((d) => d[1]));
+  const bw = 34, gap = 12, h = 120;
+  const w = data.length * (bw + gap) + gap;
+  const bars = data.map(([lab, v], i) => {
+    const bh = Math.round((v / max) * (h - 34));
+    const x = gap + i * (bw + gap), y = h - 18 - bh;
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="6" fill="${color}"/>
+      <text x="${x + bw / 2}" y="${y - 4}" text-anchor="middle" class="sv">${v}</text>
+      <text x="${x + bw / 2}" y="${h - 4}" text-anchor="middle" class="sl">${lab}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w * 1.4}px">${bars}</svg>`;
+}
+
+function svgDonut(counts) {  // {status: n}
+  const entries = Object.entries(counts).filter(([, v]) => v > 0);
+  const total = entries.reduce((a, [, v]) => a + v, 0);
+  if (!total) return '<p class="dim">Sin palabras marcadas aún.</p>';
+  let a0 = -Math.PI / 2, paths = "";
+  for (const [st, v] of entries) {
+    const a1 = a0 + (v / total) * Math.PI * 2;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (a) => `${60 + 46 * Math.cos(a)},${60 + 46 * Math.sin(a)}`;
+    paths += `<path d="M ${p(a0)} A 46 46 0 ${large} 1 ${p(a1)}" stroke="${ST_COLORS[st] || "#888"}"
+      stroke-width="16" fill="none"/>`;
+    a0 = a1;
+  }
+  const legend = entries.map(([st, v]) =>
+    `<span class="leg"><i style="background:${ST_COLORS[st] || "#888"}"></i>${ST_LABEL[st] || st}: ${v}</span>`).join("");
+  return `<div class="donut-row"><svg viewBox="0 0 120 120" width="120">${paths}
+    <text x="60" y="66" text-anchor="middle" class="sv">${total}</text></svg>
+    <div class="legend">${legend}</div></div>`;
+}
+
+async function openStats() {
+  $("stats-view").hidden = false;
+  $("stats-body").innerHTML = '<p class="dim">Cargando…</p>';
+  const s = await api("/api/stats");
+  const months = Object.entries(s.by_month).slice(-8)
+    .map(([m, v]) => [m.slice(2).replace("-", "/"), v]);
+  let html = `
+    <section><h3>Minado</h3>
+      <p><b>${s.total_cards}</b> tarjetas minadas en <b>${s.sessions}</b> sesiones.</p>
+      ${months.length ? svgBars(months) : '<p class="dim">Aún no has minado tarjetas.</p>'}
+    </section>
+    <section><h3>Palabras por estado</h3>
+      <p class="dim" title="Estados que asignas al minar/marcar; se sincronizan con Anki (intervalo ≥ 21 días → conocida)">ⓘ cómo se calcula</p>
+      ${svgDonut(s.status_counts)}
+    </section>`;
+  if (s.anki) {
+    html += `
+    <section><h3>En Anki (mazo de minado)</h3>
+      <p><b>${s.anki.total}</b> tarjetas · <b>${s.anki.mature}</b> maduras (≥ 21 días)
+      ${s.anki.retention !== null ? ` · retención <b>${s.anki.retention}%</b>` : ""}</p>
+      <p class="dim" title="retención = 1 − fallos/repasos, sobre todas las tarjetas del mazo">ⓘ retención = 1 − fallos/repasos</p>
+      ${svgBars([["hoy", s.anki.due_today], ["7 días", s.anki.due_7d], ["30 días", s.anki.due_30d]], "#e5a04c")}
+      <p class="dim">Tarjetas que te tocará repasar (carga futura).</p>
+    </section>`;
+  } else {
+    html += '<section><h3>En Anki</h3><p class="dim">Abre Anki para ver retención y pronóstico de repasos.</p></section>';
+  }
+  $("stats-body").innerHTML = html;
+}
+$("stats-btn").onclick = openStats;
+$("stats-close").onclick = () => { $("stats-view").hidden = true; };
+$("stats-view").onclick = (e) => { if (e.target === $("stats-view")) $("stats-view").hidden = true; };
 
 // ---------- init ----------
 loadSessions();
