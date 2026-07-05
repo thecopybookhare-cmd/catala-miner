@@ -10,6 +10,8 @@ h1 { font-size:20px; margin:0; }
   background:#333; color:var(--dim); }
 .badge.up { background:#1f3d2b; color:var(--ok); }
 .badge.pending { background:#4d3800; color:var(--acc); }
+.badge.err { background:#4a1f24; color:var(--err); cursor:pointer; }
+.badge { cursor:pointer; }
 main { max-width:900px; margin:0 auto; padding:18px; }
 .new-session { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
 .filebtn { background:var(--panel); padding:10px 16px; border-radius:8px;
@@ -69,7 +71,36 @@ button.toggle.on { background:var(--acc); color:#222; font-weight:700; }
   flex-wrap:wrap; }
 #transcribe-bar select { background:var(--panel); color:var(--fg);
   border:1px solid #333; border-radius:8px; padding:8px; }
-#subs { padding-bottom:40vh; }
+/* ===== v0.3 Migaku-style layout ===== */
+#player { max-width:1380px; }
+#player-top { display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  margin-bottom:10px; }
+#stage { display:flex; gap:14px; align-items:flex-start; }
+#video-col { flex:1; min-width:0; }
+#side-panel { width:340px; flex-shrink:0; max-height:calc(100vh - 170px);
+  overflow-y:auto; background:var(--panel); border-radius:10px;
+  padding:8px; scroll-behavior:smooth; }
+#controls { display:flex; align-items:center; gap:6px; background:var(--panel);
+  border-radius:10px; padding:6px 10px; margin-top:8px; flex-wrap:wrap; }
+#controls .icon { font-size:16px; padding:6px 11px; line-height:1; }
+#controls .tlabel { font-size:12px; color:var(--dim); min-width:38px;
+  text-align:center; }
+#seek { flex:1; min-width:120px; accent-color:var(--acc); }
+#help-line { color:#666; font-size:12px; margin-top:6px; text-align:center; }
+
+/* container fullscreen (native or .fake-fs fallback):
+   overlay + controls stay visible */
+#video-col.fake-fs { position:fixed; inset:0; z-index:50; }
+#video-col:fullscreen, #video-col.fake-fs { display:flex;
+  flex-direction:column; background:#000; padding:10px 14px; }
+#video-col:fullscreen #video-wrap, #video-col.fake-fs #video-wrap {
+  flex:1; min-height:0; display:flex;
+  align-items:center; justify-content:center; }
+#video-col:fullscreen video, #video-col.fake-fs video {
+  max-height:none; height:100%; width:100%; object-fit:contain; }
+#video-col:fullscreen #help-line, #video-col.fake-fs #help-line { display:none; }
+#video-col:fullscreen #controls, #video-col.fake-fs #controls { margin-bottom:2px; }
+#video-col:fullscreen #overlay-sub, #video-col.fake-fs #overlay-sub { bottom:9%; }
 .seg { padding:8px 12px; border-radius:8px; margin:2px 0; cursor:default;
   color:var(--dim); }
 .seg.active { background:var(--panel); color:var(--fg); }

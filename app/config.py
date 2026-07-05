@@ -2,7 +2,9 @@ from pathlib import Path
 import os
 
 PORT = 8977
-ANKI_URL = "http://127.0.0.1:8765"
+# AnkiConnect default port is 8765, but on this machine another local
+# service can squat it — we probe candidates and remember the winner.
+ANKI_PORTS = (8765, 8766, 8767)
 
 APP_DIR = Path.home() / "Library" / "Application Support" / "CatalaMiner"
 MEDIA_DIR = APP_DIR / "media"

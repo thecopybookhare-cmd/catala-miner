@@ -1,10 +1,24 @@
 from unittest.mock import patch, MagicMock
+import pytest
 from app import anki
+
+
+@pytest.fixture(autouse=True)
+def _reset_port():
+    anki._PORT = None
+    yield
+    anki._PORT = None
 
 
 def _resp(result=None, error=None):
     m = MagicMock()
     m.json.return_value = {"result": result, "error": error}
+    return m
+
+
+def _squat():
+    m = MagicMock()
+    m.json.return_value = {"detail": "invalid bearer token"}
     return m
 
 
@@ -40,7 +54,23 @@ def test_is_up_false_when_down(post):
 
 @patch("app.anki.requests.post")
 def test_is_up_false_when_port_squatted(post):
-    m = MagicMock()
-    m.json.return_value = {"detail": "invalid bearer token"}
-    post.return_value = m
+    post.return_value = _squat()
     assert anki.is_up() is False
+
+
+@patch("app.anki.requests.post")
+def test_find_port_discovers_8766_when_8765_squatted(post):
+    def se(url, **kw):
+        if ":8765" in url:
+            return _squat()
+        if ":8766" in url:
+            return _resp(result=6)
+        raise ConnectionError()
+
+    post.side_effect = se
+    port, diag = anki.find_port()
+    assert port == 8766
+    assert diag["8765"] == "squatted" and diag["8766"] == "ok"
+    # discovered port is remembered and reused by invoke
+    assert anki._PORT == 8766
+    assert anki.invoke("version") == 6
