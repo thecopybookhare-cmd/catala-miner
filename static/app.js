@@ -451,9 +451,31 @@ $("wp-card").onclick = () => mineFromPopup();
 
 function mineFromPopup() {
   if (!POP) return;
-  const { segIndex, selection, chosen, lookup } = POP;
+  const { segIndex, selection, chosen } = POP;
   closePopup();
-  mine(segIndex, selection, 0, 0, { chosen, lookup });
+  mineQuick(segIndex, selection, chosen || "");
+}
+
+function editFromPopup() {
+  if (!POP) return;
+  const { segIndex, selection } = POP;
+  closePopup();
+  mine(segIndex, selection);
+}
+
+// minado en segundo plano: crea + envía a Anki sin panel ni pausa
+async function mineQuick(segIndex, selection, paraula_es = "") {
+  toast("⛏️ Creando tarjeta…");
+  const r = await api("/api/cards/mine", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION.id, segment_index: segIndex,
+      selection, paraula_es }),
+  });
+  if (r.error) { toast(r.error, "err"); return; }
+  if (r.word_status) STATUS[r.lema] = r.word_status;
+  renderSegs(); renderOverlay(); updateComp(); refreshAnki();
+  toast(r.sent_now ? `✅ «${r.paraula}» → Anki` : `🕓 «${r.paraula}» en cola`,
+        r.sent_now ? "ok" : "err");
 }
 
 // ---------- minado ----------
@@ -537,9 +559,14 @@ document.addEventListener("keydown", (e) => {
   else if (k === "g") toggleBrowser();
   else if (k === "c" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiado")); }
   else if (k === "q") {
-    if (POP && !$("word-pop").hidden) mineFromPopup();
-    else if (HOVER) mine(HOVER.segIndex, HOVER.text);
-    else toast("Pasa el ratón por una palabra y pulsa Q", "err");
+    const inPop = POP && !$("word-pop").hidden;
+    const seg = inPop ? POP.segIndex : HOVER?.segIndex;
+    const sel = inPop ? POP.selection : HOVER?.text;
+    if (sel === undefined) { toast("Pasa el ratón por una palabra y pulsa Q", "err"); return; }
+    const chosen = inPop ? (POP.chosen || "") : "";
+    if (inPop) closePopup();
+    if (e.shiftKey) mine(seg, sel);
+    else mineQuick(seg, sel, chosen);
   }
   else if (k === "e") setDual(!DUAL);
   else if (k === "p") setAutopause(!AUTOPAUSE);

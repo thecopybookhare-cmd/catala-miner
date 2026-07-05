@@ -41,7 +41,8 @@ Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
 4. Revisa/edita la tarjeta en el panel y pulsa **⏎**.
 
 **Atajos (mapa Migaku):** `A`/`←` frase anterior · `D`/`→` siguiente · `S`/`↓` repetir ·
-`Q` crear tarjeta (palabra bajo el cursor o popup abierto) · `1-4` estado de palabra
+`Q` crear tarjeta en segundo plano (palabra bajo el cursor o popup abierto) · `⇧Q` abrir el
+editor de tarjeta · `1-4` estado de palabra
 (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · `W` ocultar subtítulos ·
 `Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
 `P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.
