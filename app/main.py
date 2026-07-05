@@ -384,15 +384,12 @@ class PreviewReq(BaseModel):
     pad_after: int = 0
 
 
-@app.post("/api/cards/preview")
-def card_preview(req: PreviewReq):
-    s = db.get_session(CON, req.session_id)
-    if not s:
-        return JSONResponse({"error": "not found"}, status_code=404)
+def _build_preview(s: dict, segment_index: int, selection: str,
+                   pad_before: int = 0, pad_after: int = 0) -> dict:
     segs = json.loads(s["transcript_json"])
-    seg = segs[req.segment_index]
-    start = segs[max(0, req.segment_index - req.pad_before)]["start"]
-    end = segs[min(len(segs) - 1, req.segment_index + req.pad_after)]["end"]
+    seg = segs[segment_index]
+    start = segs[max(0, segment_index - pad_before)]["start"]
+    end = segs[min(len(segs) - 1, segment_index + pad_after)]["end"]
 
     base = uuid.uuid4().hex[:10]
     audio_name, image_name = f"cm-{base}.mp3", f"cm-{base}.jpg"
@@ -418,22 +415,66 @@ def card_preview(req: PreviewReq):
     except Exception:
         clip_ok = False
 
-    lemma, pos = nlp.analyze_selection(req.selection, seg["text"])
-    z = nlp.zipf(req.selection)
-    senses = _dict().lookup(req.selection) or _dict().lookup(lemma)
+    lemma, pos = nlp.analyze_selection(selection, seg["text"])
+    z = nlp.zipf(selection)
+    senses = _senses(selection, lemma)
+    frase_es = translate.sentence(seg["text"])
+    word_es = _word_es(selection, lemma)
     return {
-        "paraula": req.selection,
+        "paraula": selection,
         "lema": lemma, "pos": pos,
-        "paraula_es": translate.translate(req.selection),
+        "paraula_es": word_es,
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
+        "active": _active_sense(senses[:8], frase_es, word_es),
         "frase": seg["text"],
-        "frase_es": translate.sentence(seg["text"]),
+        "frase_es": frase_es,
         "freq_zipf": z, "freq_rank": nlp.freq_badge(z),
         "audio_file": audio_name if audio_ok else "",
         "image_file": image_name if image_ok else "",
         "clip_file": clip_name if clip_ok else "",
         "font": f"{s['title']} @ {_fmt_ts(seg['start'])}",
     }
+
+
+@app.post("/api/cards/preview")
+def card_preview(req: PreviewReq):
+    s = db.get_session(CON, req.session_id)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return _build_preview(s, req.segment_index, req.selection,
+                          req.pad_before, req.pad_after)
+
+
+class MineReq(BaseModel):
+    session_id: str
+    segment_index: int
+    selection: str
+    paraula_es: str = ""
+
+
+@app.post("/api/cards/mine")
+def card_mine(req: MineReq):
+    """Minado one-shot: preview + alta + envío a Anki, sin panel."""
+    s = db.get_session(CON, req.session_id)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    p = _build_preview(s, req.segment_index, req.selection)
+    active_es = (p["senses"][p["active"]]["es"]
+                 if p["senses"] and p["active"] >= 0 else "")
+    paraula_es = req.paraula_es or p["paraula_es"] or active_es
+    cid = db.create_card(
+        CON, session_id=req.session_id, segment_index=req.segment_index,
+        paraula=p["paraula"], lema=p["lema"], pos=p["pos"],
+        paraula_es=paraula_es, frase=p["frase"], frase_es=p["frase_es"],
+        freq_rank=p["freq_rank"], audio_file=p["audio_file"],
+        image_file=p["clip_file"] or p["image_file"], font=p["font"])
+    if p["lema"]:
+        db.mark_learning_if_new(CON, p["lema"])
+    sent = _flush()
+    return {"card_id": cid, "sent_now": sent > 0,
+            "pending": len(db.pending_cards(CON)),
+            "word_status": db.word_statuses(CON).get(p["lema"]),
+            "lema": p["lema"], "paraula": p["paraula"]}
 
 
 class CardReq(BaseModel):

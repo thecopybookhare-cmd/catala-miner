@@ -53,3 +53,39 @@ def test_lookup_word_es_uses_lowercase_form(_tr, _sen, _ipa, tmp_path,
     assert r["word_es"] == "eres"
     assert r["ipa"] == "/əts/"
     assert "active" in r
+
+
+@patch("app.main._flush", return_value=1)
+@patch("app.main.media.animated_clip")
+@patch("app.main.media.snapshot")
+@patch("app.main.media.cut_audio")
+@patch("app.main.translate.sentence", side_effect=lambda t: "ES:" + t)
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_mine_creates_and_flushes(_tr, _sen, _cut, _snap, _clip, _fl, tmp_path):
+    c = client(tmp_path)
+    sid = _seg_session("El gos corre")
+    r = c.post("/api/cards/mine",
+               json={"session_id": sid, "segment_index": 0,
+                     "selection": "gos"}).json()
+    assert r["sent_now"] is True
+    assert r["paraula"] == "gos"
+    assert r["word_status"] == "learning"
+    rows = [dict(x) for x in main.CON.execute("SELECT * FROM cards")]
+    assert any(cc["paraula"] == "gos" for cc in rows)
+
+
+@patch("app.main._flush", return_value=0)
+@patch("app.main.media.animated_clip")
+@patch("app.main.media.snapshot")
+@patch("app.main.media.cut_audio")
+@patch("app.main.translate.sentence", side_effect=lambda t: "ES:" + t)
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_mine_respects_chosen_sense(_tr, _sen, _cut, _snap, _clip, _fl, tmp_path):
+    c = client(tmp_path)
+    sid = _seg_session("El gos corre")
+    r = c.post("/api/cards/mine",
+               json={"session_id": sid, "segment_index": 0,
+                     "selection": "gos", "paraula_es": "perro"}).json()
+    assert r["sent_now"] is False
+    row = main.CON.execute("SELECT paraula_es FROM cards").fetchone()
+    assert row["paraula_es"] == "perro"
