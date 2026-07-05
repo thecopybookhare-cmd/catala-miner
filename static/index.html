@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.2.0">
+<link rel="stylesheet" href="/style.css?v=0.3.1">
 </head>
 <body>
 <header>
   <h1 id="brand">🐈 CatalàMiner</h1>
-  <div id="anki-badge" class="badge">Anki…</div>
+  <div id="anki-badge" class="badge" title="Clica per configurar el port d'AnkiConnect">Anki…</div>
 </header>
 
 <main id="home">
@@ -29,46 +29,52 @@
 </main>
 
 <main id="player" hidden>
-  <button id="back">← Sessions</button>
-  <div id="video-wrap">
-    <video id="video" controls playsinline></video>
-    <div id="overlay-sub">
-      <div id="overlay-ca"></div>
-      <div id="overlay-es" hidden></div>
+  <div id="player-top">
+    <button id="back">← Sessions</button>
+    <div id="transcribe-bar">
+      <select id="model-select">
+        <option value="catala-large">Whisper large-v3 català (AINA)</option>
+        <option value="large-v3">Whisper large-v3 genèric</option>
+        <option value="small">Whisper small — ràpid</option>
+      </select>
+      <button id="transcribe-btn">🎙️ Transcriure</button>
+      <label class="filebtn small">📎 .srt
+        <input type="file" id="subs-input" accept=".srt,.vtt">
+      </label>
+      <progress id="job-progress" max="1" value="0" hidden></progress>
+      <span id="job-msg"></span>
     </div>
   </div>
-  <div id="transcribe-bar">
-    <select id="model-select">
-      <option value="catala-large">Whisper large-v3 català (AINA) — màxima qualitat</option>
-      <option value="large-v3">Whisper large-v3 genèric</option>
-      <option value="small">Whisper small — ràpid</option>
-    </select>
-    <button id="transcribe-btn">🎙️ Transcriure</button>
-    <label class="filebtn small">📎 Adjuntar .srt
-      <input type="file" id="subs-input" accept=".srt,.vtt">
-    </label>
-    <button id="dual-btn" class="toggle" title="Subtítol dual català + espanyol (d)">🇪🇸 Dual</button>
-    <button id="autopause-btn" class="toggle" title="Pausa al final de cada frase (p)">⏯️ Auto-pausa</button>
-    <progress id="job-progress" max="1" value="0" hidden></progress>
-    <span id="job-msg"></span>
-  </div>
-  <div id="subs"></div>
-</main>
 
-<div id="word-pop" hidden>
-  <div class="wp-head">
-    <span id="wp-word"></span>
-    <span id="wp-meta"></span>
-    <button id="wp-close">✕</button>
+  <div id="stage">
+    <div id="video-col">
+      <div id="video-wrap">
+        <video id="video" playsinline></video>
+        <div id="overlay-sub">
+          <div id="overlay-ca"></div>
+          <div id="overlay-es" hidden></div>
+        </div>
+      </div>
+      <div id="controls">
+        <button class="icon" id="play-btn" title="Reproduir/Pausar (espai)">▶</button>
+        <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">⏮</button>
+        <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">⟲</button>
+        <button class="icon" id="next-btn" title="Frase següent (D / →)">⏭</button>
+        <span id="time-cur" class="tlabel">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0">
+        <span id="time-dur" class="tlabel">0:00</span>
+        <button class="icon toggle" id="dual-btn" title="Subtítol dual espanyol (E)">🇪🇸</button>
+        <button class="icon toggle" id="autopause-btn" title="Auto-pausa per frase (P)">⏯</button>
+        <button class="icon toggle" id="browser-btn" title="Navegador de subtítols (G)">📜</button>
+        <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
+      </div>
+      <div id="help-line">A/D frase · S repetir · Q crear targeta (paraula sota el cursor) · W amaga subs · E dual · G transcripció · C copiar · F pantalla completa</div>
+    </div>
+    <aside id="side-panel" hidden>
+      <div id="subs"></div>
+    </aside>
   </div>
-  <div id="wp-senses"></div>
-  <div id="wp-word-es" class="wp-line"></div>
-  <div id="wp-sentence-es" class="wp-line dim"></div>
-  <div class="wp-actions">
-    <button id="wp-replay">🔊 Repetir (a)</button>
-    <button id="wp-card" class="primary">➕ Crear targeta</button>
-  </div>
-</div>
+</main>
 
 <aside id="card-panel" hidden>
   <h3>Nova targeta</h3>
@@ -90,7 +96,22 @@
   </div>
 </aside>
 
+<div id="word-pop" hidden>
+  <div class="wp-head">
+    <span id="wp-word"></span>
+    <span id="wp-meta"></span>
+    <button id="wp-close">✕</button>
+  </div>
+  <div id="wp-senses"></div>
+  <div id="wp-word-es" class="wp-line"></div>
+  <div id="wp-sentence-es" class="wp-line dim"></div>
+  <div class="wp-actions">
+    <button id="wp-replay">🔊 Repetir (S)</button>
+    <button id="wp-card" class="primary">➕ Crear targeta (Q)</button>
+  </div>
+</div>
+
 <div id="toast" hidden></div>
-<script src="/app.js?v=0.2.0"></script>
+<script src="/app.js?v=0.3.1"></script>
 </body>
 </html>

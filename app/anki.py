@@ -1,4 +1,10 @@
-"""AnkiConnect client. Anki may be closed: callers keep cards 'pending'."""
+"""AnkiConnect client with port auto-discovery.
+
+AnkiConnect defaults to 8765, but another local service may squat that
+port (it answers HTTP but not the AnkiConnect JSON shape). We probe the
+candidate ports, remember the first real AnkiConnect, and expose a
+diagnosis so the UI can tell the user exactly what is wrong.
+"""
 import base64
 
 import requests
@@ -10,26 +16,59 @@ class AnkiError(Exception):
     pass
 
 
+_PORT: int | None = None  # discovered AnkiConnect port
+
+
+def _url(port: int) -> str:
+    return f"http://127.0.0.1:{port}"
+
+
+def probe(port: int) -> str:
+    """Return 'ok' (real AnkiConnect), 'squatted' (other service), 'down'."""
+    try:
+        r = requests.post(_url(port),
+                          json={"action": "version", "version": 6},
+                          timeout=3)
+        data = r.json()
+        if isinstance(data, dict) and "result" in data and "error" in data:
+            return "ok"
+        return "squatted"
+    except Exception:
+        return "down"
+
+
+def find_port(preferred: int | None = None) -> tuple[int | None, dict]:
+    """Locate AnkiConnect. Returns (port or None, {port: probe_result})."""
+    global _PORT
+    if _PORT is not None and probe(_PORT) == "ok":
+        return _PORT, {str(_PORT): "ok"}
+    ports = [preferred] if preferred else list(config.ANKI_PORTS)
+    diag = {}
+    for p in ports:
+        st = probe(p)
+        diag[str(p)] = st
+        if st == "ok":
+            _PORT = p
+            return p, diag
+    _PORT = None
+    return None, diag
+
+
 def invoke(action: str, **params):
-    r = requests.post(config.ANKI_URL,
+    port = _PORT or config.ANKI_PORTS[0]
+    r = requests.post(_url(port),
                       json={"action": action, "version": 6, "params": params},
                       timeout=10)
     data = r.json()
-    # AnkiConnect always returns both keys; anything else on this port
-    # is a different service squatting on 8765.
     if not (isinstance(data, dict) and "result" in data and "error" in data):
-        raise AnkiError("port 8765 is not AnkiConnect")
+        raise AnkiError(f"port {port} is not AnkiConnect")
     if data.get("error"):
         raise AnkiError(data["error"])
     return data.get("result")
 
 
-def is_up() -> bool:
-    try:
-        invoke("version")
-        return True
-    except Exception:
-        return False
+def is_up(preferred: int | None = None) -> bool:
+    return find_port(preferred)[0] is not None
 
 
 CARD_CSS = """.card { font-family: -apple-system, sans-serif; font-size: 22px;

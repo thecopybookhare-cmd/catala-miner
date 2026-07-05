@@ -29,9 +29,10 @@ def _dict():
 
 
 def _settings() -> dict:
+    s = {"deck": "Català::Mining", "anki_port": None}
     if SETTINGS_PATH.exists():
-        return json.loads(SETTINGS_PATH.read_text())
-    return {"deck": "Català::Mining"}
+        s.update(json.loads(SETTINGS_PATH.read_text()))
+    return s
 
 
 def _save_settings(s: dict):
@@ -296,7 +297,7 @@ def create_card(req: CardReq):
 
 
 def _flush() -> int:
-    if not anki.is_up():
+    if not anki.is_up(_settings().get("anki_port")):
         return 0
     deck = _settings()["deck"]
     n = 0
@@ -317,9 +318,17 @@ def anki_flush():
 
 @app.get("/api/anki/status")
 def anki_status():
-    up = anki.is_up()
+    port, diag = anki.find_port(_settings().get("anki_port"))
+    up = port is not None
+    if up:
+        reason = "ok"
+    elif any(v == "squatted" for v in diag.values()):
+        reason = "squatted"
+    else:
+        reason = "down"
     decks = anki.invoke("deckNames") if up else []
-    return {"up": up, "decks": decks, "deck": _settings()["deck"],
+    return {"up": up, "port": port, "reason": reason, "diag": diag,
+            "decks": decks, "deck": _settings()["deck"],
             "pending": len(db.pending_cards(CON))}
 
 
@@ -333,6 +342,19 @@ def set_deck(req: DeckReq):
     s["deck"] = req.deck
     _save_settings(s)
     return {"ok": True}
+
+
+class PortReq(BaseModel):
+    port: int | None = None
+
+
+@app.post("/api/anki/port")
+def set_anki_port(req: PortReq):
+    s = _settings()
+    s["anki_port"] = req.port
+    _save_settings(s)
+    port, diag = anki.find_port(req.port)
+    return {"ok": True, "port": port, "diag": diag}
 
 
 # media (card audio previews) + frontend
