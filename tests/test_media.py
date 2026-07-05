@@ -16,6 +16,14 @@ def test_frame_cmd_midpoint_scale():
     assert "-ss 11.0" in s and "scale=640:-2" in s and "-frames:v 1" in s
 
 
+def test_clip_cmd_caps_duration_and_is_silent():
+    cmd = media.clip_cmd("/v.mp4", 10.0, 30.0, "/out.gif", max_dur=6.0)
+    s = " ".join(cmd)
+    assert "-t 6.0" in s and "-an" in s and "palettegen" in s and "-loop 0" in s
+    cmd2 = media.clip_cmd("/v.mp4", 10.0, 12.5, "/out.gif")
+    assert "-t 2.5" in " ".join(cmd2)
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="no ffmpeg")
 def test_real_cut(tmp_path):
     src = tmp_path / "tone.wav"

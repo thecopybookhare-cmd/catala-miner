@@ -1,44 +1,49 @@
 <!doctype html>
-<html lang="ca">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.4.0">
+<link rel="stylesheet" href="/style.css?v=0.5.0">
 </head>
 <body>
 <header>
-  <h1 id="brand">🐈 CatalàMiner</h1>
-  <div id="comp-chip" class="badge" hidden title="Percentatge de paraules que ja coneixes en aquest contingut"></div>
-  <div id="anki-badge" class="badge" title="Clica per configurar el port d'AnkiConnect">Anki…</div>
+  <h1 id="brand"><span class="brand-dot"></span>CatalàMiner</h1>
+  <div class="header-right">
+    <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
+    <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
+  </div>
 </header>
 
 <main id="home">
-  <section class="new-session">
-    <label class="filebtn">📁 Obrir arxiu local
-      <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
-    </label>
-    <div class="yt">
-      <input type="url" id="yt-url" placeholder="Enganxa URL de YouTube…">
-      <button id="yt-btn">⬇️ Importar</button>
+  <section class="hero">
+    <h2>Tu biblioteca</h2>
+    <p class="hero-sub">Mina catalán desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.</p>
+    <div class="new-session">
+      <label class="filebtn primary">📁 Abrir archivo
+        <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
+      </label>
+      <div class="yt">
+        <input type="url" id="yt-url" placeholder="Pega una URL de YouTube…">
+        <button id="yt-btn">⬇️ Importar</button>
+      </div>
     </div>
   </section>
   <section>
-    <h2>Sessions</h2>
-    <ul id="session-list"></ul>
+    <div id="session-list" class="scard-grid"></div>
   </section>
 </main>
 
 <main id="player" hidden>
   <div id="player-top">
-    <button id="back">← Sessions</button>
+    <button id="back">← Biblioteca</button>
     <div id="transcribe-bar">
       <select id="model-select">
-        <option value="catala-large">Whisper large-v3 català (AINA)</option>
-        <option value="large-v3">Whisper large-v3 genèric</option>
-        <option value="small">Whisper small — ràpid</option>
+        <option value="catala-large">Whisper large-v3 catalán (AINA) — máxima calidad</option>
+        <option value="large-v3">Whisper large-v3 genérico</option>
+        <option value="small">Whisper small — rápido</option>
       </select>
-      <button id="transcribe-btn">🎙️ Transcriure</button>
+      <button id="transcribe-btn">🎙️ Transcribir</button>
       <label class="filebtn small">📎 .srt
         <input type="file" id="subs-input" accept=".srt,.vtt">
       </label>
@@ -57,38 +62,38 @@
         </div>
       </div>
       <div id="controls">
-        <button class="icon" id="play-btn" title="Reproduir/Pausar (espai)">▶</button>
+        <button class="icon" id="play-btn" title="Reproducir/Pausar (espacio)">▶</button>
         <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">⏮</button>
         <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">⟲</button>
-        <button class="icon" id="next-btn" title="Frase següent (D / →)">⏭</button>
+        <button class="icon" id="next-btn" title="Frase siguiente (D / →)">⏭</button>
         <span id="time-cur" class="tlabel">0:00</span>
         <input type="range" id="seek" min="0" max="1000" value="0">
         <span id="time-dur" class="tlabel">0:00</span>
-        <button class="icon" id="speed-btn" title="Velocitat de reproducció">1×</button>
-        <button class="icon toggle" id="dual-btn" title="Subtítol dual espanyol (E)">🇪🇸</button>
-        <button class="icon toggle" id="autopause-btn" title="Auto-pausa per frase (P)">⏯</button>
-        <button class="icon toggle" id="browser-btn" title="Navegador de subtítols (G)">📜</button>
+        <button class="icon" id="speed-btn" title="Velocidad de reproducción">1×</button>
+        <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)">🇪🇸</button>
+        <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">⏯</button>
+        <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">📜</button>
         <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q targeta · 1-4 estat paraula (1 nova · 2 aprenent · 3 coneguda · 4 ignora) · W subs · E dual · G transcripció · F pantalla completa</div>
+      <div id="help-line">A/D frase · S repetir · Q tarjeta · 1-4 estado (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · W subs · E dual · G transcripción · F pantalla completa</div>
 
       <aside id="card-panel" hidden>
-        <h3>Nova targeta</h3>
-        <div class="row"><label>Paraula</label><input id="c-paraula"></div>
-        <div class="row"><label>Paraula ES</label><input id="c-paraula-es"></div>
+        <h3>Nueva tarjeta</h3>
+        <div class="row"><label>Palabra</label><input id="c-paraula"></div>
+        <div class="row"><label>Palabra ES</label><input id="c-paraula-es"></div>
         <div id="senses"></div>
         <div class="row"><label>Frase</label><textarea id="c-frase" rows="2"></textarea></div>
         <div class="row"><label>Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
         <div class="row meta"><span id="c-meta"></span></div>
         <div class="row">
           <audio id="c-audio" controls></audio>
-          <button id="pad-before" title="Incloure segment anterior">⏪+</button>
-          <button id="pad-after" title="Incloure segment següent">+⏩</button>
+          <button id="pad-before" title="Incluir el segmento anterior">⏪+</button>
+          <button id="pad-after" title="Incluir el segmento siguiente">+⏩</button>
         </div>
         <img id="c-image" alt="">
         <div class="row actions">
-          <button id="c-cancel">Cancel·lar</button>
-          <button id="c-send" class="primary">➕ Afegir a Anki (⏎)</button>
+          <button id="c-cancel">Cancelar</button>
+          <button id="c-send" class="primary">➕ Añadir a Anki (⏎)</button>
         </div>
       </aside>
 
@@ -99,17 +104,17 @@
           <button id="wp-close">✕</button>
         </div>
         <div id="wp-status">
-          <button data-st="unknown" title="1">Nova</button>
-          <button data-st="learning" title="2">Aprenent</button>
-          <button data-st="known" title="3">Coneguda</button>
-          <button data-st="ignored" title="4">Ignora</button>
+          <button data-st="unknown" title="Atajo: 1">Nueva</button>
+          <button data-st="learning" title="Atajo: 2">Aprendiendo</button>
+          <button data-st="known" title="Atajo: 3">Conocida</button>
+          <button data-st="ignored" title="Atajo: 4">Ignorar</button>
         </div>
         <div id="wp-senses"></div>
         <div id="wp-word-es" class="wp-line"></div>
         <div id="wp-sentence-es" class="wp-line dim"></div>
         <div class="wp-actions">
           <button id="wp-replay">🔊 Repetir (S)</button>
-          <button id="wp-card" class="primary">➕ Crear targeta (Q)</button>
+          <button id="wp-card" class="primary">➕ Crear tarjeta (Q)</button>
         </div>
       </div>
 
@@ -121,6 +126,6 @@
   </div>
 </main>
 
-<script src="/app.js?v=0.4.0"></script>
+<script src="/app.js?v=0.5.0"></script>
 </body>
 </html>

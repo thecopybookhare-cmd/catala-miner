@@ -12,7 +12,7 @@ const toast = (msg, cls = "ok") => {
 };
 
 let SESSION = null, SEGS = [], CARD = null, PAD = { b: 0, a: 0 };
-let STATUS = {};              // lemma -> learning|known|ignored|tracking (absent = unknown)
+let STATUS = {};              // lemma -> learning|known|ignored|tracking (ausente = desconocida)
 let CUR = -1;
 let DUAL = false, AUTOPAUSE = false, HIDE_CA = false, HIDE_ES = false;
 let POP = null, HOVER = null;
@@ -20,26 +20,26 @@ const ES_CACHE = {};
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 let SPEED_IX = 0;
 
-// ---------- Anki badge ----------
+// ---------- badge de Anki ----------
 async function refreshAnki() {
   const s = await api("/api/anki/status");
   const b = $("anki-badge");
-  const q = s.pending > 0 ? `${s.pending} en cua · ` : "";
-  if (s.up) { b.textContent = s.pending > 0 ? `Anki: enviant ${s.pending}…` : `Anki ✓ (:${s.port})`; b.className = "badge up"; }
-  else if (s.reason === "squatted") { b.textContent = `⚠️ ${q}port ocupat — clica`; b.className = "badge err"; }
-  else { b.textContent = q + "Anki tancat"; b.className = s.pending > 0 ? "badge pending" : "badge"; }
+  const q = s.pending > 0 ? `${s.pending} en cola · ` : "";
+  if (s.up) { b.textContent = s.pending > 0 ? `Anki: enviando ${s.pending}…` : `Anki ✓ (:${s.port})`; b.className = "badge up"; }
+  else if (s.reason === "squatted") { b.textContent = `⚠️ ${q}puerto ocupado — clic`; b.className = "badge err"; }
+  else { b.textContent = q + "Anki cerrado"; b.className = s.pending > 0 ? "badge pending" : "badge"; }
   b.dataset.reason = s.reason || "";
 }
 $("anki-badge").onclick = async () => {
   const reason = $("anki-badge").dataset.reason;
-  let msg = "Port d'AnkiConnect (buit = automàtic 8765/8766/8767):";
+  let msg = "Puerto de AnkiConnect (vacío = automático 8765/8766/8767):";
   if (reason === "squatted")
-    msg = "Un altre servei ocupa els ports 8765/8766 en aquest Mac.\n\nSolució: a Anki → Eines → Complements → AnkiConnect → Configuració, posa \"webBindPort\": 8767, reinicia Anki. L'app el detectarà sola (o escriu 8767 aquí sota).\n\nPort d'AnkiConnect:";
+    msg = "Otro servicio ocupa los puertos 8765/8766 en este Mac.\n\nSolución: en Anki → Herramientas → Complementos → AnkiConnect → Configuración, pon \"webBindPort\": 8767 y reinicia Anki. La app lo detectará sola (o escribe 8767 aquí abajo).\n\nPuerto de AnkiConnect:";
   const v = prompt(msg);
   if (v === null) return;
   const port = v.trim() === "" ? null : parseInt(v.trim(), 10);
   const r = await api("/api/anki/port", { method: "POST", body: JSON.stringify({ port }) });
-  toast(r.port ? `✅ AnkiConnect trobat al port ${r.port}` : "Encara no trobo AnkiConnect", r.port ? "ok" : "err");
+  toast(r.port ? `✅ AnkiConnect encontrado en el puerto ${r.port}` : "Aún no encuentro AnkiConnect", r.port ? "ok" : "err");
   refreshAnki();
 };
 setInterval(async () => {
@@ -47,26 +47,47 @@ setInterval(async () => {
   refreshAnki();
 }, 15000);
 
-// Migaku-style: statuses follow your real Anki progress (interval >= 21d -> known)
+// estilo Migaku: los estados siguen tu progreso real en Anki (intervalo >= 21d -> conocida)
 async function syncStatuses() {
   const r = await api("/api/anki/sync-statuses", { method: "POST" }).catch(() => null);
   if (r && r.synced > 0 && SESSION) {
     const s = await api("/api/sessions/" + SESSION.id);
     STATUS = s.word_statuses || {};
     renderSegs(); renderOverlay(); updateComp();
-    toast(`🔄 ${r.synced} paraules actualitzades des d'Anki`);
+    toast(`🔄 ${r.synced} palabras actualizadas desde Anki`);
   }
 }
 setInterval(syncStatuses, 60000);
 
-// ---------- home ----------
+// ---------- biblioteca ----------
+const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", none: "sin transcribir", "-": "—" };
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  const h = Math.floor(m / 60);
+  return h ? `${h}:${String(m % 60).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+           : `${m}:${String(s).padStart(2, "0")}`;
+}
+
 async function loadSessions() {
   const list = await api("/api/sessions");
-  $("session-list").innerHTML = list.map((s) =>
-    `<li data-id="${s.id}"><span>${s.title}</span>
-     <span class="dim">${s.srt_source} · ${s.created_at.slice(0, 10)}</span></li>`).join("");
-  for (const li of $("session-list").children)
-    li.onclick = () => openSession(li.dataset.id);
+  $("session-list").innerHTML = list.map((s) => `
+    <article class="scard" data-id="${s.id}">
+      <div class="thumb" style="${s.thumb ? `background-image:url('${s.thumb}')` : ""}">
+        ${s.thumb ? "" : "🎬"}
+        ${s.duration_secs ? `<span class="dur">${fmtTime(s.duration_secs)}</span>` : ""}
+      </div>
+      <div class="scard-body">
+        <div class="scard-title" title="${s.title}">${s.title}</div>
+        <div class="pills">
+          ${s.comp_pct !== null && s.comp_pct !== undefined ? `<span class="pill comp">📊 ${s.comp_pct}% conocido</span>` : ""}
+          ${s.new_words ? `<span class="pill new">${s.new_words} nuevas</span>` : ""}
+          <span class="pill">${SRC_LABEL[s.srt_source] ?? s.srt_source}</span>
+        </div>
+      </div>
+    </article>`).join("");
+  for (const card of $("session-list").children)
+    card.onclick = () => openSession(card.dataset.id);
 }
 
 $("file-input").onchange = async (e) => {
@@ -74,7 +95,7 @@ $("file-input").onchange = async (e) => {
   if (!f) return;
   const fd = new FormData();
   fd.append("file", f);
-  toast("Pujant arxiu…");
+  toast("Subiendo archivo…");
   const r = await fetch("/api/sessions/upload", { method: "POST", body: fd }).then((x) => x.json());
   await openSession(r.session_id);
 };
@@ -83,7 +104,7 @@ $("yt-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
   const { job_id } = await api("/api/sessions/youtube", { method: "POST", body: JSON.stringify({ url }) });
-  const res = await pollJob(job_id, "Descarregant de YouTube…");
+  const res = await pollJob(job_id, "Descargando de YouTube…");
   if (res) openSession(res.session_id);
 };
 
@@ -101,7 +122,7 @@ async function pollJob(jid, label) {
   }
 }
 
-// ---------- session ----------
+// ---------- sesión ----------
 async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
@@ -128,7 +149,7 @@ $("transcribe-btn").onclick = async () => {
   const model = $("model-select").value;
   const { job_id } = await api(`/api/sessions/${SESSION.id}/transcribe`,
     { method: "POST", body: JSON.stringify({ model }) });
-  const res = await pollJob(job_id, "Transcrivint… (la primera vegada descarrega el model)");
+  const res = await pollJob(job_id, "Transcribiendo… (la primera vez descarga el modelo)");
   if (res) openSession(SESSION.id);
 };
 
@@ -139,12 +160,14 @@ $("subs-input").onchange = async (e) => {
   fd.append("file", f);
   const r = await fetch(`/api/sessions/${SESSION.id}/subtitles`, { method: "POST", body: fd }).then((x) => x.json());
   if (r.error) { toast(r.error, "err"); return; }
-  toast(`📜 ${r.segments} subtítols carregats`);
+  toast(`📜 ${r.segments} subtítulos cargados`);
   openSession(SESSION.id);
 };
 
-// ---------- word statuses ----------
+// ---------- estados de palabra ----------
 function stOf(lemma) { return STATUS[lemma] || "unknown"; }
+
+const ST_LABEL = { unknown: "nueva", learning: "aprendiendo", known: "conocida", ignored: "ignorada", tracking: "seguimiento" };
 
 async function setStatus(lemma, status) {
   if (!lemma) return;
@@ -156,11 +179,10 @@ async function setStatus(lemma, status) {
   else STATUS[r.lemma] = status;
   renderSegs(); renderOverlay(); updateComp();
   if (POP && POP.lemma === r.lemma) markStatusButtons(status);
-  const labels = { unknown: "nova", learning: "aprenent", known: "coneguda", ignored: "ignorada", tracking: "seguiment" };
-  toast(`"${r.lemma}" → ${labels[status]}`);
+  toast(`"${r.lemma}" → ${ST_LABEL[status]}`);
 }
 
-// comprehension score, Migaku-style: % of word tokens you already know
+// score de comprensión estilo Migaku: % de palabras del contenido que ya conoces
 function updateComp() {
   const chip = $("comp-chip");
   if (!SEGS.length) { chip.hidden = true; return; }
@@ -177,7 +199,7 @@ function updateComp() {
       }
   if (!total) { chip.hidden = true; return; }
   const pct = Math.round((known / total) * 100);
-  chip.textContent = `📊 ${pct}% conegut · ${newLemmas.size} paraules noves`;
+  chip.textContent = `📊 ${pct}% conocido · ${newLemmas.size} palabras nuevas`;
   chip.hidden = false;
   chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
 }
@@ -223,12 +245,7 @@ document.addEventListener("fullscreenchange", () => {
   $("fs-btn").textContent = document.fullscreenElement ? "🗗" : "⛶";
 });
 
-// ---------- rendering ----------
-function fmtTime(t) {
-  const m = Math.floor(t / 60), s = Math.floor(t % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
+// ---------- render ----------
 function tokenHtml(seg) {
   if (!(seg.tokens && seg.tokens.length)) return seg.text;
   return seg.tokens.map((t, k) => {
@@ -253,7 +270,7 @@ function bindTokenEvents(container, segIndex) {
 
 function renderSegs() {
   const el = $("subs");
-  if (!SEGS.length) { el.innerHTML = '<p class="dim">Sense transcripció — 🎙️ Transcriu o 📎 adjunta un .srt.</p>'; return; }
+  if (!SEGS.length) { el.innerHTML = '<p class="dim">Sin transcripción — 🎙️ Transcribe o 📎 adjunta un .srt.</p>'; return; }
   el.innerHTML = SEGS.map((seg, i) => {
     const low = seg.logprob < -1.0 ? " lowconf" : "";
     return `<div class="seg${low}${i === CUR ? " active" : ""}" id="seg-${i}" data-i="${i}">
@@ -303,7 +320,7 @@ function scrollBrowserTo(i) {
   panel.scrollTop = row.offsetTop - panel.clientHeight / 2 + row.offsetHeight / 2;
 }
 
-// ---------- video wiring ----------
+// ---------- video ----------
 const V = $("video");
 V.addEventListener("click", () => { V.paused ? V.play() : V.pause(); });
 V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; });
@@ -352,7 +369,7 @@ V.addEventListener("timeupdate", () => {
   }
 });
 
-// ---------- word popup ----------
+// ---------- popup de palabra ----------
 function markStatusButtons(st) {
   for (const b of $("wp-status").querySelectorAll("button"))
     b.classList.toggle("on", b.dataset.st === st);
@@ -385,7 +402,7 @@ async function openPopup(segIndex, selection, anchorEl) {
   $("wp-meta").textContent = `${r.lemma} · ${r.pos || "?"} · ${r.freq_rank} (zipf ${r.zipf.toFixed(1)})`;
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
     .map((s) => `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
-    || '<span class="dim" style="font-size:13px">— sense entrada al diccionari —</span>';
+    || '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>';
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   $("wp-word-es").textContent = r.word_es ? `→ ${r.word_es}` : "";
@@ -399,7 +416,7 @@ function positionPopup(anchorEl) {
   const pop = $("word-pop");
   const rect = anchorEl.getBoundingClientRect();
   pop.hidden = false;
-  const w = 300, h = pop.offsetHeight || 240;
+  const w = 304, h = pop.offsetHeight || 250;
   let x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 8);
   let y = rect.top - h - 10;
   if (y < 8) y = Math.min(rect.bottom + 10, window.innerHeight - h - 8);
@@ -423,17 +440,19 @@ function mineFromPopup() {
   mine(segIndex, selection, 0, 0, { chosen, lookup });
 }
 
-// ---------- mining ----------
+// ---------- minado ----------
 async function mine(segIndex, selection, padB = 0, padA = 0, extra = {}) {
   V.pause();
   PAD = { b: padB, a: padA };
-  toast("Creant targeta…");
+  toast("Creando tarjeta…");
   const p = await api("/api/cards/preview", {
     method: "POST",
     body: JSON.stringify({ session_id: SESSION.id, segment_index: segIndex,
       selection, pad_before: padB, pad_after: padA }),
   });
   CARD = { ...p, session_id: SESSION.id, segment_index: segIndex };
+  // el clip animado (WebP) sustituye a la captura estática cuando existe
+  CARD.image_file = p.clip_file || p.image_file;
   $("c-paraula").value = p.paraula;
   $("c-paraula-es").value = extra.chosen || p.paraula_es;
   $("c-frase").value = p.frase;
@@ -444,7 +463,7 @@ async function mine(segIndex, selection, padB = 0, padA = 0, extra = {}) {
   for (const sp of $("senses").children)
     sp.onclick = () => { $("c-paraula-es").value = sp.dataset.es; };
   $("c-audio").src = p.audio_file ? "/media/" + p.audio_file : "";
-  $("c-image").src = p.image_file ? "/media/" + p.image_file : "";
+  $("c-image").src = CARD.image_file ? "/media/" + CARD.image_file : "";
   $("card-panel").hidden = false;
   if (p.audio_file) $("c-audio").play().catch(() => {});
 }
@@ -470,13 +489,13 @@ async function sendCard() {
   renderOverlay();
   updateComp();
   refreshAnki();
-  toast(r.sent_now ? "✅ Targeta afegida a Anki" : "🕓 Targeta en cua", r.sent_now ? "ok" : "err");
+  toast(r.sent_now ? "✅ Tarjeta añadida a Anki" : "🕓 Tarjeta en cola", r.sent_now ? "ok" : "err");
 }
 $("c-send").onclick = sendCard;
 
-// ---------- keyboard (Migaku map + status keys) ----------
-// A/← prev · D/→ next · S/↓ replay · W/↑ hide subs · shift+W hide ES ·
-// G browser · C copy · Q mine · 1-4 word status · E dual · P auto-pause · F fs
+// ---------- teclado (mapa Migaku + estados) ----------
+// A/← anterior · D/→ siguiente · S/↓ repetir · W/↑ ocultar subs · shift+W ocultar ES ·
+// G navegador · C copiar · Q minar · 1-4 estado · E dual · P auto-pausa · F pantalla completa
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") {
     if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
@@ -489,7 +508,7 @@ document.addEventListener("keydown", (e) => {
   if (statusKeys[e.key]) {
     const lemma = (POP && !$("word-pop").hidden) ? POP.lemma : HOVER?.lemma;
     if (lemma) setStatus(lemma, statusKeys[e.key]);
-    else toast("Passa el ratolí per una paraula i prem " + e.key, "err");
+    else toast("Pasa el ratón por una palabra y pulsa " + e.key, "err");
   }
   else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR - 1); }
   else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR + 1); }
@@ -500,11 +519,11 @@ document.addEventListener("keydown", (e) => {
     else { HIDE_CA = !HIDE_CA; renderOverlay(); }
   }
   else if (k === "g") toggleBrowser();
-  else if (k === "c" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiat")); }
+  else if (k === "c" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiado")); }
   else if (k === "q") {
     if (POP && !$("word-pop").hidden) mineFromPopup();
     else if (HOVER) mine(HOVER.segIndex, HOVER.text);
-    else toast("Passa el ratolí per una paraula i prem Q", "err");
+    else toast("Pasa el ratón por una palabra y pulsa Q", "err");
   }
   else if (k === "e") setDual(!DUAL);
   else if (k === "p") setAutopause(!AUTOPAUSE);

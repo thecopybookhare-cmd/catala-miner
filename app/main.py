@@ -53,9 +53,46 @@ def health():
             "translator": translate.is_downloaded()}
 
 
+def _session_meta(row: dict, statuses: dict) -> dict:
+    """Thumbnail (lazy) + comprehension stats for the home cards."""
+    sid = row["id"]
+    thumb = config.MEDIA_DIR / f"thumb-{sid}.jpg"
+    if not thumb.exists():
+        full = db.get_session(CON, sid)
+        try:
+            media.snapshot(full["media_path"],
+                           max(1.0, (full["duration_secs"] or 10) * 0.12),
+                           str(thumb))
+        except Exception:
+            pass
+    row["thumb"] = f"/media/thumb-{sid}.jpg" if thumb.exists() else None
+    full = db.get_session(CON, sid)
+    try:
+        segs = json.loads(full["transcript_json"])
+    except Exception:
+        segs = []
+    total = known = 0
+    new_lemmas = set()
+    for seg in segs:
+        for t in seg.get("tokens", []):
+            if t.get("is_word") and t.get("lemma"):
+                st = statuses.get(t["lemma"], "unknown")
+                if st == "ignored":
+                    continue
+                total += 1
+                if st == "known":
+                    known += 1
+                elif st == "unknown":
+                    new_lemmas.add(t["lemma"])
+    row["comp_pct"] = round(known / total * 100) if total else None
+    row["new_words"] = len(new_lemmas) if total else None
+    return row
+
+
 @app.get("/api/sessions")
 def sessions():
-    return db.list_sessions(CON)
+    statuses = db.word_statuses(CON)
+    return [_session_meta(r, statuses) for r in db.list_sessions(CON)]
 
 
 @app.get("/api/sessions/{sid}")
@@ -282,7 +319,8 @@ def card_preview(req: PreviewReq):
 
     base = uuid.uuid4().hex[:10]
     audio_name, image_name = f"cm-{base}.mp3", f"cm-{base}.jpg"
-    audio_ok = image_ok = True
+    clip_name = f"cm-{base}.gif"
+    audio_ok = image_ok = clip_ok = True
     try:
         media.cut_audio(s["media_path"], start, end,
                         str(config.MEDIA_DIR / audio_name))
@@ -293,6 +331,15 @@ def card_preview(req: PreviewReq):
                        str(config.MEDIA_DIR / image_name))
     except Exception:
         image_ok = False
+    try:
+        # animated clip only makes sense for video sources
+        if image_ok:
+            media.animated_clip(s["media_path"], seg["start"], seg["end"],
+                                str(config.MEDIA_DIR / clip_name))
+        else:
+            clip_ok = False
+    except Exception:
+        clip_ok = False
 
     lemma, pos = nlp.analyze_selection(req.selection, seg["text"])
     z = nlp.zipf(req.selection)
@@ -307,6 +354,7 @@ def card_preview(req: PreviewReq):
         "freq_zipf": z, "freq_rank": nlp.freq_badge(z),
         "audio_file": audio_name if audio_ok else "",
         "image_file": image_name if image_ok else "",
+        "clip_file": clip_name if clip_ok else "",
         "font": f"{s['title']} @ {_fmt_ts(seg['start'])}",
     }
 

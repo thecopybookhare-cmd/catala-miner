@@ -8,7 +8,8 @@ _TRIED = False
 
 
 def detok(pieces: list[str]) -> str:
-    return "".join(pieces).replace("▁", " ").strip()
+    out = "".join(pieces).replace("▁", " ")
+    return out.replace("<unk>", "").strip()
 
 
 class _Engine:
