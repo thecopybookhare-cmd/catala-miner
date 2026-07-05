@@ -10,6 +10,30 @@ _WORD = re.compile(r"[\w·]+(?:['’][\w·]+)*", re.UNICODE)
 _NLP = None
 _NLP_TRIED = False
 
+# Bump para re-tokenizar transcripciones guardadas con lemas antiguos.
+TOK_VERSION = 1
+
+_POS_EQ = {("VERB", "AUX"), ("AUX", "VERB")}
+
+
+def _correct(form: str, lemma: str, pos: str) -> tuple[str, str]:
+    """Fix spaCy's lemma with the Softcatalà forms dictionary.
+
+    spaCy sm mangles capitalized sentence-initial forms ('Ets' -> 'et' NOUN);
+    the forms dict is authoritative, spaCy only disambiguates homographs.
+    """
+    from . import forms
+    cands = forms.lookup(form)
+    if not cands:
+        return lemma, pos
+    if lemma in {c[0].lower() for c in cands}:
+        return lemma, pos
+    for cl, cp in cands:
+        if cp == pos or (cp, pos) in _POS_EQ:
+            return cl.lower(), pos
+    cl, cp = cands[0]
+    return cl.lower(), cp or pos
+
 
 def _spacy():
     global _NLP, _NLP_TRIED
@@ -48,7 +72,8 @@ def naive_tokenize(text: str) -> list[dict]:
                 toks.append({"t": gap.strip(), "lemma": "", "pos": "",
                              "is_word": False, "zipf": 0.0})
         w = m.group(0)
-        toks.append({"t": w, "lemma": w.lower(), "pos": "",
+        lemma, pos = _correct(w, w.lower(), "")
+        toks.append({"t": w, "lemma": lemma, "pos": pos,
                      "is_word": True, "zipf": zipf(w)})
         i = m.end()
     tail = text[i:].strip()
@@ -67,9 +92,10 @@ def tokenize(text: str) -> list[dict]:
         if tok.is_space:
             continue
         is_word = not tok.is_punct
-        toks.append({"t": tok.text,
-                     "lemma": tok.lemma_.lower() if is_word else "",
-                     "pos": tok.pos_ if is_word else "",
+        lemma, pos = ("", "")
+        if is_word:
+            lemma, pos = _correct(tok.text, tok.lemma_.lower(), tok.pos_)
+        toks.append({"t": tok.text, "lemma": lemma, "pos": pos,
                      "is_word": is_word,
                      "zipf": zipf(tok.text) if is_word else 0.0})
     return toks
