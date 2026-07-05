@@ -382,6 +382,7 @@ dialog input { width: 100%; margin: 10px 0; }
   position: fixed; inset: 0; background: rgba(0,0,0,.55);
   display: flex; align-items: center; justify-content: center; z-index: 60;
 }
+#stats-view[hidden] { display: none; }
 #stats-box {
   background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
   padding: 20px 24px; width: min(680px, 92vw); max-height: 86vh; overflow: auto;
