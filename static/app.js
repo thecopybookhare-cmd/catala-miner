@@ -327,15 +327,31 @@ V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; });
 V.addEventListener("pause", () => { $("play-btn").textContent = "▶"; });
 V.addEventListener("loadedmetadata", () => { $("time-dur").textContent = fmtTime(V.duration || 0); });
 $("play-btn").onclick = () => { V.paused ? V.play() : V.pause(); };
-$("prev-btn").onclick = () => gotoSeg(CUR - 1);
-$("next-btn").onclick = () => gotoSeg(CUR + 1);
+$("prev-btn").onclick = () => prevSeg();
+$("next-btn").onclick = () => nextSeg();
 $("replay-btn").onclick = () => replaySeg();
 
 function gotoSeg(i) {
   if (!SEGS.length) return;
-  const j = Math.min(SEGS.length - 1, Math.max(0, i < 0 && CUR < 0 ? 0 : i));
+  const j = Math.min(SEGS.length - 1, Math.max(0, i));
   V.currentTime = SEGS[j].start + 0.01;
   V.play();
+}
+// En huecos entre subtítulos CUR = -1: navegar por tiempo, nunca al segmento 0.
+function nextSeg() {
+  if (!SEGS.length) return;
+  if (CUR >= 0) { gotoSeg(CUR + 1); return; }
+  const t = V.currentTime;
+  for (let i = 0; i < SEGS.length; i++)
+    if (SEGS[i].start > t + 0.05) { gotoSeg(i); return; }
+}
+function prevSeg() {
+  if (!SEGS.length) return;
+  if (CUR >= 0) { gotoSeg(CUR - 1); return; }
+  const t = V.currentTime;
+  for (let i = SEGS.length - 1; i >= 0; i--)
+    if (SEGS[i].end < t) { gotoSeg(i); return; }
+  gotoSeg(0);
 }
 function replaySeg() {
   if (CUR < 0) return;
@@ -510,8 +526,8 @@ document.addEventListener("keydown", (e) => {
     if (lemma) setStatus(lemma, statusKeys[e.key]);
     else toast("Pasa el ratón por una palabra y pulsa " + e.key, "err");
   }
-  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR - 1); }
-  else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); gotoSeg(CUR < 0 ? 0 : CUR + 1); }
+  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); prevSeg(); }
+  else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); nextSeg(); }
   else if (k === "s" || e.key === "ArrowDown") { e.preventDefault(); replaySeg(); }
   else if (k === "w" || e.key === "ArrowUp") {
     e.preventDefault();
