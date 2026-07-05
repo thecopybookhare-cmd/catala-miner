@@ -367,3 +367,12 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
 }
 #toast.ok { border-color: #1d5238; }
 #toast.err { border-color: #63292e; }
+
+/* ---------- dialogo (puerto Anki) ---------- */
+dialog {
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 20px; width: min(420px, 90vw);
+}
+dialog::backdrop { background: rgba(0,0,0,.55); }
+dialog h3 { margin: 0 0 8px; }
+dialog input { width: 100%; margin: 10px 0; }

@@ -133,6 +133,19 @@
   </div>
 </main>
 
+<dialog id="port-dlg">
+  <form method="dialog">
+    <h3>Puerto de AnkiConnect</h3>
+    <p id="port-msg" class="dim"></p>
+    <input id="port-input" type="number" min="1" max="65535"
+           placeholder="vacío = automático (8765/8766/8767)">
+    <div class="row actions">
+      <button value="cancel" type="submit">Cancelar</button>
+      <button value="ok" type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="/app.js?v=0.5.0"></script>
 </body>
 </html>

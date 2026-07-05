@@ -32,18 +32,22 @@ async function refreshAnki() {
   else { b.textContent = q + "Anki cerrado"; b.className = s.pending > 0 ? "badge pending" : "badge"; }
   b.dataset.reason = s.reason || "";
 }
-$("anki-badge").onclick = async () => {
+$("anki-badge").onclick = () => {
   const reason = $("anki-badge").dataset.reason;
-  let msg = "Puerto de AnkiConnect (vacío = automático 8765/8766/8767):";
-  if (reason === "squatted")
-    msg = "Otro servicio ocupa los puertos 8765/8766 en este Mac.\n\nSolución: en Anki → Herramientas → Complementos → AnkiConnect → Configuración, pon \"webBindPort\": 8767 y reinicia Anki. La app lo detectará sola (o escribe 8767 aquí abajo).\n\nPuerto de AnkiConnect:";
-  const v = prompt(msg);
-  if (v === null) return;
-  const port = v.trim() === "" ? null : parseInt(v.trim(), 10);
+  $("port-msg").textContent = reason === "squatted"
+    ? "Otro servicio ocupa los puertos 8765/8766. En Anki → Herramientas → Complementos → AnkiConnect → Configuración pon \"webBindPort\": 8767 y reinicia Anki (o escribe 8767 aquí)."
+    : "Déjalo vacío para detectarlo automáticamente.";
+  $("port-input").value = "";
+  $("port-dlg").showModal();
+};
+$("port-dlg").addEventListener("close", async () => {
+  if ($("port-dlg").returnValue !== "ok") return;
+  const v = $("port-input").value.trim();
+  const port = v === "" ? null : parseInt(v, 10);
   const r = await api("/api/anki/port", { method: "POST", body: JSON.stringify({ port }) });
   toast(r.port ? `✅ AnkiConnect encontrado en el puerto ${r.port}` : "Aún no encuentro AnkiConnect", r.port ? "ok" : "err");
   refreshAnki();
-};
+});
 setInterval(async () => {
   await api("/api/anki/flush", { method: "POST" }).catch(() => {});
   refreshAnki();
