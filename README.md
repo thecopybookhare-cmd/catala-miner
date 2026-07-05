@@ -40,11 +40,16 @@ Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
 3. Clica cualquier palabra del subtítulo (o selecciona una expresión arrastrando).
 4. Revisa/edita la tarjeta en el panel y pulsa **⏎**.
 
-**Atajos:** `espacio` play/pausa · `←/→` segmento anterior/siguiente · `a` repetir
-segmento · `Esc` cerrar panel · `⏎` enviar tarjeta.
+**Atajos (mapa Migaku):** `A`/`←` frase anterior · `D`/`→` siguiente · `S`/`↓` repetir ·
+`Q` crear tarjeta (palabra bajo el cursor o popup abierto) · `1-4` estado de palabra
+(1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · `W` ocultar subtítulos ·
+`Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
+`P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.
 
-**Colores:** fondo amarillo = palabra ya minada · subrayado punteado = palabra
-poco frecuente (rojo) o media (amarillo).
+**Estados de palabra (colores Migaku):** rojo = desconocida · naranja = aprendiendo
+(se marca sola al crear tarjeta) · sin marca = conocida · gris = ignorada · morado = seguimiento.
+Los estados se sincronizan con Anki: intervalo ≥ 21 días → conocida. El chip 📊 de la
+cabecera muestra el % del contenido que ya conoces.
 
 ## Solución de problemas
 
