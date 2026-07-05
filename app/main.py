@@ -286,7 +286,7 @@ def lookup(req: LookupReq):
         "zipf": z, "freq_rank": nlp.freq_badge(z),
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
         "word_es": translate.translate(req.selection),
-        "sentence_es": translate.translate(req.sentence) if req.sentence else "",
+        "sentence_es": translate.sentence(req.sentence) if req.sentence else "",
     }
 
 
@@ -300,7 +300,7 @@ def translate_segment(sid: str, idx: int):
     if not 0 <= idx < len(segs):
         return JSONResponse({"error": "bad index"}, status_code=400)
     if not segs[idx].get("text_es"):
-        segs[idx]["text_es"] = translate.translate(segs[idx]["text"])
+        segs[idx]["text_es"] = translate.sentence(segs[idx]["text"])
         db.update_transcript(CON, sid, json.dumps(segs),
                              s["model_size"], s["srt_source"],
                              s.get("tok_version") or 0)
@@ -360,7 +360,7 @@ def card_preview(req: PreviewReq):
         "paraula_es": translate.translate(req.selection),
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
         "frase": seg["text"],
-        "frase_es": translate.translate(seg["text"]),
+        "frase_es": translate.sentence(seg["text"]),
         "freq_zipf": z, "freq_rank": nlp.freq_badge(z),
         "audio_file": audio_name if audio_ok else "",
         "image_file": image_name if image_ok else "",

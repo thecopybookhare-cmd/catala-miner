@@ -1,7 +1,10 @@
 """Softcatalà cat->spa neural translation via CTranslate2 + SentencePiece."""
+import re
 from pathlib import Path
 
 from . import config
+
+_LEAD = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 _ENGINE = None
 _TRIED = False
@@ -68,3 +71,26 @@ def translate(text: str) -> str:
         return _ENGINE.translate(text)
     except Exception:
         return ""
+
+
+def sentence(text: str) -> str:
+    """translate() + reintento decapitalizado cuando el modelo deja la
+    primera palabra sin traducir por ir en mayúscula ('Ets molt...' ->
+    'Ets muy...'): se decapitaliza, retraduce y recapitaliza."""
+    out = translate(text)
+    if not out:
+        return out
+    m = _LEAD.search(text)
+    if not m:
+        return out
+    w = m.group(0)
+    if not w[0].isupper() or w.lower() == w or w not in out:
+        return out
+    from . import forms
+    if forms.known_exact(w) or not forms.knows_lower(w):
+        return out
+    decap = text[:m.start()] + w[0].lower() + w[1:] + text[m.end():]
+    out2 = translate(decap)
+    if not out2 or w in out2:
+        return out
+    return out2[:1].upper() + out2[1:]
