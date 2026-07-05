@@ -19,6 +19,25 @@ def frame_cmd(src: str, ts: float, out: str) -> list[str]:
             "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "3", out]
 
 
+def clip_cmd(src: str, start: float, end: float, out: str,
+             max_dur: float = 6.0) -> list[str]:
+    """Animated GIF clip of the segment for the flashcard (silent — the
+    audio field carries sound). Palette pass keeps size/quality sane.
+    GIF over WebP: Homebrew's ffmpeg ships without libwebp, and GIF
+    plays everywhere Anki runs. Capped to max_dur seconds."""
+    dur = round(min(end - start, max_dur), 3)
+    vf = ("fps=8,scale=420:-2:flags=lanczos,split[s0][s1];"
+          "[s0]palettegen=max_colors=128[p];"
+          "[s1][p]paletteuse=dither=bayer:bayer_scale=4")
+    return [FFMPEG, "-y", "-ss", str(round(start, 3)), "-i", src,
+            "-t", str(dur), "-an", "-filter_complex", vf,
+            "-loop", "0", out]
+
+
+def animated_clip(src, start, end, out, max_dur=6.0):
+    _run(clip_cmd(src, start, end, out, max_dur))
+
+
 def _run(cmd: list[str]):
     subprocess.run(cmd, check=True, capture_output=True)
 
