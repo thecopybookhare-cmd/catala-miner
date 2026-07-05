@@ -89,3 +89,22 @@ def test_mine_respects_chosen_sense(_tr, _sen, _cut, _snap, _clip, _fl, tmp_path
     assert r["sent_now"] is False
     row = main.CON.execute("SELECT paraula_es FROM cards").fetchone()
     assert row["paraula_es"] == "perro"
+
+
+@patch("app.main.anki.is_up", return_value=False)
+def test_stats_local_only_when_anki_down(_up, tmp_path):
+    c = client(tmp_path)
+    sid = _seg_session("El gos corre")
+    main.db.create_card(
+        main.CON, session_id=sid, segment_index=0, paraula="gos",
+        lema="gos", pos="NOUN", paraula_es="perro", frase="El gos corre",
+        frase_es="El perro corre", freq_rank="common", audio_file="",
+        image_file="", font="V")
+    main.db.set_word_status(main.CON, "gos", "learning")
+    main.db.set_word_status(main.CON, "casa", "known")
+    r = c.get("/api/stats").json()
+    assert r["total_cards"] == 1
+    assert r["status_counts"]["learning"] == 1
+    assert r["status_counts"]["known"] == 1
+    assert len(r["by_month"]) == 1
+    assert r["anki"] is None

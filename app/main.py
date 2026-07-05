@@ -574,6 +574,42 @@ def set_anki_port(req: PortReq):
     return {"ok": True, "port": port, "diag": diag}
 
 
+@app.get("/api/stats")
+def stats():
+    """Métricas transparentes: minado local + estado real en Anki."""
+    rows = CON.execute(
+        "SELECT created_at FROM cards ORDER BY created_at").fetchall()
+    by_month: dict[str, int] = {}
+    for r in rows:
+        k = r["created_at"][:7]
+        by_month[k] = by_month.get(k, 0) + 1
+    status_counts: dict[str, int] = {}
+    for v in db.word_statuses(CON).values():
+        status_counts[v] = status_counts.get(v, 0) + 1
+    out = {"total_cards": len(rows), "by_month": by_month,
+           "status_counts": status_counts,
+           "sessions": len(db.list_sessions(CON)), "anki": None}
+    if anki.is_up(_settings().get("anki_port")):
+        try:
+            deck = _settings()["deck"]
+            ids = anki.find_cards(f'deck:"{deck}"')
+            info = anki.cards_info(ids[:5000])
+            reps = sum(c.get("reps", 0) for c in info)
+            lapses = sum(c.get("lapses", 0) for c in info)
+            out["anki"] = {
+                "total": len(ids),
+                "mature": sum(1 for c in info
+                              if (c.get("interval") or 0) >= 21),
+                "retention": round((1 - lapses / reps) * 100, 1) if reps else None,
+                "due_today": len(anki.find_cards(f'deck:"{deck}" is:due')),
+                "due_7d": len(anki.find_cards(f'deck:"{deck}" prop:due<8')),
+                "due_30d": len(anki.find_cards(f'deck:"{deck}" prop:due<31')),
+            }
+        except Exception:
+            pass
+    return out
+
+
 # media (card audio previews) + frontend
 app.mount("/media", StaticFiles(directory=str(config.MEDIA_DIR)), name="media")
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")
