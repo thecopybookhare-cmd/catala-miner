@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import anki, config, db, dictionary, jobs, media, nlp, subs, translate
+from . import (anki, config, db, dictionary, forms, ipa, jobs, media, nlp,
+               subs, translate)
 
 app = FastAPI(title="CatalaMiner")
 CON = db.connect(config.DB_PATH)
@@ -26,6 +27,67 @@ def _dict():
         except Exception:
             _DICT = dictionary.Dictionary({})
     return _DICT
+
+
+def _senses(selection: str, lemma: str, d=None) -> list[tuple[str, str]]:
+    """Acepciones del bidix: lema primero (palabra única) para que un
+    homógrafo superficial (p. ej. el acrónimo ETS) no tape al lema."""
+    d = d or _dict()
+    if " " in selection.strip():
+        return d.lookup(selection) or d.lookup(lemma)
+    return d.lookup(lemma) or d.lookup(selection)
+
+
+def _active_sense(senses, sentence_es: str, word_es: str) -> int:
+    """WSD ligero: la acepción cuya 1.ª palabra aparece en la traducción
+    de la frase (o coincide con word_es) se preselecciona en el popup."""
+    if not senses:
+        return -1
+    import re
+    words = set(re.findall(r"[^\W\d_]+", sentence_es.lower(), re.UNICODE))
+    for i, (es, _p) in enumerate(senses):
+        head = (es.lower().split() or [""])[0]
+        if head and (head in words or
+                     (len(head) >= 5 and
+                      any(w.startswith(head[:-1]) for w in words))):
+            return i
+    wl = word_es.strip().lower()
+    if wl:
+        for i, (es, _p) in enumerate(senses):
+            if es.strip().lower() == wl:
+                return i
+    return 0
+
+
+def _word_es(selection: str, lemma: str) -> str:
+    """Traducción de la palabra conservando conjugación: si 'Ets' no es
+    nombre propio se traduce 'ets' -> 'eres'; si aun así no cambia, cae
+    al lema."""
+    w = selection
+    if not forms.known_exact(w) and forms.knows_lower(w):
+        w = w.lower()
+    out = translate.translate(w)
+    if (out.strip().lower() == selection.strip().lower()
+            and lemma and lemma != w.lower()):
+        alt = translate.translate(lemma)
+        if alt:
+            out = alt
+    return out
+
+
+def _segment_es(sid: str, idx: int) -> str:
+    """text_es cacheado del segmento (lo crea si falta)."""
+    s = db.get_session(CON, sid)
+    if not s:
+        return ""
+    segs = json.loads(s["transcript_json"])
+    if not 0 <= idx < len(segs):
+        return ""
+    if not segs[idx].get("text_es"):
+        segs[idx]["text_es"] = translate.sentence(segs[idx]["text"])
+        db.update_transcript(CON, sid, json.dumps(segs), s["model_size"],
+                             s["srt_source"], s.get("tok_version") or 0)
+    return segs[idx]["text_es"]
 
 
 def _settings() -> dict:
@@ -272,6 +334,8 @@ def sync_statuses():
 class LookupReq(BaseModel):
     selection: str
     sentence: str = ""
+    session_id: str = ""
+    segment_index: int = -1
 
 
 @app.post("/api/lookup")
@@ -279,14 +343,22 @@ def lookup(req: LookupReq):
     """Instant word info for the Migaku-style popup (no media generated)."""
     lemma, pos = nlp.analyze_selection(req.selection, req.sentence)
     z = nlp.zipf(req.selection)
-    senses = _dict().lookup(req.selection) or _dict().lookup(lemma)
+    senses = _senses(req.selection, lemma)
+    word_es = _word_es(req.selection, lemma)
+    sentence_es = ""
+    if req.session_id and req.segment_index >= 0:
+        sentence_es = _segment_es(req.session_id, req.segment_index)
+    if not sentence_es and req.sentence:
+        sentence_es = translate.sentence(req.sentence)
     return {
         "selection": req.selection,
         "lemma": lemma, "pos": pos,
         "zipf": z, "freq_rank": nlp.freq_badge(z),
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
-        "word_es": translate.translate(req.selection),
-        "sentence_es": translate.sentence(req.sentence) if req.sentence else "",
+        "active": _active_sense(senses[:8], sentence_es, word_es),
+        "word_es": word_es,
+        "sentence_es": sentence_es,
+        "ipa": ipa.ipa(req.selection),
     }
 
 
@@ -299,12 +371,7 @@ def translate_segment(sid: str, idx: int):
     segs = json.loads(s["transcript_json"])
     if not 0 <= idx < len(segs):
         return JSONResponse({"error": "bad index"}, status_code=400)
-    if not segs[idx].get("text_es"):
-        segs[idx]["text_es"] = translate.sentence(segs[idx]["text"])
-        db.update_transcript(CON, sid, json.dumps(segs),
-                             s["model_size"], s["srt_source"],
-                             s.get("tok_version") or 0)
-    return {"index": idx, "text_es": segs[idx]["text_es"]}
+    return {"index": idx, "text_es": _segment_es(sid, idx)}
 
 
 # ---------- cards ----------
