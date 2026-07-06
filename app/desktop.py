@@ -1,15 +1,31 @@
 """CatalàMiner como app de escritorio: uvicorn en un hilo + WKWebView."""
+import logging
 import socket
 import threading
 import time
 
 from . import config
 
+LOG_PATH = config.APP_DIR / "desktop.log"
+
+
+def _setup_logging():
+    """La app empaquetada no tiene terminal — stdout/stderr van a /dev/null.
+    Sin esto, cualquier excepción del servidor es indiagnosticable."""
+    handler = logging.FileHandler(str(LOG_PATH))
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+    logging.getLogger("uvicorn.error").setLevel(logging.INFO)
+
 
 def _serve():
     import uvicorn
     from .main import app
-    uvicorn.run(app, host="127.0.0.1", port=config.PORT, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=config.PORT, log_level="info",
+                log_config=None)
 
 
 def _wait_port(port: int, secs: float = 20.0) -> bool:
@@ -24,12 +40,20 @@ def _wait_port(port: int, secs: float = 20.0) -> bool:
 
 
 def main():
-    import webview
-    threading.Thread(target=_serve, daemon=True).start()
-    _wait_port(config.PORT)
-    webview.create_window("CatalàMiner", f"http://127.0.0.1:{config.PORT}",
-                          width=1280, height=860, min_size=(980, 640))
-    webview.start()
+    _setup_logging()
+    log = logging.getLogger("desktop")
+    log.info("arrancando CatalàMiner desktop, log en %s", LOG_PATH)
+    try:
+        import webview
+        threading.Thread(target=_serve, daemon=True).start()
+        _wait_port(config.PORT)
+        webview.create_window("CatalàMiner", f"http://127.0.0.1:{config.PORT}",
+                              width=1280, height=860, min_size=(980, 640))
+        webview.start()
+    except Exception:
+        log.exception("fallo no capturado en main()")
+        raise
+    log.info("cerrado normalmente")
 
 
 if __name__ == "__main__":
