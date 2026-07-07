@@ -168,7 +168,7 @@ $("back").onclick = () => {
   $("video-col").classList.remove("fake-fs");
   $("player").hidden = true; $("home").hidden = false;
   $("card-panel").hidden = true; $("word-pop").hidden = true;
-  $("comp-chip").hidden = true;
+  $("comp-chip").hidden = true; $("rec-chip").hidden = true;
   loadSessions();
 };
 
@@ -229,6 +229,7 @@ function updateComp() {
   chip.textContent = `📊 ${pct}% conocido · ${newLemmas.size} palabras nuevas`;
   chip.hidden = false;
   chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
+  updateRecs();
 }
 
 // ---------- toggles ----------
@@ -878,8 +879,32 @@ $("set-import").onchange = async (e) => {
   e.target.value = "";
 };
 
-// ---------- recomendadas i+1 (stub: se completa con updateRecs) ----------
-function nextRec() {}
+// ---------- recomendadas i+1 ----------
+// frase óptima para minar = exactamente 1 lema desconocido (estilo Migaku)
+function segNewLemmas(seg) {
+  const s = new Set();
+  for (const t of (seg.tokens || []))
+    if (t.is_word && t.lemma && stOf(t.lemma) === "unknown") s.add(t.lemma);
+  return s.size;
+}
+
+function updateRecs() {
+  RECS = [];
+  SEGS.forEach((seg, i) => { if (segNewLemmas(seg) === 1) RECS.push(i); });
+  const chip = $("rec-chip");
+  if (!SEGS.length || !RECS.length) chip.hidden = true;
+  else { chip.textContent = `⭐ ${RECS.length} recomendadas`; chip.hidden = false; }
+  document.querySelectorAll(".seg.rec").forEach((d) => d.classList.remove("rec"));
+  for (const i of RECS) $("seg-" + i)?.classList.add("rec");
+}
+
+function nextRec() {
+  if (!RECS.length) { toast("No hay frases i+1 ahora mismo", "err"); return; }
+  const t = V.currentTime;
+  const nxt = RECS.find((i) => SEGS[i].start > t + 0.05) ?? RECS[0];
+  gotoSeg(nxt);
+}
+$("rec-chip").onclick = () => nextRec();
 
 // ---------- init ----------
 loadSettings();

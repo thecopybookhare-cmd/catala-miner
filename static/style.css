@@ -433,3 +433,7 @@ button.small { font-size: 12px; padding: 6px 10px; }
   cursor: text; min-width: 40px; display: inline-block;
 }
 #wp-word-es[contenteditable]:focus { border-bottom-color: var(--vio); }
+
+/* ---------- i+1 recomendadas ---------- */
+.seg.rec { border-left: 3px solid var(--amber); }
+#rec-chip { color: var(--amber); cursor: pointer; }

@@ -607,6 +607,41 @@ def anki_status():
             "pending": len(db.pending_cards(CON))}
 
 
+# ---------- export / import de progreso ----------
+
+@app.get("/api/words/export")
+def words_export():
+    import time
+    return JSONResponse(
+        {"version": 1,
+         "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+         "statuses": db.word_statuses(CON)},
+        headers={"Content-Disposition":
+                 "attachment; filename=catalaminer-paraules.json"})
+
+
+class ImportReq(BaseModel):
+    statuses: dict
+    overwrite: bool = False
+
+
+@app.post("/api/words/import")
+def words_import(req: ImportReq):
+    current = db.word_statuses(CON)
+    imported = skipped = 0
+    for lemma, st in req.statuses.items():
+        lm = str(lemma).strip().lower()
+        if not lm or st not in db.WORD_STATUSES:
+            skipped += 1
+            continue
+        if not req.overwrite and lm in current:
+            skipped += 1
+            continue
+        db.set_word_status(CON, lm, st)
+        imported += 1
+    return {"imported": imported, "skipped": skipped}
+
+
 # ---------- diccionario enriquecido ----------
 
 @app.get("/api/examples")

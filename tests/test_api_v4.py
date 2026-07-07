@@ -109,3 +109,33 @@ def test_define_extracts_catalan_section(mock_get, tmp_path):
     r = c.get("/api/define?word=gos").json()
     assert "Animal domèstic" in r["text"]
     assert "otro" not in r["text"]
+
+
+# ---------- export / import ----------
+
+def test_export_import_roundtrip(tmp_path):
+    c = client(tmp_path)
+    main.db.set_word_status(main.CON, "gos", "known")
+    main.db.set_word_status(main.CON, "casa", "learning")
+    exp = c.get("/api/words/export")
+    assert "attachment" in exp.headers["content-disposition"]
+    data = exp.json()
+    assert data["statuses"] == {"gos": "known", "casa": "learning"}
+
+    # DB nueva: importar restaura
+    main.CON = main.db.connect(tmp_path / "t2.db")
+    r = c.post("/api/words/import",
+               json={"statuses": data["statuses"]}).json()
+    assert r["imported"] == 2 and r["skipped"] == 0
+    assert main.db.word_statuses(main.CON) == data["statuses"]
+
+
+def test_import_respects_local_without_overwrite(tmp_path):
+    c = client(tmp_path)
+    main.db.set_word_status(main.CON, "gos", "known")
+    r = c.post("/api/words/import",
+               json={"statuses": {"gos": "ignored", "nou": "learning",
+                                  "malo": "invent"}}).json()
+    assert r["imported"] == 1                      # solo "nou"
+    assert r["skipped"] == 2                       # gos (local) + malo (inválido)
+    assert main.db.word_statuses(main.CON)["gos"] == "known"
