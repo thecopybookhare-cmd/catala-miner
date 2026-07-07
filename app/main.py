@@ -104,10 +104,26 @@ def _segment_es(sid: str, idx: int) -> str:
     return segs[idx]["text_es"]
 
 
+DEFAULT_SETTINGS = {
+    "deck": "Català::Mining", "anki_port": None,
+    "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
+    "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
+    "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
+               "subs": "w", "browser": "g", "copy": "c", "dual": "e",
+               "autopause": "p", "fullscreen": "f", "recommended": "r"},
+}
+
+
 def _settings() -> dict:
-    s = {"deck": "Català::Mining", "anki_port": None}
+    s = {k: (dict(v) if isinstance(v, dict) else v)
+         for k, v in DEFAULT_SETTINGS.items()}
     if SETTINGS_PATH.exists():
-        s.update(json.loads(SETTINGS_PATH.read_text()))
+        saved = json.loads(SETTINGS_PATH.read_text())
+        for k, v in saved.items():
+            if k == "keymap" and isinstance(v, dict):
+                s["keymap"].update(v)
+            else:
+                s[k] = v
     return s
 
 
@@ -589,6 +605,39 @@ def anki_status():
     return {"up": up, "port": port, "reason": reason, "diag": diag,
             "decks": decks, "deck": _settings()["deck"],
             "pending": len(db.pending_cards(CON))}
+
+
+# ---------- configuración ----------
+
+@app.get("/api/settings")
+def get_settings():
+    return _settings()
+
+
+@app.post("/api/settings")
+def post_settings(body: dict):
+    unknown = set(body) - set(DEFAULT_SETTINGS)
+    if unknown:
+        return JSONResponse({"error": f"claves desconocidas: {sorted(unknown)}"},
+                            status_code=400)
+    if "keymap" in body:
+        km = {**_settings()["keymap"], **body["keymap"]}
+        keys = list(km.values())
+        if (set(km) - set(DEFAULT_SETTINGS["keymap"])
+                or any(not (isinstance(k, str) and len(k) == 1
+                            and k.isalpha()) for k in keys)
+                or len(keys) != len(set(keys))):
+            return JSONResponse(
+                {"error": "atajos inválidos (letras a-z, sin repetir)"},
+                status_code=400)
+    saved = json.loads(SETTINGS_PATH.read_text()) if SETTINGS_PATH.exists() else {}
+    for k, v in body.items():
+        if k == "keymap":
+            saved["keymap"] = {**saved.get("keymap", {}), **v}
+        else:
+            saved[k] = v
+    _save_settings(saved)
+    return _settings()
 
 
 class DeckReq(BaseModel):

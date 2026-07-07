@@ -38,3 +38,27 @@ def test_url_session_rejects_non_http(tmp_path):
     c = client(tmp_path)
     r = c.post("/api/sessions/url", json={"url": "file:///etc/passwd"})
     assert r.status_code == 400
+
+
+# ---------- configuración ----------
+
+def test_settings_defaults_and_merge(tmp_path):
+    c = client(tmp_path)
+    s = c.get("/api/settings").json()
+    assert s["deck"] == "Català::Mining"
+    assert s["keymap"]["next"] == "d"
+    # POST parcial: cambia una clave y una tecla, el resto persiste
+    r = c.post("/api/settings",
+               json={"sub_scale": 1.3, "keymap": {"next": "l"}}).json()
+    assert r["sub_scale"] == 1.3
+    assert r["keymap"]["next"] == "l"
+    assert r["keymap"]["prev"] == "a"      # intacta
+    assert c.get("/api/settings").json()["sub_scale"] == 1.3
+
+
+def test_settings_rejects_bad_keymap_and_unknown(tmp_path):
+    c = client(tmp_path)
+    # tecla duplicada con otra acción
+    assert c.post("/api/settings",
+                  json={"keymap": {"next": "a"}}).status_code == 400
+    assert c.post("/api/settings", json={"invent": 1}).status_code == 400
