@@ -133,14 +133,16 @@ def _session_meta(row: dict, statuses: dict) -> dict:
     """Thumbnail (lazy) + comprehension stats for the home cards."""
     sid = row["id"]
     thumb = config.MEDIA_DIR / f"thumb-{sid}.jpg"
-    if not thumb.exists():
+    failed = config.MEDIA_DIR / f"thumb-{sid}.failed"
+    if not thumb.exists() and not failed.exists():
         full = db.get_session(CON, sid)
         try:
             media.snapshot(full["media_path"],
                            max(1.0, (full["duration_secs"] or 10) * 0.12),
                            str(thumb))
         except Exception:
-            pass
+            # URL muerta/lenta: marcar para no reintentar en cada carga
+            failed.touch()
     row["thumb"] = f"/media/thumb-{sid}.jpg" if thumb.exists() else None
     full = db.get_session(CON, sid)
     try:
@@ -185,7 +187,8 @@ def session_detail(sid: str):
                              nlp.TOK_VERSION)
         s["tok_version"] = nlp.TOK_VERSION
     s["word_statuses"] = db.word_statuses(CON)
-    s["media_url"] = "/media-file/" + sid
+    s["media_url"] = (s["media_path"] if s["source_type"] == "url"
+                      else "/media-file/" + sid)
     return s
 
 
@@ -209,6 +212,31 @@ async def upload(file: UploadFile = File(...)):
         duration_secs=media.duration(str(playable)), transcript_json="[]")
     sidecar = _find_sidecar_subs(dest)
     return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+
+
+class UrlReq(BaseModel):
+    url: str
+
+
+@app.post("/api/sessions/url")
+def url_session(req: UrlReq):
+    """Video online por enlace directo (.mp4/.m3u8): streaming sin descarga.
+    ffmpeg corta audio/fotograma de las tarjetas leyendo la misma URL."""
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        return JSONResponse({"error": "la URL debe empezar por http(s)://"},
+                            status_code=400)
+    dur = media.duration(url)
+    if dur <= 0:
+        return JSONResponse(
+            {"error": "no se pudo leer el video de esa URL (¿es un enlace "
+                      "directo a .mp4/.m3u8?)"}, status_code=400)
+    title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
+    sid = db.create_session(
+        CON, title=title, source_type="url", media_path=url,
+        srt_source="none", model_size="-", duration_secs=dur,
+        transcript_json="[]")
+    return {"session_id": sid}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:
