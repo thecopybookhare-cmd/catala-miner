@@ -9,8 +9,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import (anki, config, db, dictionary, forms, ipa, jobs, media, nlp,
-               subs, translate)
+from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
+               media, nlp, subs, translate, tts)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -104,10 +104,26 @@ def _segment_es(sid: str, idx: int) -> str:
     return segs[idx]["text_es"]
 
 
+DEFAULT_SETTINGS = {
+    "deck": "Català::Mining", "anki_port": None,
+    "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
+    "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
+    "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
+               "subs": "w", "browser": "g", "copy": "c", "dual": "e",
+               "autopause": "p", "fullscreen": "f", "recommended": "r"},
+}
+
+
 def _settings() -> dict:
-    s = {"deck": "Català::Mining", "anki_port": None}
+    s = {k: (dict(v) if isinstance(v, dict) else v)
+         for k, v in DEFAULT_SETTINGS.items()}
     if SETTINGS_PATH.exists():
-        s.update(json.loads(SETTINGS_PATH.read_text()))
+        saved = json.loads(SETTINGS_PATH.read_text())
+        for k, v in saved.items():
+            if k == "keymap" and isinstance(v, dict):
+                s["keymap"].update(v)
+            else:
+                s[k] = v
     return s
 
 
@@ -133,14 +149,16 @@ def _session_meta(row: dict, statuses: dict) -> dict:
     """Thumbnail (lazy) + comprehension stats for the home cards."""
     sid = row["id"]
     thumb = config.MEDIA_DIR / f"thumb-{sid}.jpg"
-    if not thumb.exists():
+    failed = config.MEDIA_DIR / f"thumb-{sid}.failed"
+    if not thumb.exists() and not failed.exists():
         full = db.get_session(CON, sid)
         try:
             media.snapshot(full["media_path"],
                            max(1.0, (full["duration_secs"] or 10) * 0.12),
                            str(thumb))
         except Exception:
-            pass
+            # URL muerta/lenta: marcar para no reintentar en cada carga
+            failed.touch()
     row["thumb"] = f"/media/thumb-{sid}.jpg" if thumb.exists() else None
     full = db.get_session(CON, sid)
     try:
@@ -185,7 +203,8 @@ def session_detail(sid: str):
                              nlp.TOK_VERSION)
         s["tok_version"] = nlp.TOK_VERSION
     s["word_statuses"] = db.word_statuses(CON)
-    s["media_url"] = "/media-file/" + sid
+    s["media_url"] = (s["media_path"] if s["source_type"] == "url"
+                      else "/media-file/" + sid)
     return s
 
 
@@ -209,6 +228,31 @@ async def upload(file: UploadFile = File(...)):
         duration_secs=media.duration(str(playable)), transcript_json="[]")
     sidecar = _find_sidecar_subs(dest)
     return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+
+
+class UrlReq(BaseModel):
+    url: str
+
+
+@app.post("/api/sessions/url")
+def url_session(req: UrlReq):
+    """Video online por enlace directo (.mp4/.m3u8): streaming sin descarga.
+    ffmpeg corta audio/fotograma de las tarjetas leyendo la misma URL."""
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        return JSONResponse({"error": "la URL debe empezar por http(s)://"},
+                            status_code=400)
+    dur = media.duration(url)
+    if dur <= 0:
+        return JSONResponse(
+            {"error": "no se pudo leer el video de esa URL (¿es un enlace "
+                      "directo a .mp4/.m3u8?)"}, status_code=400)
+    title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
+    sid = db.create_session(
+        CON, title=title, source_type="url", media_path=url,
+        srt_source="none", model_size="-", duration_secs=dur,
+        transcript_json="[]")
+    return {"session_id": sid}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:
@@ -561,6 +605,117 @@ def anki_status():
     return {"up": up, "port": port, "reason": reason, "diag": diag,
             "decks": decks, "deck": _settings()["deck"],
             "pending": len(db.pending_cards(CON))}
+
+
+# ---------- export / import de progreso ----------
+
+@app.get("/api/words/export")
+def words_export():
+    import time
+    return JSONResponse(
+        {"version": 1,
+         "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+         "statuses": db.word_statuses(CON)},
+        headers={"Content-Disposition":
+                 "attachment; filename=catalaminer-paraules.json"})
+
+
+class ImportReq(BaseModel):
+    statuses: dict
+    overwrite: bool = False
+
+
+@app.post("/api/words/import")
+def words_import(req: ImportReq):
+    current = db.word_statuses(CON)
+    imported = skipped = 0
+    for lemma, st in req.statuses.items():
+        lm = str(lemma).strip().lower()
+        if not lm or st not in db.WORD_STATUSES:
+            skipped += 1
+            continue
+        if not req.overwrite and lm in current:
+            skipped += 1
+            continue
+        db.set_word_status(CON, lm, st)
+        imported += 1
+    return {"imported": imported, "skipped": skipped}
+
+
+# ---------- diccionario enriquecido ----------
+
+@app.get("/api/examples")
+def get_examples(lemma: str, session_id: str = "", index: int = -1):
+    """Frases del propio contenido del usuario donde aparece el lema."""
+    return {"examples": examples.find(CON, lemma, limit=4,
+                                      exclude_sid=session_id,
+                                      exclude_idx=index)}
+
+
+@app.get("/api/tts")
+def get_tts(text: str):
+    return {"file": tts.speak(text)}
+
+
+@app.get("/api/define")
+def define(word: str):
+    """Extracto del Viccionari (online, opcional). Best-effort: '' si falla."""
+    word = (word or "").strip()
+    if not word or not _settings().get("online_enabled"):
+        return {"text": ""}
+    try:
+        import requests
+        r = requests.get(
+            "https://ca.wiktionary.org/w/api.php",
+            params={"action": "query", "prop": "extracts",
+                    "explaintext": 1, "redirects": 1, "format": "json",
+                    "titles": word},
+            timeout=6, headers={"User-Agent": "CatalaMiner/0.7"})
+        pages = r.json()["query"]["pages"]
+        extract = next(iter(pages.values())).get("extract", "")
+        # quedarnos con la sección catalana si existe
+        if "== Català ==" in extract:
+            extract = extract.split("== Català ==", 1)[1]
+            for stop in ("\n== ", "\n=="):
+                if stop in extract:
+                    extract = extract.split(stop, 1)[0]
+                    break
+        return {"text": extract.strip()[:800]}
+    except Exception:
+        return {"text": ""}
+
+
+# ---------- configuración ----------
+
+@app.get("/api/settings")
+def get_settings():
+    return _settings()
+
+
+@app.post("/api/settings")
+def post_settings(body: dict):
+    unknown = set(body) - set(DEFAULT_SETTINGS)
+    if unknown:
+        return JSONResponse({"error": f"claves desconocidas: {sorted(unknown)}"},
+                            status_code=400)
+    if "keymap" in body:
+        km = {**_settings()["keymap"], **body["keymap"]}
+        keys = list(km.values())
+        if (set(km) - set(DEFAULT_SETTINGS["keymap"])
+                or any(not (isinstance(k, str) and len(k) == 1
+                            and k.isalpha()) for k in keys)
+                or len(keys) != len(set(keys))):
+            return JSONResponse(
+                {"error": "atajos inválidos (letras a-z, sin repetir)"},
+                status_code=400)
+    saved = json.loads(SETTINGS_PATH.read_text()) if SETTINGS_PATH.exists() else {}
+    for k, v in body.items():
+        if k == "keymap":
+            saved["keymap"] = {**saved.get("keymap", {}), **v}
+        else:
+            saved[k] = v
+    _save_settings(saved)
+    return _settings()
 
 
 class DeckReq(BaseModel):

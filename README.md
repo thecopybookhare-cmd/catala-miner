@@ -39,7 +39,10 @@ navegador ni terminal. `./install.sh` ya la genera al final. El modo `./run.sh` 
 disponible como alternativa. `espeak-ng` (se instala con `install.sh`) habilita la
 pronunciación IPA en el popup.
 
-1. Abre un archivo local (mp4/mkv/mp3…) o pega una URL de YouTube.
+1. Abre un archivo local (mp4/mkv/mp3…), pega una URL de YouTube (⬇️ descarga)
+   o un **enlace directo .mp4/.m3u8 con «🔗 Ver online»** (streaming sin descargar;
+   las tarjetas cortan audio e imagen desde la propia URL). HLS (.m3u8) reproduce
+   nativo en la app de escritorio/Safari; en Chrome usa mp4 directo.
 2. Pulsa **🎙️ Transcriure** (el modelo catalán ≈3 GB se descarga la primera vez;
    usa `small` si quieres probar rápido). Si el video trae `.srt`/subtítulos de
    YouTube en catalán, puedes usarlos directamente.
@@ -52,6 +55,11 @@ editor de tarjeta · `1-4` estado de palabra
 (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · `W` ocultar subtítulos ·
 `Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
 `P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.
+
+**⚙️ Configuración:** mazo de Anki, tamaño de subtítulos en vivo, dual/auto-pausa/velocidad
+por defecto, IPA, funciones online (Viccionari, off por defecto), **atajos remapeables** y
+export/import de palabras conocidas. **⭐ i+1:** el chip cuenta las frases con exactamente
+una palabra nueva (las óptimas para minar); `R` salta entre ellas.
 
 **Estados de palabra (colores Migaku):** rojo = desconocida · naranja = aprendiendo
 (se marca sola al crear tarjeta) · sin marca = conocida · gris = ignorada · morado = seguimiento.

@@ -9,3 +9,10 @@ def no_forms_download(monkeypatch):
     from app import forms
     monkeypatch.setattr(forms, "_CON", None)
     monkeypatch.setattr(forms, "_TRIED", True)
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(monkeypatch, tmp_path):
+    """Los tests nunca leen/escriben el settings.json real del usuario."""
+    import app.main as main
+    monkeypatch.setattr(main, "SETTINGS_PATH", tmp_path / "settings.json")

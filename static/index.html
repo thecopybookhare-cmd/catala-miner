@@ -4,14 +4,16 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.6.0">
+<link rel="stylesheet" href="/style.css?v=0.7.0">
 </head>
 <body>
 <header>
   <h1 id="brand"><span class="brand-dot"></span>CatalàMiner</h1>
   <div class="header-right">
+    <div id="rec-chip" class="badge" hidden title="Frases con exactamente 1 palabra nueva (i+1) — clic o tecla R para saltar entre ellas"></div>
     <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
     <div id="stats-btn" class="badge" title="Estadísticas">📊</div>
+    <div id="settings-btn" class="badge" title="Configuración">⚙️</div>
     <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
   </div>
 </header>
@@ -25,8 +27,9 @@
         <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
       </label>
       <div class="yt">
-        <input type="url" id="yt-url" placeholder="Pega una URL de YouTube…">
-        <button id="yt-btn">⬇️ Importar</button>
+        <input type="url" id="yt-url" placeholder="URL de YouTube o enlace directo (.mp4, .m3u8)…">
+        <button id="yt-btn" title="Descargar con yt-dlp (YouTube)">⬇️ Importar</button>
+        <button id="url-btn" title="Streaming directo sin descargar (enlaces .mp4/.m3u8)">🔗 Ver online</button>
       </div>
     </div>
   </section>
@@ -76,7 +79,7 @@
         <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">📜</button>
         <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar tarjeta · 1-4 estado (1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · W subs · E dual · G transcripción · F pantalla completa</div>
+      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · G transcripción · F pantalla completa · ⚙️ para cambiar atajos</div>
 
       <aside id="card-panel" hidden>
         <h3>Nueva tarjeta</h3>
@@ -111,13 +114,19 @@
           <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)">🔊</button>
           <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)">➕</button>
           <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)">✏️</button>
+          <button id="wp-say" class="wp-ic" title="Pronunciar palabra" hidden>🗣</button>
+          <button id="wp-dict" class="wp-ic" title="Definición del Viccionari (online)" hidden>🌐</button>
         </div>
         <div id="wp-ctx">
           <div id="wp-sentence-es"></div>
           <div id="wp-sentence-ca"></div>
         </div>
         <div id="wp-senses"></div>
-        <div id="wp-foot"><span id="wp-word-es"></span></div>
+        <div id="wp-examples"></div>
+        <div id="wp-def" class="dim" hidden></div>
+        <div id="wp-foot"><span class="dim">→</span>
+          <span id="wp-word-es" contenteditable="true" spellcheck="false"
+                title="Haz clic para editar la traducción de la tarjeta"></span></div>
         <div id="wp-status">
           <button data-st="unknown" title="Atajo: 1">Nueva</button>
           <button data-st="learning" title="Atajo: 2">Aprendiendo</button>
@@ -133,6 +142,56 @@
     </aside>
   </div>
 </main>
+
+<div id="settings-view" class="modal-view" hidden>
+  <div id="settings-box" class="modal-box">
+    <div class="stats-head"><h2>⚙️ Configuración</h2><button id="settings-close">✕</button></div>
+    <section>
+      <h3>Anki</h3>
+      <div class="set-row"><label>Mazo de minado</label><select id="set-deck"></select></div>
+      <div class="set-row"><label>Puerto AnkiConnect</label>
+        <input id="set-port" type="number" min="1" max="65535" placeholder="automático"></div>
+    </section>
+    <section>
+      <h3>Subtítulos</h3>
+      <div class="set-row"><label>Tamaño (<span id="set-sub-val">100</span>%)</label>
+        <input id="set-sub-scale" type="range" min="60" max="160" step="5"></div>
+      <div class="set-row"><label>Dual español al abrir</label>
+        <input id="set-dual" type="checkbox"></div>
+    </section>
+    <section>
+      <h3>Reproducción</h3>
+      <div class="set-row"><label>Velocidad al abrir</label>
+        <select id="set-speed">
+          <option value="0.75">0.75×</option><option value="1">1×</option>
+          <option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+        </select></div>
+      <div class="set-row"><label>Auto-pausa al abrir</label>
+        <input id="set-autopause" type="checkbox"></div>
+    </section>
+    <section>
+      <h3>Diccionario</h3>
+      <div class="set-row"><label>Pronunciación IPA</label>
+        <input id="set-ipa" type="checkbox"></div>
+      <div class="set-row"><label>Funciones online (Viccionari)</label>
+        <input id="set-online" type="checkbox"></div>
+    </section>
+    <section>
+      <h3>Atajos de teclado</h3>
+      <div id="set-keys"></div>
+      <button id="set-keys-reset" class="small">Restaurar predeterminados</button>
+    </section>
+    <section>
+      <h3>Datos</h3>
+      <div class="set-row">
+        <a id="set-export" href="/api/words/export" download>⬇️ Exportar palabras conocidas</a>
+        <label class="filebtn small">⬆️ Importar
+          <input type="file" id="set-import" accept=".json">
+        </label>
+      </div>
+    </section>
+  </div>
+</div>
 
 <div id="stats-view" hidden>
   <div id="stats-box">
@@ -154,6 +213,6 @@
   </form>
 </dialog>
 
-<script src="/app.js?v=0.6.0"></script>
+<script src="/app.js?v=0.7.0"></script>
 </body>
 </html>
