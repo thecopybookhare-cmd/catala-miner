@@ -114,6 +114,15 @@ $("yt-btn").onclick = async () => {
   if (res) openSession(res.session_id);
 };
 
+$("url-btn").onclick = async () => {
+  const url = $("yt-url").value.trim();
+  if (!url) return;
+  toast("🔗 Comprobando el enlace…");
+  const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
+  if (r.error) { toast(r.error, "err"); return; }
+  openSession(r.session_id);
+};
+
 // ---------- jobs ----------
 async function pollJob(jid, label) {
   $("job-progress").hidden = false;
