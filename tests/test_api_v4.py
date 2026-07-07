@@ -62,3 +62,50 @@ def test_settings_rejects_bad_keymap_and_unknown(tmp_path):
     assert c.post("/api/settings",
                   json={"keymap": {"next": "a"}}).status_code == 400
     assert c.post("/api/settings", json={"invent": 1}).status_code == 400
+
+
+# ---------- ejemplos / tts / define ----------
+
+def _mk_session(title, text, lemma):
+    return main.db.create_session(
+        main.CON, title=title, source_type="local", media_path="/x.mp4",
+        srt_source="srt", model_size="-", duration_secs=10,
+        transcript_json=json.dumps([{
+            "start": 1.0, "end": 2.0, "text": text, "text_es": "",
+            "words": [], "logprob": 0.0,
+            "tokens": [{"t": text.split()[0], "lemma": lemma, "pos": "NOUN",
+                        "is_word": True, "zipf": 4.0}]}]))
+
+
+def test_examples_from_own_content_excludes_current(tmp_path):
+    c = client(tmp_path)
+    sid_a = _mk_session("A", "El gos corre", "gos")
+    _mk_session("B", "Un gos petit", "gos")
+    r = c.get(f"/api/examples?lemma=gos&session_id={sid_a}&index=0").json()
+    texts = [e["text"] for e in r["examples"]]
+    assert "Un gos petit" in texts
+    assert "El gos corre" not in texts          # frase actual excluida
+
+
+@patch("app.tts.shutil.which", return_value=None)
+def test_tts_degrades_without_espeak(_which, tmp_path):
+    c = client(tmp_path)
+    assert c.get("/api/tts?text=gos").json() == {"file": ""}
+
+
+def test_define_gated_by_online_setting(tmp_path):
+    c = client(tmp_path)
+    # online_enabled False por defecto -> ni siquiera hace la peticion
+    assert c.get("/api/define?word=gos").json() == {"text": ""}
+
+
+@patch("requests.get")
+def test_define_extracts_catalan_section(mock_get, tmp_path):
+    c = client(tmp_path)
+    c.post("/api/settings", json={"online_enabled": True})
+    mock_get.return_value.json.return_value = {
+        "query": {"pages": {"1": {"extract":
+            "== Català ==\nNom. Animal domèstic.\n== Espanyol ==\notro"}}}}
+    r = c.get("/api/define?word=gos").json()
+    assert "Animal domèstic" in r["text"]
+    assert "otro" not in r["text"]

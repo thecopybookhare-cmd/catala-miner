@@ -9,8 +9,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import (anki, config, db, dictionary, forms, ipa, jobs, media, nlp,
-               subs, translate)
+from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
+               media, nlp, subs, translate, tts)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -605,6 +605,49 @@ def anki_status():
     return {"up": up, "port": port, "reason": reason, "diag": diag,
             "decks": decks, "deck": _settings()["deck"],
             "pending": len(db.pending_cards(CON))}
+
+
+# ---------- diccionario enriquecido ----------
+
+@app.get("/api/examples")
+def get_examples(lemma: str, session_id: str = "", index: int = -1):
+    """Frases del propio contenido del usuario donde aparece el lema."""
+    return {"examples": examples.find(CON, lemma, limit=4,
+                                      exclude_sid=session_id,
+                                      exclude_idx=index)}
+
+
+@app.get("/api/tts")
+def get_tts(text: str):
+    return {"file": tts.speak(text)}
+
+
+@app.get("/api/define")
+def define(word: str):
+    """Extracto del Viccionari (online, opcional). Best-effort: '' si falla."""
+    word = (word or "").strip()
+    if not word or not _settings().get("online_enabled"):
+        return {"text": ""}
+    try:
+        import requests
+        r = requests.get(
+            "https://ca.wiktionary.org/w/api.php",
+            params={"action": "query", "prop": "extracts",
+                    "explaintext": 1, "redirects": 1, "format": "json",
+                    "titles": word},
+            timeout=6, headers={"User-Agent": "CatalaMiner/0.7"})
+        pages = r.json()["query"]["pages"]
+        extract = next(iter(pages.values())).get("extract", "")
+        # quedarnos con la sección catalana si existe
+        if "== Català ==" in extract:
+            extract = extract.split("== Català ==", 1)[1]
+            for stop in ("\n== ", "\n=="):
+                if stop in extract:
+                    extract = extract.split(stop, 1)[0]
+                    break
+        return {"text": extract.strip()[:800]}
+    except Exception:
+        return {"text": ""}
 
 
 # ---------- configuración ----------

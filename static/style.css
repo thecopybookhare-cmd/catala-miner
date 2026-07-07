@@ -417,3 +417,19 @@ dialog input { width: 100%; margin: 10px 0; }
 button.small { font-size: 12px; padding: 6px 10px; }
 #settings-btn { cursor: pointer; }
 #set-export { font-size: 14px; }
+
+/* ---------- popup: ejemplos, definicion, traduccion editable ---------- */
+.wp-ex {
+  font-size: 12.5px; color: var(--dim); margin: 4px 0;
+  border-left: 2px solid var(--line); padding-left: 8px;
+}
+#wp-def {
+  font-size: 12.5px; max-height: 130px; overflow: auto;
+  white-space: pre-wrap; margin: 6px 0; border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+#wp-word-es[contenteditable] {
+  outline: none; border-bottom: 1px dashed var(--line);
+  cursor: text; min-width: 40px; display: inline-block;
+}
+#wp-word-es[contenteditable]:focus { border-bottom-color: var(--vio); }

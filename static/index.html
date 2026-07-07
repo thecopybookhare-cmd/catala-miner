@@ -113,13 +113,19 @@
           <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)">🔊</button>
           <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)">➕</button>
           <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)">✏️</button>
+          <button id="wp-say" class="wp-ic" title="Pronunciar palabra" hidden>🗣</button>
+          <button id="wp-dict" class="wp-ic" title="Definición del Viccionari (online)" hidden>🌐</button>
         </div>
         <div id="wp-ctx">
           <div id="wp-sentence-es"></div>
           <div id="wp-sentence-ca"></div>
         </div>
         <div id="wp-senses"></div>
-        <div id="wp-foot"><span id="wp-word-es"></span></div>
+        <div id="wp-examples"></div>
+        <div id="wp-def" class="dim" hidden></div>
+        <div id="wp-foot"><span class="dim">→</span>
+          <span id="wp-word-es" contenteditable="true" spellcheck="false"
+                title="Haz clic para editar la traducción de la tarjeta"></span></div>
         <div id="wp-status">
           <button data-st="unknown" title="Atajo: 1">Nueva</button>
           <button data-st="learning" title="Atajo: 2">Aprendiendo</button>

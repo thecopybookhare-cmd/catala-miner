@@ -455,6 +455,8 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   $("wp-meta").textContent = "…";
   $("wp-level").textContent = "";
   $("wp-senses").innerHTML = "";
+  $("wp-examples").innerHTML = "";
+  $("wp-def").hidden = true; $("wp-def").textContent = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
   $("wp-sentence-ca").textContent = SEGS[segIndex].text;
@@ -494,7 +496,22 @@ function renderPopupLookup(r) {
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
-  $("wp-word-es").textContent = r.word_es ? `→ ${r.word_es}` : "";
+  $("wp-word-es").textContent = r.word_es || "";
+  $("wp-say").hidden = !r.ipa;                       // espeak-ng presente
+  $("wp-dict").hidden = !(SETTINGS?.online_enabled);
+  renderExamples(r);
+}
+
+// frases del propio contenido donde aparece el mismo lema (carga perezosa)
+async function renderExamples(r) {
+  if (!r._examples) {
+    const ex = await api(`/api/examples?lemma=${encodeURIComponent(r.lemma)}` +
+      `&session_id=${SESSION.id}&index=${POP ? POP.segIndex : -1}`);
+    r._examples = ex.examples || [];
+  }
+  if (!POP || POP.lookup !== r) return;
+  $("wp-examples").innerHTML = r._examples.slice(0, 3).map((e) =>
+    `<div class="wp-ex" title="${e.session_title}">${e.text}</div>`).join("");
 }
 
 for (const b of $("wp-status").querySelectorAll("button"))
@@ -529,6 +546,21 @@ document.addEventListener("click", (e) => {
 $("wp-replay").onclick = () => { if (POP) { V.currentTime = SEGS[POP.segIndex].start; V.play(); } };
 $("wp-card").onclick = () => mineFromPopup();
 $("wp-edit").onclick = () => editFromPopup();
+$("wp-say").onclick = async () => {
+  if (!POP) return;
+  const r = await api("/api/tts?text=" + encodeURIComponent(POP.selection));
+  if (r.file) new Audio("/media/" + r.file).play().catch(() => {});
+};
+$("wp-dict").onclick = async () => {
+  if (!POP) return;
+  $("wp-def").hidden = false; $("wp-def").textContent = "…";
+  const r = await api("/api/define?word=" + encodeURIComponent(POP.lemma || POP.selection));
+  $("wp-def").textContent = r.text || "— sin entrada en el Viccionari —";
+};
+// traducción editable: lo escrito pasa a ser el paraula_es de la tarjeta
+$("wp-word-es").addEventListener("input", () => {
+  if (POP) POP.chosen = $("wp-word-es").textContent.trim();
+});
 
 function mineFromPopup() {
   if (!POP) return;
@@ -616,7 +648,7 @@ $("c-send").onclick = sendCard;
 // A/← anterior · D/→ siguiente · S/↓ repetir · W/↑ ocultar subs · shift+W ocultar ES ·
 // G navegador · C copiar · Q minar · 1-4 estado · E dual · P auto-pausa · F pantalla completa
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.target.isContentEditable) {
     if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
     return;
   }
