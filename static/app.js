@@ -19,6 +19,10 @@ let POP = null, HOVER = null;
 let PINNED = false, RESUME = false, HOVER_TIMER = null, CLOSE_TIMER = null;
 const ES_CACHE = {};
 const LOOKUP_CACHE = {};
+let SETTINGS = null, KEY2ACTION = {}, CAPTURING = null, RECS = [];
+const DEFAULT_KEYMAP = { prev: "a", next: "d", replay: "s", mine: "q",
+  subs: "w", browser: "g", copy: "c", dual: "e", autopause: "p",
+  fullscreen: "f", recommended: "r" };
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 let SPEED_IX = 0;
 
@@ -147,6 +151,13 @@ async function openSession(sid) {
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
   $("video").src = s.media_url;
+  // preferencias por defecto de la configuración
+  setDual(SETTINGS?.dual_default ?? DUAL);
+  setAutopause(SETTINGS?.autopause_default ?? AUTOPAUSE);
+  const sp = SETTINGS?.speed_default ?? 1;
+  $("video").playbackRate = sp;
+  SPEED_IX = Math.max(0, SPEEDS.indexOf(sp));
+  $("speed-btn").textContent = sp + "×";
   renderSegs();
   renderOverlay();
   updateComp();
@@ -472,7 +483,7 @@ const LEVEL_LABEL = { 5: "muy frecuente", 4: "frecuente", 3: "media", 2: "poco c
 function zipfLevel(z) { return z >= 5.5 ? 5 : z >= 5 ? 4 : z >= 4.3 ? 3 : z >= 3.3 ? 2 : 1; }
 
 function renderPopupLookup(r) {
-  $("wp-ipa").textContent = r.ipa || "";
+  $("wp-ipa").textContent = (SETTINGS?.ipa_enabled ?? true) ? (r.ipa || "") : "";
   const lvl = zipfLevel(r.zipf);
   $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
   $("wp-meta").textContent = `${r.lemma}${r.pos ? " · " + r.pos : ""}`;
@@ -609,7 +620,13 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !$("card-panel").hidden) { e.preventDefault(); sendCard(); }
     return;
   }
-  if ($("player").hidden) return;
+  if (e.key === "Escape") {
+    closePopup(); $("card-panel").hidden = true;
+    $("stats-view").hidden = true; $("settings-view").hidden = true;
+    if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
+    return;
+  }
+  if ($("player").hidden || !$("settings-view").hidden || CAPTURING) return;
   const k = e.key.toLowerCase();
   const statusKeys = { "1": "unknown", "2": "learning", "3": "known", "4": "ignored", "5": "tracking" };
   if (e.key === " ") { e.preventDefault(); V.paused ? V.play() : V.pause(); return; }
@@ -617,35 +634,36 @@ document.addEventListener("keydown", (e) => {
     const lemma = (POP && !$("word-pop").hidden) ? POP.lemma : HOVER?.lemma;
     if (lemma) setStatus(lemma, statusKeys[e.key]);
     else toast("Pasa el ratón por una palabra y pulsa " + e.key, "err");
+    return;
   }
-  else if (k === "a" || e.key === "ArrowLeft") { e.preventDefault(); prevSeg(); }
-  else if (k === "d" || e.key === "ArrowRight") { e.preventDefault(); nextSeg(); }
-  else if (k === "s" || e.key === "ArrowDown") { e.preventDefault(); replaySeg(); }
-  else if (k === "w" || e.key === "ArrowUp") {
+  // teclas de letra remapeables (⚙️) + flechas fijas
+  const act = KEY2ACTION[k] ||
+    ({ ArrowLeft: "prev", ArrowRight: "next", ArrowDown: "replay", ArrowUp: "subs" })[e.key];
+  if (act === "prev") { e.preventDefault(); prevSeg(); }
+  else if (act === "next") { e.preventDefault(); nextSeg(); }
+  else if (act === "replay") { e.preventDefault(); replaySeg(); }
+  else if (act === "subs") {
     e.preventDefault();
     if (e.shiftKey) { HIDE_ES = !HIDE_ES; $("overlay-es").hidden = !DUAL || HIDE_ES; }
     else { HIDE_CA = !HIDE_CA; renderOverlay(); }
   }
-  else if (k === "g") toggleBrowser();
-  else if (k === "c" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiado")); }
-  else if (k === "q") {
+  else if (act === "browser") toggleBrowser();
+  else if (act === "copy" && CUR >= 0) { navigator.clipboard.writeText(SEGS[CUR].text).then(() => toast("📋 Copiado")); }
+  else if (act === "mine") {
     const inPop = POP && !$("word-pop").hidden;
     const seg = inPop ? POP.segIndex : HOVER?.segIndex;
     const sel = inPop ? POP.selection : HOVER?.text;
-    if (sel === undefined) { toast("Pasa el ratón por una palabra y pulsa Q", "err"); return; }
+    if (sel === undefined) { toast("Pasa el ratón por una palabra y pulsa " + (SETTINGS?.keymap?.mine || "Q").toUpperCase(), "err"); return; }
     const chosen = inPop ? (POP.chosen || "") : "";
     if (inPop) closePopup();
     if (e.shiftKey) mine(seg, sel);
     else mineQuick(seg, sel, chosen);
   }
-  else if (k === "e") setDual(!DUAL);
-  else if (k === "p") setAutopause(!AUTOPAUSE);
-  else if (k === "f") toggleFullscreen();
+  else if (act === "dual") setDual(!DUAL);
+  else if (act === "autopause") setAutopause(!AUTOPAUSE);
+  else if (act === "fullscreen") toggleFullscreen();
+  else if (act === "recommended") nextRec();
   else if (e.key === "Enter" && !$("card-panel").hidden) sendCard();
-  else if (e.key === "Escape") {
-    closePopup(); $("card-panel").hidden = true; $("stats-view").hidden = true;
-    if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
-  }
 });
 
 // ---------- estadísticas ----------
@@ -718,6 +736,120 @@ $("stats-btn").onclick = openStats;
 $("stats-close").onclick = () => { $("stats-view").hidden = true; };
 $("stats-view").onclick = (e) => { if (e.target === $("stats-view")) $("stats-view").hidden = true; };
 
+// ---------- configuración ⚙️ ----------
+const ACTION_LABEL = {
+  prev: "Frase anterior", next: "Frase siguiente", replay: "Repetir frase",
+  mine: "Crear tarjeta (⇧ = editar)", subs: "Ocultar subtítulos (⇧ = línea ES)",
+  browser: "Navegador de subtítulos", copy: "Copiar frase",
+  dual: "Subtítulo dual", autopause: "Auto-pausa",
+  fullscreen: "Pantalla completa", recommended: "Siguiente recomendada ⭐",
+};
+
+function rebuildKeymap() {
+  KEY2ACTION = {};
+  const km = SETTINGS?.keymap || DEFAULT_KEYMAP;
+  for (const [act, key] of Object.entries(km)) KEY2ACTION[key] = act;
+}
+
+function applySettings() {
+  document.documentElement.style.setProperty("--sub-scale", SETTINGS.sub_scale);
+  rebuildKeymap();
+  renderKeyEditor();
+  $("set-sub-scale").value = Math.round(SETTINGS.sub_scale * 100);
+  $("set-sub-val").textContent = Math.round(SETTINGS.sub_scale * 100);
+  $("set-dual").checked = SETTINGS.dual_default;
+  $("set-autopause").checked = SETTINGS.autopause_default;
+  $("set-speed").value = String(SETTINGS.speed_default);
+  $("set-ipa").checked = SETTINGS.ipa_enabled;
+  $("set-online").checked = SETTINGS.online_enabled;
+  $("set-port").value = SETTINGS.anki_port ?? "";
+}
+
+async function loadSettings() {
+  SETTINGS = await api("/api/settings");
+  applySettings();
+}
+
+async function saveSettings(partial) {
+  const r = await api("/api/settings", { method: "POST", body: JSON.stringify(partial) });
+  if (r.error) { toast(r.error, "err"); return; }
+  SETTINGS = r;
+  applySettings();
+}
+
+function renderKeyEditor() {
+  const km = SETTINGS?.keymap || DEFAULT_KEYMAP;
+  $("set-keys").innerHTML = Object.keys(ACTION_LABEL).map((a) =>
+    `<div class="set-row"><label>${ACTION_LABEL[a]}</label>
+     <button class="keybtn" data-act="${a}">${CAPTURING === a ? "pulsa una tecla…" : (km[a] || "?").toUpperCase()}</button></div>`).join("");
+  for (const b of $("set-keys").querySelectorAll(".keybtn"))
+    b.onclick = () => { CAPTURING = b.dataset.act; renderKeyEditor(); };
+}
+
+// captura de tecla nueva (fase capture: le gana al handler global)
+document.addEventListener("keydown", (e) => {
+  if (!CAPTURING) return;
+  e.preventDefault(); e.stopPropagation();
+  const k = e.key.toLowerCase();
+  const act = CAPTURING; CAPTURING = null;
+  if (!/^[a-z]$/.test(k)) { toast("Solo letras a–z", "err"); renderKeyEditor(); return; }
+  saveSettings({ keymap: { [act]: k } });
+}, true);
+
+$("set-keys-reset").onclick = () => saveSettings({ keymap: { ...DEFAULT_KEYMAP } });
+
+async function openSettings() {
+  $("settings-view").hidden = false;
+  const st = await api("/api/anki/status");
+  $("set-deck").innerHTML = (st.decks || []).map((d) =>
+    `<option${d === st.deck ? " selected" : ""}>${d}</option>`).join("")
+    || `<option>${SETTINGS?.deck || ""}</option>`;
+}
+$("settings-btn").onclick = openSettings;
+$("settings-close").onclick = () => { $("settings-view").hidden = true; };
+$("settings-view").onclick = (e) => { if (e.target === $("settings-view")) $("settings-view").hidden = true; };
+
+$("set-deck").onchange = async () => {
+  await api("/api/anki/deck", { method: "POST", body: JSON.stringify({ deck: $("set-deck").value }) });
+  toast("✅ Mazo: " + $("set-deck").value);
+};
+$("set-port").onchange = async () => {
+  const v = $("set-port").value.trim();
+  const r = await api("/api/anki/port", { method: "POST", body: JSON.stringify({ port: v === "" ? null : parseInt(v, 10) }) });
+  toast(r.port ? `✅ AnkiConnect en el puerto ${r.port}` : "Aún no encuentro AnkiConnect", r.port ? "ok" : "err");
+  refreshAnki();
+};
+$("set-sub-scale").oninput = () => {
+  const v = $("set-sub-scale").value;
+  $("set-sub-val").textContent = v;
+  document.documentElement.style.setProperty("--sub-scale", v / 100);
+};
+$("set-sub-scale").onchange = () => saveSettings({ sub_scale: $("set-sub-scale").value / 100 });
+$("set-dual").onchange = () => saveSettings({ dual_default: $("set-dual").checked });
+$("set-autopause").onchange = () => saveSettings({ autopause_default: $("set-autopause").checked });
+$("set-speed").onchange = () => saveSettings({ speed_default: parseFloat($("set-speed").value) });
+$("set-ipa").onchange = () => saveSettings({ ipa_enabled: $("set-ipa").checked });
+$("set-online").onchange = () => saveSettings({ online_enabled: $("set-online").checked });
+$("set-import").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const r = await api("/api/words/import", {
+      method: "POST",
+      body: JSON.stringify({ statuses: data.statuses || data, overwrite: false }),
+    });
+    if (r.error) { toast(r.error, "err"); return; }
+    toast(`⬆️ ${r.imported} palabras importadas (${r.skipped} ya existían)`);
+    if (SESSION) openSession(SESSION.id);
+  } catch { toast("JSON inválido", "err"); }
+  e.target.value = "";
+};
+
+// ---------- recomendadas i+1 (stub: se completa con updateRecs) ----------
+function nextRec() {}
+
 // ---------- init ----------
+loadSettings();
 loadSessions();
 refreshAnki();
