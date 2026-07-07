@@ -13,6 +13,20 @@ from . import (anki, config, db, dictionary, forms, ipa, jobs, media, nlp,
                subs, translate)
 
 app = FastAPI(title="CatalaMiner")
+
+
+@app.middleware("http")
+async def no_stale_ui(request, call_next):
+    """Sin esto el navegador cachea index.html/app.js heurísticamente y
+    puede servir UI vieja días después de una actualización. no-cache =
+    revalidar siempre (ETag -> 304, gratis en localhost)."""
+    resp = await call_next(request)
+    p = request.url.path
+    if p == "/" or p.endswith((".html", ".js", ".css")):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 CON = db.connect(config.DB_PATH)
 STATIC = Path(__file__).resolve().parent.parent / "static"
 _DICT = None

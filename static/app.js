@@ -354,10 +354,22 @@ $("prev-btn").onclick = () => prevSeg();
 $("next-btn").onclick = () => nextSeg();
 $("replay-btn").onclick = () => replaySeg();
 
+function setCur(i) {
+  if (i === CUR) return;
+  CUR = i;
+  document.querySelectorAll(".seg.active").forEach((d) => d.classList.remove("active"));
+  if (i >= 0) $("seg-" + i)?.classList.add("active");
+  scrollBrowserTo(i);
+  renderOverlay();
+}
+
 function gotoSeg(i) {
   if (!SEGS.length) return;
   const j = Math.min(SEGS.length - 1, Math.max(0, i));
   V.currentTime = SEGS[j].start + 0.01;
+  // actualizar CUR ya: si no, el timeupdate con auto-pausa cree que nos
+  // "escapamos" del segmento viejo y rebota al final de este.
+  setCur(j);
   V.play();
 }
 // En huecos entre subtítulos CUR = -1: navegar por tiempo, nunca al segmento 0.
@@ -399,13 +411,7 @@ V.addEventListener("timeupdate", () => {
     V.currentTime = Math.max(SEGS[CUR].end - 0.02, SEGS[CUR].start);
     return;
   }
-  if (i !== CUR) {
-    CUR = i;
-    document.querySelectorAll(".seg.active").forEach((d) => d.classList.remove("active"));
-    if (i >= 0) $("seg-" + i)?.classList.add("active");
-    scrollBrowserTo(i);
-    renderOverlay();
-  }
+  setCur(i);
 });
 
 // ---------- popup de palabra ----------

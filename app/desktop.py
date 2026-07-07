@@ -1,5 +1,6 @@
 """CatalàMiner como app de escritorio: uvicorn en un hilo + WKWebView."""
 import logging
+import os
 import socket
 import threading
 import time
@@ -7,6 +8,13 @@ import time
 from . import config
 
 LOG_PATH = config.APP_DIR / "desktop.log"
+
+# Lanzada por LaunchServices (doble clic), la app NO hereda el PATH de la
+# terminal: ffmpeg/ffprobe/espeak-ng de Homebrew quedan invisibles y todo
+# subprocess.run(["ffprobe", ...]) revienta con FileNotFoundError.
+for _hb in ("/opt/homebrew/bin", "/usr/local/bin"):
+    if _hb not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = _hb + os.pathsep + os.environ.get("PATH", "")
 
 
 def _setup_logging():
