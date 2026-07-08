@@ -70,7 +70,7 @@ async function syncStatuses() {
 setInterval(syncStatuses, 60000);
 
 // ---------- biblioteca ----------
-const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", none: "sin transcribir", "-": "—" };
+const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", youtube_auto: "Subs auto YouTube", none: "sin transcribir", "-": "—" };
 
 function fmtTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);

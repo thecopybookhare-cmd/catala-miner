@@ -296,9 +296,12 @@ def youtube_import(req: YoutubeReq):
         if info["subtitles"]:
             from .transcribe import tokens_for_existing
             segs = subs.parse_subtitles(Path(info["subtitles"]).read_text())
+            kind = info.get("subs_kind", "youtube_subs")
+            if kind == "youtube_auto":
+                segs = subs.clean_auto(segs)
             db.update_transcript(CON, sid,
                                  json.dumps(tokens_for_existing(segs)),
-                                 "-", "youtube_subs", nlp.TOK_VERSION)
+                                 "-", kind, nlp.TOK_VERSION)
         return {"session_id": sid}
 
     return {"job_id": jobs.start(work, label="youtube")}
