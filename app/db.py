@@ -80,7 +80,8 @@ def get_session(con, sid):
 def list_sessions(con):
     rs = con.execute(
         "SELECT id,title,source_type,srt_source,model_size,duration_secs,"
-        "created_at FROM sessions ORDER BY created_at DESC").fetchall()
+        "created_at,updated_at FROM sessions ORDER BY created_at DESC"
+    ).fetchall()
     return [dict(r) for r in rs]
 
 
@@ -144,6 +145,21 @@ def mark_learning_if_new(con, lemma: str):
                       (lemma.strip().lower(),)).fetchone()
     if cur is None or cur["status"] == "tracking":
         set_word_status(con, lemma, "learning")
+
+
+def backup_daily(con, app_dir: Path, keep: int = 7):
+    """Copia diaria de la DB (API backup de sqlite, segura con WAL);
+    conserva las `keep` más recientes."""
+    bdir = app_dir / "backups"
+    bdir.mkdir(exist_ok=True)
+    dest = bdir / time.strftime("app-%Y%m%d.db")
+    if not dest.exists():
+        out = sqlite3.connect(str(dest))
+        with out:
+            con.backup(out)
+        out.close()
+    for p in sorted(bdir.glob("app-*.db"))[:-keep]:
+        p.unlink()
 
 
 def cards_with_notes(con) -> list[dict]:

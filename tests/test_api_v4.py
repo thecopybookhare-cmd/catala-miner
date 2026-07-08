@@ -182,3 +182,36 @@ def test_bulk_known_respects_existing(tmp_path, monkeypatch):
     assert st["ser"] == "known"
     assert st["casa"] == "learning"               # intacta
     assert "gos" not in st                        # rango 3 > top_n 2
+
+
+# ---------- biblioteca instantanea + backup ----------
+
+def test_session_meta_cache_invalidates_on_status_change(tmp_path):
+    c = client(tmp_path)
+    _mk_session("V", "El gos corre", "gos")
+    r1 = c.get("/api/sessions").json()[0]
+    assert r1["new_words"] == 1 and r1["comp_pct"] == 0
+    # segunda carga: viene de cache (mismo resultado)
+    assert c.get("/api/sessions").json()[0]["new_words"] == 1
+    # cambiar estado invalida la cache
+    main.db.set_word_status(main.CON, "gos", "known")
+    r2 = c.get("/api/sessions").json()[0]
+    assert r2["comp_pct"] == 100 and r2["new_words"] == 0
+
+
+def test_backup_daily_creates_and_prunes(tmp_path):
+    from app import db as adb
+    con = adb.connect(tmp_path / "app.db")
+    adb.set_word_status(con, "gos", "known")
+    # 9 backups falsos antiguos
+    bdir = tmp_path / "backups"; bdir.mkdir()
+    for i in range(9):
+        (bdir / f"app-2026010{i}.db").write_bytes(b"x")
+    adb.backup_daily(con, tmp_path)
+    files = sorted(p.name for p in bdir.glob("app-*.db"))
+    assert len(files) == 7                        # podado a 7
+    assert files[-1].startswith("app-2026")       # incluye el de hoy
+    # el backup es una DB valida con los datos
+    import sqlite3 as s3
+    bcon = s3.connect(str(bdir / files[-1]))
+    assert bcon.execute("SELECT status FROM word_status").fetchone()[0] == "known"

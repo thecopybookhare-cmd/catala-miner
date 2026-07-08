@@ -28,6 +28,10 @@ async def no_stale_ui(request, call_next):
 
 
 CON = db.connect(config.DB_PATH)
+try:
+    db.backup_daily(CON, config.APP_DIR)
+except Exception:
+    pass
 STATIC = Path(__file__).resolve().parent.parent / "static"
 _DICT = None
 SETTINGS_PATH = config.APP_DIR / "settings.json"
@@ -145,7 +149,19 @@ def health():
             "translator": translate.is_downloaded()}
 
 
-def _session_meta(row: dict, statuses: dict) -> dict:
+# caché de stats de la home: releer todas las transcripciones en cada
+# carga hacía la biblioteca cada vez más lenta. Se invalida al cambiar
+# la transcripción (updated_at) o cualquier estado de palabra (ws_version).
+_META_CACHE: dict = {}
+
+
+def _ws_version() -> str:
+    r = CON.execute(
+        "SELECT MAX(updated_at), COUNT(*) FROM word_status").fetchone()
+    return f"{r[0] or ''}|{r[1]}"
+
+
+def _session_meta(row: dict, statuses: dict, wsv: str) -> dict:
     """Thumbnail (lazy) + comprehension stats for the home cards."""
     sid = row["id"]
     thumb = config.MEDIA_DIR / f"thumb-{sid}.jpg"
@@ -160,33 +176,41 @@ def _session_meta(row: dict, statuses: dict) -> dict:
             # URL muerta/lenta: marcar para no reintentar en cada carga
             failed.touch()
     row["thumb"] = f"/media/thumb-{sid}.jpg" if thumb.exists() else None
-    full = db.get_session(CON, sid)
-    try:
-        segs = json.loads(full["transcript_json"])
-    except Exception:
-        segs = []
-    total = known = 0
-    new_lemmas = set()
-    for seg in segs:
-        for t in seg.get("tokens", []):
-            if t.get("is_word") and t.get("lemma"):
-                st = statuses.get(t["lemma"], "unknown")
-                if st == "ignored":
-                    continue
-                total += 1
-                if st == "known":
-                    known += 1
-                elif st == "unknown":
-                    new_lemmas.add(t["lemma"])
-    row["comp_pct"] = round(known / total * 100) if total else None
-    row["new_words"] = len(new_lemmas) if total else None
+    key = (id(CON), sid, row.get("updated_at"), wsv)
+    cached = _META_CACHE.get(key)
+    if cached is None:
+        full = db.get_session(CON, sid)
+        try:
+            segs = json.loads(full["transcript_json"])
+        except Exception:
+            segs = []
+        total = known = 0
+        new_lemmas = set()
+        for seg in segs:
+            for t in seg.get("tokens", []):
+                if t.get("is_word") and t.get("lemma"):
+                    st = statuses.get(t["lemma"], "unknown")
+                    if st == "ignored":
+                        continue
+                    total += 1
+                    if st == "known":
+                        known += 1
+                    elif st == "unknown":
+                        new_lemmas.add(t["lemma"])
+        cached = {"comp_pct": round(known / total * 100) if total else None,
+                  "new_words": len(new_lemmas) if total else None}
+        if len(_META_CACHE) > 500:
+            _META_CACHE.clear()
+        _META_CACHE[key] = cached
+    row.update(cached)
     return row
 
 
 @app.get("/api/sessions")
 def sessions():
     statuses = db.word_statuses(CON)
-    return [_session_meta(r, statuses) for r in db.list_sessions(CON)]
+    wsv = _ws_version()
+    return [_session_meta(r, statuses, wsv) for r in db.list_sessions(CON)]
 
 
 @app.get("/api/sessions/{sid}")
