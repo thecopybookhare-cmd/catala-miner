@@ -462,3 +462,15 @@ button.small { font-size: 12px; padding: 6px 10px; }
 #words-list .w.st-tracking { border-bottom-color: #b678f0; }
 #words-list .w.st-known { opacity: .55; }
 #words-list .w.st-ignored { opacity: .35; }
+
+/* ---------- progreso global (visible en home y reproductor) ---------- */
+#progress-pill {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 74px;
+  display: flex; align-items: center; gap: 10px; z-index: 65;
+  background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 10px 18px;
+  box-shadow: 0 10px 34px #00000080; animation: toast-in .18s ease;
+}
+#progress-pill[hidden] { display: none; }
+#gp-bar { width: 180px; accent-color: var(--vio); }
+#gp-msg { font-family: var(--display); font-size: 13px; font-weight: 600; }

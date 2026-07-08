@@ -13,12 +13,25 @@ def client(tmp_path):
 
 # ---------- sesiones por URL ----------
 
+def _wait_job(jid, timeout=10):
+    import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        j = main.jobs.get(jid)
+        if j["status"] in ("done", "error"):
+            return j
+        time.sleep(0.05)
+    raise TimeoutError(jid)
+
+
 @patch("app.main.media.duration", return_value=120.5)
 def test_url_session_streams_directly(_dur, tmp_path):
     c = client(tmp_path)
     url = "https://cdn.example.com/videos/merli.mp4?token=abc"
     r = c.post("/api/sessions/url", json={"url": url}).json()
-    sid = r["session_id"]
+    j = _wait_job(r["job_id"])
+    assert j["status"] == "done", j["message"]
+    sid = j["result"]["session_id"]
     d = c.get("/api/sessions/" + sid).json()
     assert d["source_type"] == "url"
     assert d["media_url"] == url            # streaming directo, sin proxy
@@ -30,8 +43,10 @@ def test_url_session_streams_directly(_dur, tmp_path):
 def test_url_session_rejects_unreadable(_dur, tmp_path):
     c = client(tmp_path)
     r = c.post("/api/sessions/url",
-               json={"url": "https://example.com/nada.mp4"})
-    assert r.status_code == 400
+               json={"url": "https://example.com/nada.mp4"}).json()
+    j = _wait_job(r["job_id"])
+    assert j["status"] == "error"
+    assert "no se pudo leer" in j["message"]
 
 
 def test_url_session_rejects_non_http(tmp_path):

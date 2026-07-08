@@ -218,16 +218,26 @@ def media_file(sid: str):
 
 @app.post("/api/sessions/upload")
 async def upload(file: UploadFile = File(...)):
+    """Guarda el archivo y delega remux+análisis a un job con progreso
+    (los .mkv grandes tardan minutos: sin job parecía colgado)."""
     dest = config.DL_DIR / (uuid.uuid4().hex[:6] + "-" + file.filename)
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    playable = media.ensure_browser_playable(dest, config.DL_DIR)
-    sid = db.create_session(
-        CON, title=file.filename, source_type="local",
-        media_path=str(playable), srt_source="none", model_size="-",
-        duration_secs=media.duration(str(playable)), transcript_json="[]")
-    sidecar = _find_sidecar_subs(dest)
-    return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+    fname = file.filename
+
+    def work(jid):
+        jobs.set_progress(jid, 0.3, "Convirtiendo el video si hace falta…")
+        playable = media.ensure_browser_playable(dest, config.DL_DIR)
+        jobs.set_progress(jid, 0.8, "Analizando el video…")
+        sid = db.create_session(
+            CON, title=fname, source_type="local",
+            media_path=str(playable), srt_source="none", model_size="-",
+            duration_secs=media.duration(str(playable)),
+            transcript_json="[]")
+        sidecar = _find_sidecar_subs(dest)
+        return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+
+    return {"job_id": jobs.start(work, label="upload")}
 
 
 class UrlReq(BaseModel):
@@ -242,17 +252,21 @@ def url_session(req: UrlReq):
     if not url.startswith(("http://", "https://")):
         return JSONResponse({"error": "la URL debe empezar por http(s)://"},
                             status_code=400)
-    dur = media.duration(url)
-    if dur <= 0:
-        return JSONResponse(
-            {"error": "no se pudo leer el video de esa URL (¿es un enlace "
-                      "directo a .mp4/.m3u8?)"}, status_code=400)
-    title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
-    sid = db.create_session(
-        CON, title=title, source_type="url", media_path=url,
-        srt_source="none", model_size="-", duration_secs=dur,
-        transcript_json="[]")
-    return {"session_id": sid}
+
+    def work(jid):
+        jobs.set_progress(jid, 0.3, "Comprobando el enlace…")
+        dur = media.duration(url)
+        if dur <= 0:
+            raise ValueError("no se pudo leer el video de esa URL (¿es un "
+                             "enlace directo a .mp4/.m3u8?)")
+        title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
+        sid = db.create_session(
+            CON, title=title, source_type="url", media_path=url,
+            srt_source="none", model_size="-", duration_secs=dur,
+            transcript_json="[]")
+        return {"session_id": sid}
+
+    return {"job_id": jobs.start(work, label="url")}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:

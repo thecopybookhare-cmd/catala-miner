@@ -105,9 +105,11 @@ $("file-input").onchange = async (e) => {
   if (!f) return;
   const fd = new FormData();
   fd.append("file", f);
-  toast("Subiendo archivo…");
-  const r = await fetch("/api/sessions/upload", { method: "POST", body: fd }).then((x) => x.json());
-  await openSession(r.session_id);
+  const r = await uploadWithProgress("/api/sessions/upload", fd).catch(() => null);
+  e.target.value = "";
+  if (!r || r.error) { hideProgress(); toast(r?.error || "Error subiendo el archivo", "err"); return; }
+  const res = await pollJob(r.job_id, "Procesando el video…");
+  if (res) openSession(res.session_id);
 };
 
 $("yt-btn").onclick = async () => {
@@ -121,24 +123,45 @@ $("yt-btn").onclick = async () => {
 $("url-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
-  toast("🔗 Comprobando el enlace…");
   const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
   if (r.error) { toast(r.error, "err"); return; }
-  openSession(r.session_id);
+  const res = await pollJob(r.job_id, "Comprobando el enlace…");
+  if (res) openSession(res.session_id);
 };
 
-// ---------- jobs ----------
+// ---------- jobs (progreso global, visible también en la home) ----------
+function showProgress(v, msg) {
+  $("progress-pill").hidden = false;
+  $("gp-bar").value = v || 0;
+  $("gp-msg").textContent = msg || "";
+}
+function hideProgress() { $("progress-pill").hidden = true; }
+
 async function pollJob(jid, label) {
-  $("job-progress").hidden = false;
-  $("job-msg").textContent = label;
+  showProgress(0, label);
   while (true) {
     const j = await api("/api/jobs/" + jid);
-    $("job-progress").value = j.progress || 0;
-    $("job-msg").textContent = j.message || label;
-    if (j.status === "done") { $("job-progress").hidden = true; $("job-msg").textContent = ""; return j.result; }
-    if (j.status === "error") { $("job-progress").hidden = true; toast("Error: " + j.message, "err"); return null; }
+    showProgress(j.progress || 0, j.message || label);
+    if (j.status === "done") { hideProgress(); return j.result; }
+    if (j.status === "error") { hideProgress(); toast("Error: " + j.message, "err"); return null; }
     await new Promise((r) => setTimeout(r, 800));
   }
+}
+
+// subida con porcentaje real (fetch no expone progreso de subida)
+function uploadWithProgress(url, fd) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", url);
+    x.upload.onprogress = (e) => {
+      if (e.lengthComputable)
+        showProgress(e.loaded / e.total,
+          `Subiendo… ${Math.round((100 * e.loaded) / e.total)}%`);
+    };
+    x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch (err) { reject(err); } };
+    x.onerror = () => reject(new Error("fallo de red"));
+    x.send(fd);
+  });
 }
 
 // ---------- sesión ----------

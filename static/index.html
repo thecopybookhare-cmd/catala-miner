@@ -51,8 +51,6 @@
       <label class="filebtn small">📎 .srt
         <input type="file" id="subs-input" accept=".srt,.vtt">
       </label>
-      <progress id="job-progress" max="1" value="0" hidden></progress>
-      <span id="job-msg"></span>
     </div>
   </div>
 
@@ -207,6 +205,11 @@
     <div class="stats-head"><h2>📊 Estadísticas</h2><button id="stats-close">✕</button></div>
     <div id="stats-body"></div>
   </div>
+</div>
+
+<div id="progress-pill" hidden>
+  <progress id="gp-bar" max="1" value="0"></progress>
+  <span id="gp-msg"></span>
 </div>
 
 <dialog id="level-dlg">
