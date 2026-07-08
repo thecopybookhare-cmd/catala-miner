@@ -481,6 +481,7 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   $("wp-level").textContent = "";
   $("wp-senses").innerHTML = "";
   $("wp-examples").innerHTML = "";
+  $("wp-gloss").hidden = true; $("wp-gloss").innerHTML = "";
   $("wp-def").hidden = true; $("wp-def").textContent = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
@@ -521,6 +522,9 @@ function renderPopupLookup(r) {
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
+  const gl = (r.glosses || []).slice(0, 3);
+  $("wp-gloss").hidden = !gl.length;
+  $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${g.es}</div>`).join("");
   $("wp-word-es").textContent = r.word_es || "";
   $("wp-say").hidden = !r.ipa;                       // espeak-ng presente
   $("wp-dict").hidden = !(SETTINGS?.online_enabled);

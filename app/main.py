@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               media, nlp, subs, translate, tts, vocab)
+               media, nlp, subs, translate, tts, vocab, wikdict)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -449,12 +449,14 @@ def lookup(req: LookupReq):
         sentence_es = _segment_es(req.session_id, req.segment_index)
     if not sentence_es and req.sentence:
         sentence_es = translate.sentence(req.sentence)
+    glosses = wikdict.lookup(lemma) or wikdict.lookup(req.selection)
     return {
         "selection": req.selection,
         "lemma": lemma, "pos": pos,
         "zipf": z, "freq_rank": nlp.freq_badge(z),
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
         "active": _active_sense(senses[:8], sentence_es, word_es),
+        "glosses": [{"es": g, "pos": p} for g, p in glosses[:4]],
         "word_es": word_es,
         "sentence_es": sentence_es,
         "ipa": ipa.ipa(req.selection),

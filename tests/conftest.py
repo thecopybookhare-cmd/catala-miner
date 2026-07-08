@@ -16,3 +16,11 @@ def isolated_settings(monkeypatch, tmp_path):
     """Los tests nunca leen/escriben el settings.json real del usuario."""
     import app.main as main
     monkeypatch.setattr(main, "SETTINGS_PATH", tmp_path / "settings.json")
+
+
+@pytest.fixture(autouse=True)
+def no_wikdict_download(monkeypatch):
+    """Los tests nunca descargan el Wikcionario real."""
+    from app import wikdict
+    monkeypatch.setattr(wikdict, "_CON", None)
+    monkeypatch.setattr(wikdict, "_TRIED", True)

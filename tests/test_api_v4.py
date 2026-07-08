@@ -215,3 +215,37 @@ def test_backup_daily_creates_and_prunes(tmp_path):
     import sqlite3 as s3
     bcon = s3.connect(str(bdir / files[-1]))
     assert bcon.execute("SELECT status FROM word_status").fetchone()[0] == "known"
+
+
+# ---------- wikdict (glosas Wikcionario offline) ----------
+
+def test_wikdict_build_and_lookup(tmp_path, monkeypatch):
+    import sqlite3
+    from app import wikdict
+    sample = "\n".join([
+        '{"word": "gos", "pos": "noun", "senses": [{"glosses": ["Perro, animal doméstico."]}]}',
+        '{"word": "gos", "pos": "noun", "senses": [{"glosses": ["Perro, animal doméstico."]}]}',
+        '{"word": "casa", "pos": "noun", "senses": [{"glosses": ["Casa, vivienda."]}]}',
+        'linea rota no json',
+    ])
+    dbp = tmp_path / "wik.sqlite"
+    wikdict.build(sample, dbp)
+    monkeypatch.setattr(wikdict, "_CON",
+                        sqlite3.connect(str(dbp), check_same_thread=False))
+    monkeypatch.setattr(wikdict, "_TRIED", True)
+    assert wikdict.lookup("gos") == [("Perro, animal doméstico.", "noun")]  # dedupe
+    assert wikdict.lookup("GOS")[0][0].startswith("Perro")
+    assert wikdict.lookup("zzz") == []
+
+
+@patch("app.main.ipa.ipa", return_value="")
+@patch("app.main.translate.sentence", side_effect=lambda t: "ES:" + t)
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_lookup_includes_glosses(_tr, _sen, _ipa, tmp_path, monkeypatch):
+    from app import wikdict
+    monkeypatch.setattr(wikdict, "lookup",
+                        lambda t: [("Perro.", "noun")] if t == "gos" else [])
+    c = client(tmp_path)
+    r = c.post("/api/lookup",
+               json={"selection": "gos", "sentence": "El gos corre"}).json()
+    assert r["glosses"] == [{"es": "Perro.", "pos": "noun"}]
