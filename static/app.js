@@ -230,6 +230,7 @@ function updateComp() {
   chip.hidden = false;
   chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
   updateRecs();
+  if (!$("side-panel").hidden && PANEL_TAB === "words") renderWords();
 }
 
 // ---------- toggles ----------
@@ -878,6 +879,86 @@ $("set-import").onchange = async (e) => {
   } catch { toast("JSON inválido", "err"); }
   e.target.value = "";
 };
+
+// ---------- panel de palabras (Language Reactor) ----------
+let RANKS = null, PANEL_TAB = "subs";
+
+async function loadRanks() {
+  if (!RANKS) RANKS = (await api("/api/vocab/ranks")).ranks || {};
+  return RANKS;
+}
+
+function setPanelTab(t) {
+  PANEL_TAB = t;
+  $("tab-subs").classList.toggle("on", t === "subs");
+  $("tab-words").classList.toggle("on", t === "words");
+  $("subs").hidden = t !== "subs";
+  $("words-view").hidden = t !== "words";
+  if (t === "words") renderWords();
+}
+$("tab-subs").onclick = () => setPanelTab("subs");
+$("tab-words").onclick = () => setPanelTab("words");
+
+const BANDS = [[1, 100], [101, 300], [301, 1000], [1001, 5000]];
+
+async function renderWords() {
+  await loadRanks();
+  // lemas del video: primera aparición + zipf máximo
+  const first = {}, zmax = {};
+  SEGS.forEach((seg, i) => {
+    for (const t of (seg.tokens || []))
+      if (t.is_word && t.lemma) {
+        if (!(t.lemma in first)) first[t.lemma] = i;
+        zmax[t.lemma] = Math.max(zmax[t.lemma] || 0, t.zipf || 0);
+      }
+  });
+  const lemmas = Object.keys(first);
+  if (!lemmas.length) { $("words-list").innerHTML = '<p class="dim">Sin transcripción.</p>'; return; }
+  const bandOf = (l) => {
+    const r = RANKS[l];
+    if (!r) return BANDS.length;
+    for (let b = 0; b < BANDS.length; b++) if (r <= BANDS[b][1]) return b;
+    return BANDS.length;
+  };
+  const groups = Array.from({ length: BANDS.length + 1 }, () => []);
+  for (const l of lemmas) groups[bandOf(l)].push(l);
+  for (const g of groups)
+    g.sort((a, b) => (RANKS[a] || 1e9) - (RANKS[b] || 1e9) || (zmax[b] - zmax[a]));
+  const label = (b) => b < BANDS.length
+    ? `Rank ${BANDS[b][0]} – ${BANDS[b][1]}` : "Resto (raras / sin rango)";
+  $("words-list").innerHTML = groups.map((g, b) => g.length ? `
+    <div class="wband"><div class="wband-h">${label(b)} · ${g.length}</div>
+      <div class="wband-words">${g.map((l) =>
+        `<span class="w st-${stOf(l)}" data-l="${l}">${l}</span>`).join("")}</div></div>` : "").join("");
+  for (const w of $("words-list").querySelectorAll(".w")) {
+    w.onclick = (ev) => {
+      ev.stopPropagation();
+      openPopup(first[w.dataset.l], w.dataset.l, w, true);
+    };
+    w.oncontextmenu = (ev) => {
+      ev.preventDefault();
+      const st = stOf(w.dataset.l);
+      setStatus(w.dataset.l, st === "known" ? "unknown" : "known");
+    };
+  }
+}
+
+$("vocab-level-btn").onclick = () => $("level-dlg").showModal();
+$("level-n").oninput = () => { $("level-val").textContent = $("level-n").value; };
+$("level-dlg").addEventListener("close", async () => {
+  if ($("level-dlg").returnValue !== "ok") return;
+  toast("⏳ Marcando vocabulario…");
+  const r = await api("/api/words/bulk-known", {
+    method: "POST",
+    body: JSON.stringify({ top_n: parseInt($("level-n").value, 10) }),
+  });
+  toast(`✅ ${r.marked} palabras marcadas como conocidas`);
+  if (SESSION) {
+    const s = await api("/api/sessions/" + SESSION.id);
+    STATUS = s.word_statuses || {};
+    renderSegs(); renderOverlay(); updateComp();
+  }
+});
 
 // ---------- recomendadas i+1 ----------
 // frase óptima para minar = exactamente 1 lema desconocido (estilo Migaku)

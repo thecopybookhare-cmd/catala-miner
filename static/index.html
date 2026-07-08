@@ -138,7 +138,16 @@
       <div id="toast" hidden></div>
     </div>
     <aside id="side-panel" hidden>
+      <div id="panel-tabs">
+        <button id="tab-subs" class="ptab on">Subtítulos</button>
+        <button id="tab-words" class="ptab">Palabras</button>
+      </div>
       <div id="subs"></div>
+      <div id="words-view" hidden>
+        <button id="vocab-level-btn">Establecer nivel de vocabulario</button>
+        <p class="dim" id="words-hint">clic = diccionario · clic derecho = conocida ↔ nueva</p>
+        <div id="words-list"></div>
+      </div>
     </aside>
   </div>
 </main>
@@ -199,6 +208,20 @@
     <div id="stats-body"></div>
   </div>
 </div>
+
+<dialog id="level-dlg">
+  <form method="dialog">
+    <h3>Nivel de vocabulario</h3>
+    <p class="dim">Marca como <b>conocidas</b> las palabras más frecuentes del catalán
+      de un solo golpe. No toca las que ya marcaste (aprendiendo/ignoradas se respetan).</p>
+    <div class="set-row"><label>Top <b><span id="level-val">1000</span></b> palabras</label>
+      <input id="level-n" type="range" min="500" max="5000" step="100" value="1000"></div>
+    <div class="row actions">
+      <button value="cancel" type="submit">Cancelar</button>
+      <button value="ok" type="submit" class="primary">Marcar como conocidas</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="port-dlg">
   <form method="dialog">

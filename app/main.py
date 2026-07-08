@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               media, nlp, subs, translate, tts)
+               media, nlp, subs, translate, tts, vocab)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -605,6 +605,23 @@ def anki_status():
     return {"up": up, "port": port, "reason": reason, "diag": diag,
             "decks": decks, "deck": _settings()["deck"],
             "pending": len(db.pending_cards(CON))}
+
+
+# ---------- vocabulario (Language Reactor) ----------
+
+@app.get("/api/vocab/ranks")
+def vocab_ranks():
+    return {"ranks": vocab.ranks()}
+
+
+class BulkKnownReq(BaseModel):
+    top_n: int
+
+
+@app.post("/api/words/bulk-known")
+def words_bulk_known(req: BulkKnownReq):
+    n = max(0, min(5000, req.top_n))
+    return {"marked": vocab.bulk_known(CON, n)}
 
 
 # ---------- export / import de progreso ----------

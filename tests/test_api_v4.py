@@ -139,3 +139,31 @@ def test_import_respects_local_without_overwrite(tmp_path):
     assert r["imported"] == 1                      # solo "nou"
     assert r["skipped"] == 2                       # gos (local) + malo (inválido)
     assert main.db.word_statuses(main.CON)["gos"] == "known"
+
+
+# ---------- vocabulario (Language Reactor) ----------
+
+def test_vocab_ranks_lemmatizes_and_caches(monkeypatch):
+    from app import vocab, forms
+    monkeypatch.setattr(vocab, "_RANKS", None)
+    monkeypatch.setattr(forms, "lookup",
+                        lambda w: [("ser", "VERB")] if w in ("és", "sóc") else [])
+    monkeypatch.setattr("wordfreq.top_n_list",
+                        lambda lang, n: ["és", "sóc", "casa"])
+    r = vocab.ranks()
+    assert r["ser"] == 1          # primera aparición gana ("sóc" no lo pisa)
+    assert r["casa"] == 3
+    assert "sóc" not in r
+
+
+def test_bulk_known_respects_existing(tmp_path, monkeypatch):
+    from app import vocab
+    monkeypatch.setattr(vocab, "_RANKS", {"ser": 1, "casa": 2, "gos": 3})
+    c = client(tmp_path)
+    main.db.set_word_status(main.CON, "casa", "learning")
+    r = c.post("/api/words/bulk-known", json={"top_n": 2}).json()
+    assert r["marked"] == 1                       # solo "ser"
+    st = main.db.word_statuses(main.CON)
+    assert st["ser"] == "known"
+    assert st["casa"] == "learning"               # intacta
+    assert "gos" not in st                        # rango 3 > top_n 2
