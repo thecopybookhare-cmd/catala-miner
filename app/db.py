@@ -19,9 +19,11 @@ CREATE TABLE IF NOT EXISTS cards (
   anki_note_id INTEGER, status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS word_status (
-  lemma TEXT PRIMARY KEY,
+  lemma TEXT NOT NULL,
+  language TEXT NOT NULL DEFAULT 'ca',
   status TEXT NOT NULL,          -- learning | known | ignored | tracking
-  updated_at TEXT NOT NULL);     -- absent row = unknown (Migaku default)
+  updated_at TEXT NOT NULL,      -- absent row = unknown (Migaku default)
+  PRIMARY KEY (lemma, language));
 """
 
 WORD_STATUSES = {"unknown", "learning", "known", "ignored", "tracking"}
@@ -41,10 +43,23 @@ def connect(path: Path) -> sqlite3.Connection:
     if "tok_version" not in cols:
         con.execute("ALTER TABLE sessions ADD COLUMN tok_version "
                     "INTEGER NOT NULL DEFAULT 0")
+    # migración multi-idioma: word_status pasa a PK (lemma, language)
+    ws_cols = {r["name"] for r in con.execute("PRAGMA table_info(word_status)")}
+    if "language" not in ws_cols:
+        con.executescript("""
+        CREATE TABLE word_status_v2 (
+          lemma TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'ca',
+          status TEXT NOT NULL, updated_at TEXT NOT NULL,
+          PRIMARY KEY (lemma, language));
+        INSERT INTO word_status_v2
+          SELECT lemma, 'ca', status, updated_at FROM word_status;
+        DROP TABLE word_status;
+        ALTER TABLE word_status_v2 RENAME TO word_status;
+        """)
     # backfill: lemmas mined before word_status existed become 'learning'
     con.execute(
         "INSERT OR IGNORE INTO word_status "
-        "SELECT DISTINCT lema, 'learning', ? FROM cards WHERE lema != ''",
+        "SELECT DISTINCT lema, 'ca', 'learning', ? FROM cards WHERE lema != ''",
         (_now(),))
     con.commit()
     return con
@@ -80,7 +95,8 @@ def get_session(con, sid):
 def list_sessions(con):
     rs = con.execute(
         "SELECT id,title,source_type,srt_source,model_size,duration_secs,"
-        "created_at FROM sessions ORDER BY created_at DESC").fetchall()
+        "created_at,updated_at FROM sessions ORDER BY created_at DESC"
+    ).fetchall()
     return [dict(r) for r in rs]
 
 
@@ -118,32 +134,50 @@ def known_lemmas(con) -> set[str]:
     return {r["lema"] for r in rs}
 
 
-def set_word_status(con, lemma: str, status: str):
+def set_word_status(con, lemma: str, status: str, lang: str = "ca"):
     lemma = lemma.strip().lower()
     if not lemma:
         return
     if status == "unknown":
-        con.execute("DELETE FROM word_status WHERE lemma=?", (lemma,))
+        con.execute("DELETE FROM word_status WHERE lemma=? AND language=?",
+                    (lemma, lang))
     else:
         con.execute(
-            "INSERT INTO word_status VALUES (?,?,?) "
-            "ON CONFLICT(lemma) DO UPDATE SET status=excluded.status, "
-            "updated_at=excluded.updated_at",
-            (lemma, status, _now()))
+            "INSERT INTO word_status VALUES (?,?,?,?) "
+            "ON CONFLICT(lemma, language) DO UPDATE SET "
+            "status=excluded.status, updated_at=excluded.updated_at",
+            (lemma, lang, status, _now()))
     con.commit()
 
 
-def word_statuses(con) -> dict[str, str]:
-    rs = con.execute("SELECT lemma, status FROM word_status").fetchall()
+def word_statuses(con, lang: str = "ca") -> dict[str, str]:
+    rs = con.execute("SELECT lemma, status FROM word_status "
+                     "WHERE language=?", (lang,)).fetchall()
     return {r["lemma"]: r["status"] for r in rs}
 
 
-def mark_learning_if_new(con, lemma: str):
+def mark_learning_if_new(con, lemma: str, lang: str = "ca"):
     """Card created -> lemma becomes 'learning' unless already known/ignored."""
-    cur = con.execute("SELECT status FROM word_status WHERE lemma=?",
-                      (lemma.strip().lower(),)).fetchone()
+    cur = con.execute(
+        "SELECT status FROM word_status WHERE lemma=? AND language=?",
+        (lemma.strip().lower(), lang)).fetchone()
     if cur is None or cur["status"] == "tracking":
-        set_word_status(con, lemma, "learning")
+        set_word_status(con, lemma, "learning", lang)
+
+
+def backup_daily(con, app_dir: Path, keep: int = 7):
+    """Copia diaria de la DB (API backup de sqlite, segura con WAL);
+    conserva las `keep` más recientes."""
+    bdir = app_dir / "backups"
+    bdir.mkdir(exist_ok=True)
+    dest = bdir / time.strftime("app-%Y%m%d.db")
+    if not dest.exists():
+        out = sqlite3.connect(str(dest))
+        with out:
+            con.backup(out)
+        out.close()
+    for p in sorted(bdir.glob("app-*.db"))[:-keep]:
+        p.unlink()
 
 
 def cards_with_notes(con) -> list[dict]:

@@ -20,6 +20,7 @@ def test_build_and_lookup(tmp_path, monkeypatch):
     con = _db(tmp_path)
     monkeypatch.setattr(forms, "_CON", con)
     monkeypatch.setattr(forms, "_TRIED", True)
+    monkeypatch.setattr(forms, "_LANG", "ca")
     assert forms.lookup("ets") == [("ser", "VERB")]
     assert forms.lookup("Ets") == [("ser", "VERB")]        # cae a minúscula
     assert forms.lookup("gossos") == [("gos", "NOUN")]
@@ -32,6 +33,7 @@ def test_proper_noun_helpers(tmp_path, monkeypatch):
     con = _db(tmp_path)
     monkeypatch.setattr(forms, "_CON", con)
     monkeypatch.setattr(forms, "_TRIED", True)
+    monkeypatch.setattr(forms, "_LANG", "ca")
     assert forms.known_exact("Barcelona") is True
     assert forms.known_exact("Ets") is False
     assert forms.knows_lower("Ets") is True

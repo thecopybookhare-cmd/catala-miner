@@ -70,7 +70,7 @@ async function syncStatuses() {
 setInterval(syncStatuses, 60000);
 
 // ---------- biblioteca ----------
-const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", none: "sin transcribir", "-": "—" };
+const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", youtube_auto: "Subs auto YouTube", none: "sin transcribir", "-": "—" };
 
 function fmtTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
@@ -105,9 +105,11 @@ $("file-input").onchange = async (e) => {
   if (!f) return;
   const fd = new FormData();
   fd.append("file", f);
-  toast("Subiendo archivo…");
-  const r = await fetch("/api/sessions/upload", { method: "POST", body: fd }).then((x) => x.json());
-  await openSession(r.session_id);
+  const r = await uploadWithProgress("/api/sessions/upload", fd).catch(() => null);
+  e.target.value = "";
+  if (!r || r.error) { hideProgress(); toast(r?.error || "Error subiendo el archivo", "err"); return; }
+  const res = await pollJob(r.job_id, "Procesando el video…");
+  if (res) openSession(res.session_id);
 };
 
 $("yt-btn").onclick = async () => {
@@ -121,24 +123,45 @@ $("yt-btn").onclick = async () => {
 $("url-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
-  toast("🔗 Comprobando el enlace…");
   const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
   if (r.error) { toast(r.error, "err"); return; }
-  openSession(r.session_id);
+  const res = await pollJob(r.job_id, "Comprobando el enlace…");
+  if (res) openSession(res.session_id);
 };
 
-// ---------- jobs ----------
+// ---------- jobs (progreso global, visible también en la home) ----------
+function showProgress(v, msg) {
+  $("progress-pill").hidden = false;
+  $("gp-bar").value = v || 0;
+  $("gp-msg").textContent = msg || "";
+}
+function hideProgress() { $("progress-pill").hidden = true; }
+
 async function pollJob(jid, label) {
-  $("job-progress").hidden = false;
-  $("job-msg").textContent = label;
+  showProgress(0, label);
   while (true) {
     const j = await api("/api/jobs/" + jid);
-    $("job-progress").value = j.progress || 0;
-    $("job-msg").textContent = j.message || label;
-    if (j.status === "done") { $("job-progress").hidden = true; $("job-msg").textContent = ""; return j.result; }
-    if (j.status === "error") { $("job-progress").hidden = true; toast("Error: " + j.message, "err"); return null; }
+    showProgress(j.progress || 0, j.message || label);
+    if (j.status === "done") { hideProgress(); return j.result; }
+    if (j.status === "error") { hideProgress(); toast("Error: " + j.message, "err"); return null; }
     await new Promise((r) => setTimeout(r, 800));
   }
+}
+
+// subida con porcentaje real (fetch no expone progreso de subida)
+function uploadWithProgress(url, fd) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", url);
+    x.upload.onprogress = (e) => {
+      if (e.lengthComputable)
+        showProgress(e.loaded / e.total,
+          `Subiendo… ${Math.round((100 * e.loaded) / e.total)}%`);
+    };
+    x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch (err) { reject(err); } };
+    x.onerror = () => reject(new Error("fallo de red"));
+    x.send(fd);
+  });
 }
 
 // ---------- sesión ----------
@@ -230,6 +253,7 @@ function updateComp() {
   chip.hidden = false;
   chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
   updateRecs();
+  if (!$("side-panel").hidden && PANEL_TAB === "words") renderWords();
 }
 
 // ---------- toggles ----------
@@ -457,6 +481,7 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   $("wp-level").textContent = "";
   $("wp-senses").innerHTML = "";
   $("wp-examples").innerHTML = "";
+  $("wp-gloss").hidden = true; $("wp-gloss").innerHTML = "";
   $("wp-def").hidden = true; $("wp-def").textContent = "";
   $("wp-word-es").textContent = "";
   $("wp-sentence-es").textContent = "";
@@ -497,6 +522,9 @@ function renderPopupLookup(r) {
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
+  const gl = (r.glosses || []).slice(0, 3);
+  $("wp-gloss").hidden = !gl.length;
+  $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${g.es}</div>`).join("");
   $("wp-word-es").textContent = r.word_es || "";
   $("wp-say").hidden = !r.ipa;                       // espeak-ng presente
   $("wp-dict").hidden = !(SETTINGS?.online_enabled);
@@ -796,6 +824,11 @@ function applySettings() {
   $("set-ipa").checked = SETTINGS.ipa_enabled;
   $("set-online").checked = SETTINGS.online_enabled;
   $("set-port").value = SETTINGS.anki_port ?? "";
+  // idioma: el selector solo aparece cuando hay más de un perfil activable
+  const langs = (SETTINGS.languages || []).filter((l) => l.available);
+  $("set-lang-section").hidden = langs.length <= 1;
+  $("set-language").innerHTML = langs.map((l) =>
+    `<option value="${l.code}"${l.code === SETTINGS.language ? " selected" : ""}>${l.name}</option>`).join("");
 }
 
 async function loadSettings() {
@@ -863,6 +896,11 @@ $("set-autopause").onchange = () => saveSettings({ autopause_default: $("set-aut
 $("set-speed").onchange = () => saveSettings({ speed_default: parseFloat($("set-speed").value) });
 $("set-ipa").onchange = () => saveSettings({ ipa_enabled: $("set-ipa").checked });
 $("set-online").onchange = () => saveSettings({ online_enabled: $("set-online").checked });
+$("set-language").onchange = async () => {
+  await saveSettings({ language: $("set-language").value });
+  toast("🌍 Idioma cambiado — recarga las sesiones de ese idioma");
+  loadSessions();
+};
 $("set-import").onchange = async (e) => {
   const f = e.target.files[0];
   if (!f) return;
@@ -878,6 +916,86 @@ $("set-import").onchange = async (e) => {
   } catch { toast("JSON inválido", "err"); }
   e.target.value = "";
 };
+
+// ---------- panel de palabras (Language Reactor) ----------
+let RANKS = null, PANEL_TAB = "subs";
+
+async function loadRanks() {
+  if (!RANKS) RANKS = (await api("/api/vocab/ranks")).ranks || {};
+  return RANKS;
+}
+
+function setPanelTab(t) {
+  PANEL_TAB = t;
+  $("tab-subs").classList.toggle("on", t === "subs");
+  $("tab-words").classList.toggle("on", t === "words");
+  $("subs").hidden = t !== "subs";
+  $("words-view").hidden = t !== "words";
+  if (t === "words") renderWords();
+}
+$("tab-subs").onclick = () => setPanelTab("subs");
+$("tab-words").onclick = () => setPanelTab("words");
+
+const BANDS = [[1, 100], [101, 300], [301, 1000], [1001, 5000]];
+
+async function renderWords() {
+  await loadRanks();
+  // lemas del video: primera aparición + zipf máximo
+  const first = {}, zmax = {};
+  SEGS.forEach((seg, i) => {
+    for (const t of (seg.tokens || []))
+      if (t.is_word && t.lemma) {
+        if (!(t.lemma in first)) first[t.lemma] = i;
+        zmax[t.lemma] = Math.max(zmax[t.lemma] || 0, t.zipf || 0);
+      }
+  });
+  const lemmas = Object.keys(first);
+  if (!lemmas.length) { $("words-list").innerHTML = '<p class="dim">Sin transcripción.</p>'; return; }
+  const bandOf = (l) => {
+    const r = RANKS[l];
+    if (!r) return BANDS.length;
+    for (let b = 0; b < BANDS.length; b++) if (r <= BANDS[b][1]) return b;
+    return BANDS.length;
+  };
+  const groups = Array.from({ length: BANDS.length + 1 }, () => []);
+  for (const l of lemmas) groups[bandOf(l)].push(l);
+  for (const g of groups)
+    g.sort((a, b) => (RANKS[a] || 1e9) - (RANKS[b] || 1e9) || (zmax[b] - zmax[a]));
+  const label = (b) => b < BANDS.length
+    ? `Rank ${BANDS[b][0]} – ${BANDS[b][1]}` : "Resto (raras / sin rango)";
+  $("words-list").innerHTML = groups.map((g, b) => g.length ? `
+    <div class="wband"><div class="wband-h">${label(b)} · ${g.length}</div>
+      <div class="wband-words">${g.map((l) =>
+        `<span class="w st-${stOf(l)}" data-l="${l}">${l}</span>`).join("")}</div></div>` : "").join("");
+  for (const w of $("words-list").querySelectorAll(".w")) {
+    w.onclick = (ev) => {
+      ev.stopPropagation();
+      openPopup(first[w.dataset.l], w.dataset.l, w, true);
+    };
+    w.oncontextmenu = (ev) => {
+      ev.preventDefault();
+      const st = stOf(w.dataset.l);
+      setStatus(w.dataset.l, st === "known" ? "unknown" : "known");
+    };
+  }
+}
+
+$("vocab-level-btn").onclick = () => $("level-dlg").showModal();
+$("level-n").oninput = () => { $("level-val").textContent = $("level-n").value; };
+$("level-dlg").addEventListener("close", async () => {
+  if ($("level-dlg").returnValue !== "ok") return;
+  toast("⏳ Marcando vocabulario…");
+  const r = await api("/api/words/bulk-known", {
+    method: "POST",
+    body: JSON.stringify({ top_n: parseInt($("level-n").value, 10) }),
+  });
+  toast(`✅ ${r.marked} palabras marcadas como conocidas`);
+  if (SESSION) {
+    const s = await api("/api/sessions/" + SESSION.id);
+    STATUS = s.word_statuses || {};
+    renderSegs(); renderOverlay(); updateComp();
+  }
+});
 
 // ---------- recomendadas i+1 ----------
 // frase óptima para minar = exactamente 1 lema desconocido (estilo Migaku)

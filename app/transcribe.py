@@ -6,10 +6,14 @@ _MODELS: dict[str, object] = {}
 
 def _model(key: str):
     from faster_whisper import WhisperModel
-    if key not in _MODELS:
-        _MODELS[key] = WhisperModel(config.WHISPER_MODELS[key],
-                                    device="cpu", compute_type="int8")
-    return _MODELS[key]
+    from . import languages
+    code = languages.active_code()
+    models = languages.PROFILES[code]["whisper_models"]
+    cache_key = (code, key)
+    if cache_key not in _MODELS:
+        _MODELS[cache_key] = WhisperModel(models.get(key) or key,
+                                          device="cpu", compute_type="int8")
+    return _MODELS[cache_key]
 
 
 def transcribe(jid: str, media_path: str, model_key: str,

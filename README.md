@@ -56,6 +56,14 @@ editor de tarjeta · `1-4` estado de palabra
 `Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
 `P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.
 
+**📋 Panel «Palabras» (G → pestaña Palabras):** todos los lemas del video por bandas de
+frecuencia (Rank 1–100, 101–300…). Clic = diccionario; clic derecho = conocida ↔ nueva.
+**«Establecer nivel de vocabulario»** marca de un golpe las N palabras más frecuentes del
+catalán como conocidas (sin pisar lo que ya marcaste). Los subtítulos de YouTube usan los
+oficiales o los **automáticos** (etiqueta «Subs auto YouTube») antes de recurrir a Whisper.
+El popup añade **glosas del Wikcionario** (offline, ~4 MB, descarga única). La DB se
+respalda a diario en `backups/` (7 copias). Arquitectura preparada para más idiomas.
+
 **⚙️ Configuración:** mazo de Anki, tamaño de subtítulos en vivo, dual/auto-pausa/velocidad
 por defecto, IPA, funciones online (Viccionari, off por defecto), **atajos remapeables** y
 export/import de palabras conocidas. **⭐ i+1:** el chip cuenta las frases con exactamente

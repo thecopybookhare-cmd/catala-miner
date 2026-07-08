@@ -16,6 +16,7 @@ def download(jid: str, url: str) -> dict:
         "format": "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
         "outtmpl": str(config.DL_DIR / "%(title).80s-%(id)s.%(ext)s"),
         "writesubtitles": True,
+        "writeautomaticsub": True,   # fallback: subs autogenerados de YouTube
         "subtitleslangs": ["ca"],
         "subtitlesformat": "vtt",
         "noplaylist": True,
@@ -26,7 +27,9 @@ def download(jid: str, url: str) -> dict:
         info = ydl.extract_info(url, download=True)
         media = Path(ydl.prepare_filename(info))
     vtt = Path(str(media.with_suffix("")) + ".ca.vtt")
+    manual = "ca" in (info.get("subtitles") or {})
     return {"media_path": str(media),
             "title": info.get("title") or media.stem,
             "subtitles": str(vtt) if vtt.exists() else None,
+            "subs_kind": "youtube_subs" if manual else "youtube_auto",
             "duration": float(info.get("duration") or 0)}

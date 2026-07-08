@@ -6,9 +6,6 @@ from . import config
 
 _LEAD = re.compile(r"[^\W\d_]+", re.UNICODE)
 
-_ENGINE = None
-_TRIED = False
-
 
 def detok(pieces: list[str]) -> str:
     out = "".join(pieces).replace("▁", " ")
@@ -41,7 +38,8 @@ class _Engine:
 
 
 def model_dir() -> Path:
-    return config.MODELS_DIR / "translate-cat-spa"
+    from . import languages
+    return config.MODELS_DIR / languages.profile()["translate_dir"]
 
 
 def is_downloaded() -> bool:
@@ -50,25 +48,31 @@ def is_downloaded() -> bool:
 
 def download():
     from huggingface_hub import snapshot_download
-    snapshot_download(repo_id=config.TRANSLATE_REPO,
-                      local_dir=str(model_dir()))
+    from . import languages
+    repo = languages.profile()["translate_repo"]
+    if repo:
+        snapshot_download(repo_id=repo, local_dir=str(model_dir()))
+
+
+_ENGINES: dict = {}   # motor por idioma
 
 
 def translate(text: str) -> str:
-    """Translate ca->es. Returns '' on any failure (never raises to caller)."""
-    global _ENGINE, _TRIED
-    if _ENGINE is None and not _TRIED:
-        _TRIED = True
+    """Translate →es. Returns '' on any failure (never raises to caller)."""
+    from . import languages
+    code = languages.active_code()
+    if code not in _ENGINES:
         try:
             if not is_downloaded():
                 download()
-            _ENGINE = _Engine(model_dir())
+            _ENGINES[code] = _Engine(model_dir())
         except Exception:
-            _ENGINE = None
-    if _ENGINE is None:
+            _ENGINES[code] = None
+    eng = _ENGINES[code]
+    if eng is None:
         return ""
     try:
-        return _ENGINE.translate(text)
+        return eng.translate(text)
     except Exception:
         return ""
 

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               media, nlp, subs, translate, tts)
+               languages, media, nlp, subs, translate, tts, vocab, wikdict)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -28,19 +28,23 @@ async def no_stale_ui(request, call_next):
 
 
 CON = db.connect(config.DB_PATH)
+try:
+    db.backup_daily(CON, config.APP_DIR)
+except Exception:
+    pass
 STATIC = Path(__file__).resolve().parent.parent / "static"
-_DICT = None
+_DICTS: dict = {}   # bidix por idioma
 SETTINGS_PATH = config.APP_DIR / "settings.json"
 
 
 def _dict():
-    global _DICT
-    if _DICT is None:
+    code = languages.active_code()
+    if code not in _DICTS:
         try:
-            _DICT = dictionary.load()
+            _DICTS[code] = dictionary.load()
         except Exception:
-            _DICT = dictionary.Dictionary({})
-    return _DICT
+            _DICTS[code] = dictionary.Dictionary({})
+    return _DICTS[code]
 
 
 def _senses(selection: str, lemma: str, d=None) -> list[tuple[str, str]]:
@@ -105,7 +109,7 @@ def _segment_es(sid: str, idx: int) -> str:
 
 
 DEFAULT_SETTINGS = {
-    "deck": "Català::Mining", "anki_port": None,
+    "deck": "Català::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
     "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
@@ -131,6 +135,10 @@ def _save_settings(s: dict):
     SETTINGS_PATH.write_text(json.dumps(s))
 
 
+def _lang() -> str:
+    return languages.active_code()
+
+
 def _fmt_ts(secs: float) -> str:
     m, s = divmod(int(secs), 60)
     h, m = divmod(m, 60)
@@ -145,7 +153,19 @@ def health():
             "translator": translate.is_downloaded()}
 
 
-def _session_meta(row: dict, statuses: dict) -> dict:
+# caché de stats de la home: releer todas las transcripciones en cada
+# carga hacía la biblioteca cada vez más lenta. Se invalida al cambiar
+# la transcripción (updated_at) o cualquier estado de palabra (ws_version).
+_META_CACHE: dict = {}
+
+
+def _ws_version() -> str:
+    r = CON.execute(
+        "SELECT MAX(updated_at), COUNT(*) FROM word_status").fetchone()
+    return f"{r[0] or ''}|{r[1]}"
+
+
+def _session_meta(row: dict, statuses: dict, wsv: str) -> dict:
     """Thumbnail (lazy) + comprehension stats for the home cards."""
     sid = row["id"]
     thumb = config.MEDIA_DIR / f"thumb-{sid}.jpg"
@@ -160,33 +180,41 @@ def _session_meta(row: dict, statuses: dict) -> dict:
             # URL muerta/lenta: marcar para no reintentar en cada carga
             failed.touch()
     row["thumb"] = f"/media/thumb-{sid}.jpg" if thumb.exists() else None
-    full = db.get_session(CON, sid)
-    try:
-        segs = json.loads(full["transcript_json"])
-    except Exception:
-        segs = []
-    total = known = 0
-    new_lemmas = set()
-    for seg in segs:
-        for t in seg.get("tokens", []):
-            if t.get("is_word") and t.get("lemma"):
-                st = statuses.get(t["lemma"], "unknown")
-                if st == "ignored":
-                    continue
-                total += 1
-                if st == "known":
-                    known += 1
-                elif st == "unknown":
-                    new_lemmas.add(t["lemma"])
-    row["comp_pct"] = round(known / total * 100) if total else None
-    row["new_words"] = len(new_lemmas) if total else None
+    key = (id(CON), sid, row.get("updated_at"), wsv)
+    cached = _META_CACHE.get(key)
+    if cached is None:
+        full = db.get_session(CON, sid)
+        try:
+            segs = json.loads(full["transcript_json"])
+        except Exception:
+            segs = []
+        total = known = 0
+        new_lemmas = set()
+        for seg in segs:
+            for t in seg.get("tokens", []):
+                if t.get("is_word") and t.get("lemma"):
+                    st = statuses.get(t["lemma"], "unknown")
+                    if st == "ignored":
+                        continue
+                    total += 1
+                    if st == "known":
+                        known += 1
+                    elif st == "unknown":
+                        new_lemmas.add(t["lemma"])
+        cached = {"comp_pct": round(known / total * 100) if total else None,
+                  "new_words": len(new_lemmas) if total else None}
+        if len(_META_CACHE) > 500:
+            _META_CACHE.clear()
+        _META_CACHE[key] = cached
+    row.update(cached)
     return row
 
 
 @app.get("/api/sessions")
 def sessions():
-    statuses = db.word_statuses(CON)
-    return [_session_meta(r, statuses) for r in db.list_sessions(CON)]
+    statuses = db.word_statuses(CON, _lang())
+    wsv = _ws_version()
+    return [_session_meta(r, statuses, wsv) for r in db.list_sessions(CON)]
 
 
 @app.get("/api/sessions/{sid}")
@@ -202,7 +230,7 @@ def session_detail(sid: str):
                              s["model_size"], s["srt_source"],
                              nlp.TOK_VERSION)
         s["tok_version"] = nlp.TOK_VERSION
-    s["word_statuses"] = db.word_statuses(CON)
+    s["word_statuses"] = db.word_statuses(CON, _lang())
     s["media_url"] = (s["media_path"] if s["source_type"] == "url"
                       else "/media-file/" + sid)
     return s
@@ -218,16 +246,26 @@ def media_file(sid: str):
 
 @app.post("/api/sessions/upload")
 async def upload(file: UploadFile = File(...)):
+    """Guarda el archivo y delega remux+análisis a un job con progreso
+    (los .mkv grandes tardan minutos: sin job parecía colgado)."""
     dest = config.DL_DIR / (uuid.uuid4().hex[:6] + "-" + file.filename)
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    playable = media.ensure_browser_playable(dest, config.DL_DIR)
-    sid = db.create_session(
-        CON, title=file.filename, source_type="local",
-        media_path=str(playable), srt_source="none", model_size="-",
-        duration_secs=media.duration(str(playable)), transcript_json="[]")
-    sidecar = _find_sidecar_subs(dest)
-    return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+    fname = file.filename
+
+    def work(jid):
+        jobs.set_progress(jid, 0.3, "Convirtiendo el video si hace falta…")
+        playable = media.ensure_browser_playable(dest, config.DL_DIR)
+        jobs.set_progress(jid, 0.8, "Analizando el video…")
+        sid = db.create_session(
+            CON, title=fname, source_type="local",
+            media_path=str(playable), srt_source="none", model_size="-",
+            duration_secs=media.duration(str(playable)),
+            transcript_json="[]")
+        sidecar = _find_sidecar_subs(dest)
+        return {"session_id": sid, "has_sidecar_subs": bool(sidecar)}
+
+    return {"job_id": jobs.start(work, label="upload")}
 
 
 class UrlReq(BaseModel):
@@ -242,17 +280,21 @@ def url_session(req: UrlReq):
     if not url.startswith(("http://", "https://")):
         return JSONResponse({"error": "la URL debe empezar por http(s)://"},
                             status_code=400)
-    dur = media.duration(url)
-    if dur <= 0:
-        return JSONResponse(
-            {"error": "no se pudo leer el video de esa URL (¿es un enlace "
-                      "directo a .mp4/.m3u8?)"}, status_code=400)
-    title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
-    sid = db.create_session(
-        CON, title=title, source_type="url", media_path=url,
-        srt_source="none", model_size="-", duration_secs=dur,
-        transcript_json="[]")
-    return {"session_id": sid}
+
+    def work(jid):
+        jobs.set_progress(jid, 0.3, "Comprobando el enlace…")
+        dur = media.duration(url)
+        if dur <= 0:
+            raise ValueError("no se pudo leer el video de esa URL (¿es un "
+                             "enlace directo a .mp4/.m3u8?)")
+        title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
+        sid = db.create_session(
+            CON, title=title, source_type="url", media_path=url,
+            srt_source="none", model_size="-", duration_secs=dur,
+            transcript_json="[]")
+        return {"session_id": sid}
+
+    return {"job_id": jobs.start(work, label="url")}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:
@@ -282,9 +324,12 @@ def youtube_import(req: YoutubeReq):
         if info["subtitles"]:
             from .transcribe import tokens_for_existing
             segs = subs.parse_subtitles(Path(info["subtitles"]).read_text())
+            kind = info.get("subs_kind", "youtube_subs")
+            if kind == "youtube_auto":
+                segs = subs.clean_auto(segs)
             db.update_transcript(CON, sid,
                                  json.dumps(tokens_for_existing(segs)),
-                                 "-", "youtube_subs", nlp.TOK_VERSION)
+                                 "-", kind, nlp.TOK_VERSION)
         return {"session_id": sid}
 
     return {"job_id": jobs.start(work, label="youtube")}
@@ -355,7 +400,7 @@ class WordStatusReq(BaseModel):
 def set_word_status(req: WordStatusReq):
     if req.status not in db.WORD_STATUSES:
         return JSONResponse({"error": "bad status"}, status_code=400)
-    db.set_word_status(CON, req.lemma, req.status)
+    db.set_word_status(CON, req.lemma, req.status, _lang())
     return {"ok": True, "lemma": req.lemma.strip().lower(),
             "status": req.status}
 
@@ -371,7 +416,7 @@ def sync_statuses():
         pass
     pairs = db.cards_with_notes(CON)
     intervals = anki.note_intervals([p["anki_note_id"] for p in pairs])
-    statuses = db.word_statuses(CON)
+    statuses = db.word_statuses(CON, _lang())
     n = 0
     for p in pairs:
         iv = intervals.get(p["anki_note_id"])
@@ -382,7 +427,7 @@ def sync_statuses():
         if current in ("ignored",):
             continue
         if current != target:
-            db.set_word_status(CON, p["lema"], target)
+            db.set_word_status(CON, p["lema"], target, _lang())
             n += 1
     return {"synced": n}
 
@@ -408,12 +453,14 @@ def lookup(req: LookupReq):
         sentence_es = _segment_es(req.session_id, req.segment_index)
     if not sentence_es and req.sentence:
         sentence_es = translate.sentence(req.sentence)
+    glosses = wikdict.lookup(lemma) or wikdict.lookup(req.selection)
     return {
         "selection": req.selection,
         "lemma": lemma, "pos": pos,
         "zipf": z, "freq_rank": nlp.freq_badge(z),
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
         "active": _active_sense(senses[:8], sentence_es, word_es),
+        "glosses": [{"es": g, "pos": p} for g, p in glosses[:4]],
         "word_es": word_es,
         "sentence_es": sentence_es,
         "ipa": ipa.ipa(req.selection),
@@ -527,11 +574,11 @@ def card_mine(req: MineReq):
         freq_rank=p["freq_rank"], audio_file=p["audio_file"],
         image_file=p["clip_file"] or p["image_file"], font=p["font"])
     if p["lema"]:
-        db.mark_learning_if_new(CON, p["lema"])
+        db.mark_learning_if_new(CON, p["lema"], _lang())
     sent = _flush()
     return {"card_id": cid, "sent_now": sent > 0,
             "pending": len(db.pending_cards(CON)),
-            "word_status": db.word_statuses(CON).get(p["lema"]),
+            "word_status": db.word_statuses(CON, _lang()).get(p["lema"]),
             "lema": p["lema"], "paraula": p["paraula"]}
 
 
@@ -559,11 +606,11 @@ def create_card(req: CardReq):
                          freq_rank=req.freq_rank, audio_file=req.audio_file,
                          image_file=req.image_file, font=req.font)
     if req.lema:
-        db.mark_learning_if_new(CON, req.lema)
+        db.mark_learning_if_new(CON, req.lema, _lang())
     sent = _flush()
     return {"card_id": cid, "sent_now": sent,
             "pending": len(db.pending_cards(CON)),
-            "word_status": db.word_statuses(CON).get(req.lema.strip().lower())}
+            "word_status": db.word_statuses(CON, _lang()).get(req.lema.strip().lower())}
 
 
 def _flush() -> int:
@@ -607,6 +654,23 @@ def anki_status():
             "pending": len(db.pending_cards(CON))}
 
 
+# ---------- vocabulario (Language Reactor) ----------
+
+@app.get("/api/vocab/ranks")
+def vocab_ranks():
+    return {"ranks": vocab.ranks()}
+
+
+class BulkKnownReq(BaseModel):
+    top_n: int
+
+
+@app.post("/api/words/bulk-known")
+def words_bulk_known(req: BulkKnownReq):
+    n = max(0, min(5000, req.top_n))
+    return {"marked": vocab.bulk_known(CON, n, _lang())}
+
+
 # ---------- export / import de progreso ----------
 
 @app.get("/api/words/export")
@@ -615,7 +679,7 @@ def words_export():
     return JSONResponse(
         {"version": 1,
          "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-         "statuses": db.word_statuses(CON)},
+         "statuses": db.word_statuses(CON, _lang())},
         headers={"Content-Disposition":
                  "attachment; filename=catalaminer-paraules.json"})
 
@@ -627,7 +691,7 @@ class ImportReq(BaseModel):
 
 @app.post("/api/words/import")
 def words_import(req: ImportReq):
-    current = db.word_statuses(CON)
+    current = db.word_statuses(CON, _lang())
     imported = skipped = 0
     for lemma, st in req.statuses.items():
         lm = str(lemma).strip().lower()
@@ -637,7 +701,7 @@ def words_import(req: ImportReq):
         if not req.overwrite and lm in current:
             skipped += 1
             continue
-        db.set_word_status(CON, lm, st)
+        db.set_word_status(CON, lm, st, _lang())
         imported += 1
     return {"imported": imported, "skipped": skipped}
 
@@ -687,9 +751,17 @@ def define(word: str):
 
 # ---------- configuración ----------
 
+def _settings_payload() -> dict:
+    s = _settings()
+    s["languages"] = [{"code": c, "name": p["name"],
+                       "available": languages.available(c)}
+                      for c, p in languages.PROFILES.items()]
+    return s
+
+
 @app.get("/api/settings")
 def get_settings():
-    return _settings()
+    return _settings_payload()
 
 
 @app.post("/api/settings")
@@ -697,6 +769,9 @@ def post_settings(body: dict):
     unknown = set(body) - set(DEFAULT_SETTINGS)
     if unknown:
         return JSONResponse({"error": f"claves desconocidas: {sorted(unknown)}"},
+                            status_code=400)
+    if "language" in body and body["language"] not in languages.activable():
+        return JSONResponse({"error": "idioma no disponible todavía"},
                             status_code=400)
     if "keymap" in body:
         km = {**_settings()["keymap"], **body["keymap"]}
@@ -715,7 +790,7 @@ def post_settings(body: dict):
         else:
             saved[k] = v
     _save_settings(saved)
-    return _settings()
+    return _settings_payload()
 
 
 class DeckReq(BaseModel):
@@ -753,7 +828,7 @@ def stats():
         k = r["created_at"][:7]
         by_month[k] = by_month.get(k, 0) + 1
     status_counts: dict[str, int] = {}
-    for v in db.word_statuses(CON).values():
+    for v in db.word_statuses(CON, _lang()).values():
         status_counts[v] = status_counts.get(v, 0) + 1
     out = {"total_cards": len(rows), "by_month": by_month,
            "status_counts": status_counts,

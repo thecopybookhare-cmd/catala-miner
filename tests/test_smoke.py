@@ -18,7 +18,16 @@ def test_upload_preview_card_flow(_tr, tmp_path):
     with wav.open("rb") as f:
         r = c.post("/api/sessions/upload",
                    files={"file": ("clip.wav", f, "audio/wav")}).json()
-    sid = r["session_id"]
+    # la subida ahora delega a un job con progreso
+    import time
+    t0 = time.time()
+    while time.time() - t0 < 15:
+        j = main.jobs.get(r["job_id"])
+        if j["status"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    assert j["status"] == "done", j["message"]
+    sid = j["result"]["session_id"]
     # inject a fake transcript (whisper itself not exercised here)
     import json
     segs = [{"start": 0.5, "end": 2.0, "text": "Bon dia a tothom",

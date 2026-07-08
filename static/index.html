@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css?v=0.7.0">
+<link rel="stylesheet" href="/style.css?v=0.8.0">
 </head>
 <body>
 <header>
@@ -51,8 +51,6 @@
       <label class="filebtn small">📎 .srt
         <input type="file" id="subs-input" accept=".srt,.vtt">
       </label>
-      <progress id="job-progress" max="1" value="0" hidden></progress>
-      <span id="job-msg"></span>
     </div>
   </div>
 
@@ -122,6 +120,7 @@
           <div id="wp-sentence-ca"></div>
         </div>
         <div id="wp-senses"></div>
+        <div id="wp-gloss" hidden></div>
         <div id="wp-examples"></div>
         <div id="wp-def" class="dim" hidden></div>
         <div id="wp-foot"><span class="dim">→</span>
@@ -138,7 +137,16 @@
       <div id="toast" hidden></div>
     </div>
     <aside id="side-panel" hidden>
+      <div id="panel-tabs">
+        <button id="tab-subs" class="ptab on">Subtítulos</button>
+        <button id="tab-words" class="ptab">Palabras</button>
+      </div>
       <div id="subs"></div>
+      <div id="words-view" hidden>
+        <button id="vocab-level-btn">Establecer nivel de vocabulario</button>
+        <p class="dim" id="words-hint">clic = diccionario · clic derecho = conocida ↔ nueva</p>
+        <div id="words-list"></div>
+      </div>
     </aside>
   </div>
 </main>
@@ -146,6 +154,11 @@
 <div id="settings-view" class="modal-view" hidden>
   <div id="settings-box" class="modal-box">
     <div class="stats-head"><h2>⚙️ Configuración</h2><button id="settings-close">✕</button></div>
+    <section id="set-lang-section" hidden>
+      <h3>Idioma</h3>
+      <div class="set-row"><label>Idioma de estudio</label>
+        <select id="set-language"></select></div>
+    </section>
     <section>
       <h3>Anki</h3>
       <div class="set-row"><label>Mazo de minado</label><select id="set-deck"></select></div>
@@ -200,6 +213,25 @@
   </div>
 </div>
 
+<div id="progress-pill" hidden>
+  <progress id="gp-bar" max="1" value="0"></progress>
+  <span id="gp-msg"></span>
+</div>
+
+<dialog id="level-dlg">
+  <form method="dialog">
+    <h3>Nivel de vocabulario</h3>
+    <p class="dim">Marca como <b>conocidas</b> las palabras más frecuentes del catalán
+      de un solo golpe. No toca las que ya marcaste (aprendiendo/ignoradas se respetan).</p>
+    <div class="set-row"><label>Top <b><span id="level-val">1000</span></b> palabras</label>
+      <input id="level-n" type="range" min="500" max="5000" step="100" value="1000"></div>
+    <div class="row actions">
+      <button value="cancel" type="submit">Cancelar</button>
+      <button value="ok" type="submit" class="primary">Marcar como conocidas</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="port-dlg">
   <form method="dialog">
     <h3>Puerto de AnkiConnect</h3>
@@ -213,6 +245,6 @@
   </form>
 </dialog>
 
-<script src="/app.js?v=0.7.0"></script>
+<script src="/app.js?v=0.8.0"></script>
 </body>
 </html>

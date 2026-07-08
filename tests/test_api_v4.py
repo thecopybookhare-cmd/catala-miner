@@ -13,12 +13,25 @@ def client(tmp_path):
 
 # ---------- sesiones por URL ----------
 
+def _wait_job(jid, timeout=10):
+    import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        j = main.jobs.get(jid)
+        if j["status"] in ("done", "error"):
+            return j
+        time.sleep(0.05)
+    raise TimeoutError(jid)
+
+
 @patch("app.main.media.duration", return_value=120.5)
 def test_url_session_streams_directly(_dur, tmp_path):
     c = client(tmp_path)
     url = "https://cdn.example.com/videos/merli.mp4?token=abc"
     r = c.post("/api/sessions/url", json={"url": url}).json()
-    sid = r["session_id"]
+    j = _wait_job(r["job_id"])
+    assert j["status"] == "done", j["message"]
+    sid = j["result"]["session_id"]
     d = c.get("/api/sessions/" + sid).json()
     assert d["source_type"] == "url"
     assert d["media_url"] == url            # streaming directo, sin proxy
@@ -30,8 +43,10 @@ def test_url_session_streams_directly(_dur, tmp_path):
 def test_url_session_rejects_unreadable(_dur, tmp_path):
     c = client(tmp_path)
     r = c.post("/api/sessions/url",
-               json={"url": "https://example.com/nada.mp4"})
-    assert r.status_code == 400
+               json={"url": "https://example.com/nada.mp4"}).json()
+    j = _wait_job(r["job_id"])
+    assert j["status"] == "error"
+    assert "no se pudo leer" in j["message"]
 
 
 def test_url_session_rejects_non_http(tmp_path):
@@ -139,3 +154,142 @@ def test_import_respects_local_without_overwrite(tmp_path):
     assert r["imported"] == 1                      # solo "nou"
     assert r["skipped"] == 2                       # gos (local) + malo (inválido)
     assert main.db.word_statuses(main.CON)["gos"] == "known"
+
+
+# ---------- vocabulario (Language Reactor) ----------
+
+def test_vocab_ranks_lemmatizes_and_caches(monkeypatch):
+    from app import vocab, forms
+    monkeypatch.setattr(vocab, "_RANKS", {})
+    monkeypatch.setattr(forms, "lookup",
+                        lambda w: [("ser", "VERB")] if w in ("és", "sóc") else [])
+    monkeypatch.setattr("wordfreq.top_n_list",
+                        lambda lang, n: ["és", "sóc", "casa"])
+    r = vocab.ranks()
+    assert r["ser"] == 1          # primera aparición gana ("sóc" no lo pisa)
+    assert r["casa"] == 3
+    assert "sóc" not in r
+
+
+def test_bulk_known_respects_existing(tmp_path, monkeypatch):
+    from app import vocab
+    monkeypatch.setattr(vocab, "_RANKS", {"ca": {"ser": 1, "casa": 2, "gos": 3}})
+    c = client(tmp_path)
+    main.db.set_word_status(main.CON, "casa", "learning")
+    r = c.post("/api/words/bulk-known", json={"top_n": 2}).json()
+    assert r["marked"] == 1                       # solo "ser"
+    st = main.db.word_statuses(main.CON)
+    assert st["ser"] == "known"
+    assert st["casa"] == "learning"               # intacta
+    assert "gos" not in st                        # rango 3 > top_n 2
+
+
+# ---------- biblioteca instantanea + backup ----------
+
+def test_session_meta_cache_invalidates_on_status_change(tmp_path):
+    c = client(tmp_path)
+    _mk_session("V", "El gos corre", "gos")
+    r1 = c.get("/api/sessions").json()[0]
+    assert r1["new_words"] == 1 and r1["comp_pct"] == 0
+    # segunda carga: viene de cache (mismo resultado)
+    assert c.get("/api/sessions").json()[0]["new_words"] == 1
+    # cambiar estado invalida la cache
+    main.db.set_word_status(main.CON, "gos", "known")
+    r2 = c.get("/api/sessions").json()[0]
+    assert r2["comp_pct"] == 100 and r2["new_words"] == 0
+
+
+def test_backup_daily_creates_and_prunes(tmp_path):
+    from app import db as adb
+    con = adb.connect(tmp_path / "app.db")
+    adb.set_word_status(con, "gos", "known")
+    # 9 backups falsos antiguos
+    bdir = tmp_path / "backups"; bdir.mkdir()
+    for i in range(9):
+        (bdir / f"app-2026010{i}.db").write_bytes(b"x")
+    adb.backup_daily(con, tmp_path)
+    files = sorted(p.name for p in bdir.glob("app-*.db"))
+    assert len(files) == 7                        # podado a 7
+    assert files[-1].startswith("app-2026")       # incluye el de hoy
+    # el backup es una DB valida con los datos
+    import sqlite3 as s3
+    bcon = s3.connect(str(bdir / files[-1]))
+    assert bcon.execute("SELECT status FROM word_status").fetchone()[0] == "known"
+
+
+# ---------- wikdict (glosas Wikcionario offline) ----------
+
+def test_wikdict_build_and_lookup(tmp_path, monkeypatch):
+    import sqlite3
+    from app import wikdict
+    sample = "\n".join([
+        '{"word": "gos", "pos": "noun", "senses": [{"glosses": ["Perro, animal doméstico."]}]}',
+        '{"word": "gos", "pos": "noun", "senses": [{"glosses": ["Perro, animal doméstico."]}]}',
+        '{"word": "casa", "pos": "noun", "senses": [{"glosses": ["Casa, vivienda."]}]}',
+        'linea rota no json',
+    ])
+    dbp = tmp_path / "wik.sqlite"
+    wikdict.build(sample, dbp)
+    monkeypatch.setattr(wikdict, "_CON",
+                        sqlite3.connect(str(dbp), check_same_thread=False))
+    monkeypatch.setattr(wikdict, "_TRIED", True)
+    monkeypatch.setattr(wikdict, "_LANG", "ca")
+    assert wikdict.lookup("gos") == [("Perro, animal doméstico.", "noun")]  # dedupe
+    assert wikdict.lookup("GOS")[0][0].startswith("Perro")
+    assert wikdict.lookup("zzz") == []
+
+
+@patch("app.main.ipa.ipa", return_value="")
+@patch("app.main.translate.sentence", side_effect=lambda t: "ES:" + t)
+@patch("app.main.translate.translate", side_effect=lambda t: "ES:" + t)
+def test_lookup_includes_glosses(_tr, _sen, _ipa, tmp_path, monkeypatch):
+    from app import wikdict
+    monkeypatch.setattr(wikdict, "lookup",
+                        lambda t: [("Perro.", "noun")] if t == "gos" else [])
+    c = client(tmp_path)
+    r = c.post("/api/lookup",
+               json={"selection": "gos", "sentence": "El gos corre"}).json()
+    assert r["glosses"] == [{"es": "Perro.", "pos": "noun"}]
+
+
+# ---------- multi-idioma ----------
+
+def test_word_status_migration_preserves_data(tmp_path):
+    import sqlite3
+    from app import db as adb
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(str(path))
+    old.executescript("""
+    CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL,
+      source_type TEXT NOT NULL, media_path TEXT NOT NULL,
+      srt_source TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'ca',
+      model_size TEXT NOT NULL, duration_secs REAL,
+      transcript_json TEXT NOT NULL, created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL);
+    CREATE TABLE cards (id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
+      segment_index INTEGER NOT NULL, paraula TEXT NOT NULL,
+      lema TEXT NOT NULL, pos TEXT, paraula_es TEXT, frase TEXT NOT NULL,
+      frase_es TEXT, freq_rank TEXT, audio_file TEXT, image_file TEXT,
+      font TEXT, anki_note_id INTEGER, status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL);
+    CREATE TABLE word_status (lemma TEXT PRIMARY KEY, status TEXT NOT NULL,
+      updated_at TEXT NOT NULL);
+    INSERT INTO word_status VALUES ('gos', 'known', '2026-07-01T00:00:00');
+    INSERT INTO word_status VALUES ('casa', 'learning', '2026-07-01T00:00:00');
+    """)
+    old.commit(); old.close()
+    con = adb.connect(path)                       # migra al conectar
+    assert adb.word_statuses(con) == {"gos": "known", "casa": "learning"}
+    # la PK compuesta permite el mismo lema en otro idioma
+    adb.set_word_status(con, "gos", "learning", "fr")
+    assert adb.word_statuses(con, "fr") == {"gos": "learning"}
+    assert adb.word_statuses(con)["gos"] == "known"   # ca intacto
+
+
+def test_language_fr_not_selectable_yet(tmp_path):
+    c = client(tmp_path)
+    s = c.get("/api/settings").json()
+    frs = [l for l in s["languages"] if l["code"] == "fr"]
+    assert frs and frs[0]["available"] is False
+    assert c.post("/api/settings", json={"language": "fr"}).status_code == 400
+    assert c.post("/api/settings", json={"language": "ca"}).status_code == 200
