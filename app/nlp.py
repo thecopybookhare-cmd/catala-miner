@@ -7,8 +7,7 @@ import re
 
 _WORD = re.compile(r"[\w·]+(?:['’][\w·]+)*", re.UNICODE)
 
-_NLP = None
-_NLP_TRIED = False
+_NLPS: dict = {}   # modelo spaCy por idioma
 
 # Bump para re-tokenizar transcripciones guardadas con lemas antiguos.
 TOK_VERSION = 1
@@ -36,15 +35,16 @@ def _correct(form: str, lemma: str, pos: str) -> tuple[str, str]:
 
 
 def _spacy():
-    global _NLP, _NLP_TRIED
-    if not _NLP_TRIED:
-        _NLP_TRIED = True
+    from . import languages
+    code = languages.active_code()
+    if code not in _NLPS:
         try:
             import spacy
-            _NLP = spacy.load("ca_core_news_sm", disable=["parser", "ner"])
+            _NLPS[code] = spacy.load(languages.PROFILES[code]["spacy"],
+                                     disable=["parser", "ner"])
         except Exception:
-            _NLP = None
-    return _NLP
+            _NLPS[code] = None
+    return _NLPS[code]
 
 
 def freq_badge(zipf_value: float) -> str:
@@ -58,7 +58,8 @@ def freq_badge(zipf_value: float) -> str:
 def zipf(word: str) -> float:
     try:
         from wordfreq import zipf_frequency
-        return zipf_frequency(word, "ca")
+        from . import languages
+        return zipf_frequency(word, languages.profile()["wordfreq"])
     except Exception:
         return 0.0
 

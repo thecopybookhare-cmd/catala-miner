@@ -824,6 +824,11 @@ function applySettings() {
   $("set-ipa").checked = SETTINGS.ipa_enabled;
   $("set-online").checked = SETTINGS.online_enabled;
   $("set-port").value = SETTINGS.anki_port ?? "";
+  // idioma: el selector solo aparece cuando hay más de un perfil activable
+  const langs = (SETTINGS.languages || []).filter((l) => l.available);
+  $("set-lang-section").hidden = langs.length <= 1;
+  $("set-language").innerHTML = langs.map((l) =>
+    `<option value="${l.code}"${l.code === SETTINGS.language ? " selected" : ""}>${l.name}</option>`).join("");
 }
 
 async function loadSettings() {
@@ -891,6 +896,11 @@ $("set-autopause").onchange = () => saveSettings({ autopause_default: $("set-aut
 $("set-speed").onchange = () => saveSettings({ speed_default: parseFloat($("set-speed").value) });
 $("set-ipa").onchange = () => saveSettings({ ipa_enabled: $("set-ipa").checked });
 $("set-online").onchange = () => saveSettings({ online_enabled: $("set-online").checked });
+$("set-language").onchange = async () => {
+  await saveSettings({ language: $("set-language").value });
+  toast("🌍 Idioma cambiado — recarga las sesiones de ese idioma");
+  loadSessions();
+};
 $("set-import").onchange = async (e) => {
   const f = e.target.files[0];
   if (!f) return;

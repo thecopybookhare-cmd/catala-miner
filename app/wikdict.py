@@ -9,13 +9,9 @@ import requests
 
 from . import config
 
-URL = ("https://kaikki.org/eswiktionary/Catal%C3%A1n/"
-       "kaikki.org-dictionary-Catal%C3%A1n.jsonl")
-_JSONL_PATH = config.MODELS_DIR / "wikdict-ca.jsonl"
-_DB_PATH = config.MODELS_DIR / "wikdict-ca.sqlite"
-
 _CON = None
 _TRIED = False
+_LANG = None
 
 
 def build(jsonl_text: str, db_path: Path):
@@ -50,17 +46,27 @@ def build(jsonl_text: str, db_path: Path):
 
 
 def _con():
-    global _CON, _TRIED
+    global _CON, _TRIED, _LANG
+    from . import languages
+    code = languages.active_code()
+    if code != _LANG:
+        _CON, _TRIED, _LANG = None, False, code
     if _CON is None and not _TRIED:
         _TRIED = True
         try:
-            if not _DB_PATH.exists():
-                if not _JSONL_PATH.exists():
-                    resp = requests.get(URL, timeout=120)
+            url = languages.PROFILES[code].get("wikdict_url")
+            jsonl = config.MODELS_DIR / f"wikdict-{code}.jsonl"
+            dbp = config.MODELS_DIR / f"wikdict-{code}.sqlite"
+            if not dbp.exists():
+                if not url:
+                    _CON = None
+                    return _CON
+                if not jsonl.exists():
+                    resp = requests.get(url, timeout=120)
                     resp.raise_for_status()
-                    _JSONL_PATH.write_text(resp.text, encoding="utf-8")
-                build(_JSONL_PATH.read_text(encoding="utf-8"), _DB_PATH)
-            _CON = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+                    jsonl.write_text(resp.text, encoding="utf-8")
+                build(jsonl.read_text(encoding="utf-8"), dbp)
+            _CON = sqlite3.connect(str(dbp), check_same_thread=False)
         except Exception:
             _CON = None
     return _CON

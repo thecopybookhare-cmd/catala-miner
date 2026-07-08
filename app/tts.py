@@ -8,16 +8,19 @@ from . import config
 
 
 def speak(text: str) -> str:
+    from . import languages
     text = (text or "").strip()
     exe = shutil.which("espeak-ng") or shutil.which("espeak")
     if not exe or not text:
         return ""
-    name = "tts-" + hashlib.md5(text.encode()).hexdigest()[:12] + ".wav"
+    voice = languages.profile()["espeak"]
+    name = ("tts-" + voice + "-"
+            + hashlib.md5(text.encode()).hexdigest()[:12] + ".wav")
     out = config.MEDIA_DIR / name
     if out.exists():
         return name
     try:
-        subprocess.run([exe, "-v", "ca", "-s", "150", "-w", str(out), text],
+        subprocess.run([exe, "-v", voice, "-s", "150", "-w", str(out), text],
                        check=True, capture_output=True, timeout=10)
         return name if out.exists() else ""
     except Exception:

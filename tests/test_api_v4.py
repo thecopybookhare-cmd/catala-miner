@@ -160,7 +160,7 @@ def test_import_respects_local_without_overwrite(tmp_path):
 
 def test_vocab_ranks_lemmatizes_and_caches(monkeypatch):
     from app import vocab, forms
-    monkeypatch.setattr(vocab, "_RANKS", None)
+    monkeypatch.setattr(vocab, "_RANKS", {})
     monkeypatch.setattr(forms, "lookup",
                         lambda w: [("ser", "VERB")] if w in ("és", "sóc") else [])
     monkeypatch.setattr("wordfreq.top_n_list",
@@ -173,7 +173,7 @@ def test_vocab_ranks_lemmatizes_and_caches(monkeypatch):
 
 def test_bulk_known_respects_existing(tmp_path, monkeypatch):
     from app import vocab
-    monkeypatch.setattr(vocab, "_RANKS", {"ser": 1, "casa": 2, "gos": 3})
+    monkeypatch.setattr(vocab, "_RANKS", {"ca": {"ser": 1, "casa": 2, "gos": 3}})
     c = client(tmp_path)
     main.db.set_word_status(main.CON, "casa", "learning")
     r = c.post("/api/words/bulk-known", json={"top_n": 2}).json()
@@ -233,6 +233,7 @@ def test_wikdict_build_and_lookup(tmp_path, monkeypatch):
     monkeypatch.setattr(wikdict, "_CON",
                         sqlite3.connect(str(dbp), check_same_thread=False))
     monkeypatch.setattr(wikdict, "_TRIED", True)
+    monkeypatch.setattr(wikdict, "_LANG", "ca")
     assert wikdict.lookup("gos") == [("Perro, animal doméstico.", "noun")]  # dedupe
     assert wikdict.lookup("GOS")[0][0].startswith("Perro")
     assert wikdict.lookup("zzz") == []
@@ -249,3 +250,46 @@ def test_lookup_includes_glosses(_tr, _sen, _ipa, tmp_path, monkeypatch):
     r = c.post("/api/lookup",
                json={"selection": "gos", "sentence": "El gos corre"}).json()
     assert r["glosses"] == [{"es": "Perro.", "pos": "noun"}]
+
+
+# ---------- multi-idioma ----------
+
+def test_word_status_migration_preserves_data(tmp_path):
+    import sqlite3
+    from app import db as adb
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(str(path))
+    old.executescript("""
+    CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL,
+      source_type TEXT NOT NULL, media_path TEXT NOT NULL,
+      srt_source TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'ca',
+      model_size TEXT NOT NULL, duration_secs REAL,
+      transcript_json TEXT NOT NULL, created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL);
+    CREATE TABLE cards (id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
+      segment_index INTEGER NOT NULL, paraula TEXT NOT NULL,
+      lema TEXT NOT NULL, pos TEXT, paraula_es TEXT, frase TEXT NOT NULL,
+      frase_es TEXT, freq_rank TEXT, audio_file TEXT, image_file TEXT,
+      font TEXT, anki_note_id INTEGER, status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL);
+    CREATE TABLE word_status (lemma TEXT PRIMARY KEY, status TEXT NOT NULL,
+      updated_at TEXT NOT NULL);
+    INSERT INTO word_status VALUES ('gos', 'known', '2026-07-01T00:00:00');
+    INSERT INTO word_status VALUES ('casa', 'learning', '2026-07-01T00:00:00');
+    """)
+    old.commit(); old.close()
+    con = adb.connect(path)                       # migra al conectar
+    assert adb.word_statuses(con) == {"gos": "known", "casa": "learning"}
+    # la PK compuesta permite el mismo lema en otro idioma
+    adb.set_word_status(con, "gos", "learning", "fr")
+    assert adb.word_statuses(con, "fr") == {"gos": "learning"}
+    assert adb.word_statuses(con)["gos"] == "known"   # ca intacto
+
+
+def test_language_fr_not_selectable_yet(tmp_path):
+    c = client(tmp_path)
+    s = c.get("/api/settings").json()
+    frs = [l for l in s["languages"] if l["code"] == "fr"]
+    assert frs and frs[0]["available"] is False
+    assert c.post("/api/settings", json={"language": "fr"}).status_code == 400
+    assert c.post("/api/settings", json={"language": "ca"}).status_code == 200

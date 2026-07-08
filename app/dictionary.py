@@ -68,8 +68,13 @@ class Dictionary:
 
 def load() -> Dictionary:
     """Load from disk cache, downloading the bidix on first use."""
-    if not _BIDIX_PATH.exists():
-        resp = requests.get(config.BIDIX_URL, timeout=60)
+    from . import languages
+    prof = languages.profile()
+    path = config.MODELS_DIR / prof["bidix_file"]
+    if not path.exists():
+        if not prof.get("bidix_url"):
+            return Dictionary({})
+        resp = requests.get(prof["bidix_url"], timeout=60)
         resp.raise_for_status()
-        _BIDIX_PATH.write_text(resp.text, encoding="utf-8")
-    return Dictionary(parse_bidix(_BIDIX_PATH.read_text(encoding="utf-8")))
+        path.write_text(resp.text, encoding="utf-8")
+    return Dictionary(parse_bidix(path.read_text(encoding="utf-8")))

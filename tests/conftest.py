@@ -9,6 +9,7 @@ def no_forms_download(monkeypatch):
     from app import forms
     monkeypatch.setattr(forms, "_CON", None)
     monkeypatch.setattr(forms, "_TRIED", True)
+    monkeypatch.setattr(forms, "_LANG", "ca")
 
 
 @pytest.fixture(autouse=True)
@@ -24,3 +25,4 @@ def no_wikdict_download(monkeypatch):
     from app import wikdict
     monkeypatch.setattr(wikdict, "_CON", None)
     monkeypatch.setattr(wikdict, "_TRIED", True)
+    monkeypatch.setattr(wikdict, "_LANG", "ca")

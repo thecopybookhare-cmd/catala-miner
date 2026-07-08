@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               media, nlp, subs, translate, tts, vocab, wikdict)
+               languages, media, nlp, subs, translate, tts, vocab, wikdict)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -33,18 +33,18 @@ try:
 except Exception:
     pass
 STATIC = Path(__file__).resolve().parent.parent / "static"
-_DICT = None
+_DICTS: dict = {}   # bidix por idioma
 SETTINGS_PATH = config.APP_DIR / "settings.json"
 
 
 def _dict():
-    global _DICT
-    if _DICT is None:
+    code = languages.active_code()
+    if code not in _DICTS:
         try:
-            _DICT = dictionary.load()
+            _DICTS[code] = dictionary.load()
         except Exception:
-            _DICT = dictionary.Dictionary({})
-    return _DICT
+            _DICTS[code] = dictionary.Dictionary({})
+    return _DICTS[code]
 
 
 def _senses(selection: str, lemma: str, d=None) -> list[tuple[str, str]]:
@@ -109,7 +109,7 @@ def _segment_es(sid: str, idx: int) -> str:
 
 
 DEFAULT_SETTINGS = {
-    "deck": "Català::Mining", "anki_port": None,
+    "deck": "Català::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
     "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
@@ -133,6 +133,10 @@ def _settings() -> dict:
 
 def _save_settings(s: dict):
     SETTINGS_PATH.write_text(json.dumps(s))
+
+
+def _lang() -> str:
+    return languages.active_code()
 
 
 def _fmt_ts(secs: float) -> str:
@@ -208,7 +212,7 @@ def _session_meta(row: dict, statuses: dict, wsv: str) -> dict:
 
 @app.get("/api/sessions")
 def sessions():
-    statuses = db.word_statuses(CON)
+    statuses = db.word_statuses(CON, _lang())
     wsv = _ws_version()
     return [_session_meta(r, statuses, wsv) for r in db.list_sessions(CON)]
 
@@ -226,7 +230,7 @@ def session_detail(sid: str):
                              s["model_size"], s["srt_source"],
                              nlp.TOK_VERSION)
         s["tok_version"] = nlp.TOK_VERSION
-    s["word_statuses"] = db.word_statuses(CON)
+    s["word_statuses"] = db.word_statuses(CON, _lang())
     s["media_url"] = (s["media_path"] if s["source_type"] == "url"
                       else "/media-file/" + sid)
     return s
@@ -396,7 +400,7 @@ class WordStatusReq(BaseModel):
 def set_word_status(req: WordStatusReq):
     if req.status not in db.WORD_STATUSES:
         return JSONResponse({"error": "bad status"}, status_code=400)
-    db.set_word_status(CON, req.lemma, req.status)
+    db.set_word_status(CON, req.lemma, req.status, _lang())
     return {"ok": True, "lemma": req.lemma.strip().lower(),
             "status": req.status}
 
@@ -412,7 +416,7 @@ def sync_statuses():
         pass
     pairs = db.cards_with_notes(CON)
     intervals = anki.note_intervals([p["anki_note_id"] for p in pairs])
-    statuses = db.word_statuses(CON)
+    statuses = db.word_statuses(CON, _lang())
     n = 0
     for p in pairs:
         iv = intervals.get(p["anki_note_id"])
@@ -423,7 +427,7 @@ def sync_statuses():
         if current in ("ignored",):
             continue
         if current != target:
-            db.set_word_status(CON, p["lema"], target)
+            db.set_word_status(CON, p["lema"], target, _lang())
             n += 1
     return {"synced": n}
 
@@ -570,11 +574,11 @@ def card_mine(req: MineReq):
         freq_rank=p["freq_rank"], audio_file=p["audio_file"],
         image_file=p["clip_file"] or p["image_file"], font=p["font"])
     if p["lema"]:
-        db.mark_learning_if_new(CON, p["lema"])
+        db.mark_learning_if_new(CON, p["lema"], _lang())
     sent = _flush()
     return {"card_id": cid, "sent_now": sent > 0,
             "pending": len(db.pending_cards(CON)),
-            "word_status": db.word_statuses(CON).get(p["lema"]),
+            "word_status": db.word_statuses(CON, _lang()).get(p["lema"]),
             "lema": p["lema"], "paraula": p["paraula"]}
 
 
@@ -602,11 +606,11 @@ def create_card(req: CardReq):
                          freq_rank=req.freq_rank, audio_file=req.audio_file,
                          image_file=req.image_file, font=req.font)
     if req.lema:
-        db.mark_learning_if_new(CON, req.lema)
+        db.mark_learning_if_new(CON, req.lema, _lang())
     sent = _flush()
     return {"card_id": cid, "sent_now": sent,
             "pending": len(db.pending_cards(CON)),
-            "word_status": db.word_statuses(CON).get(req.lema.strip().lower())}
+            "word_status": db.word_statuses(CON, _lang()).get(req.lema.strip().lower())}
 
 
 def _flush() -> int:
@@ -664,7 +668,7 @@ class BulkKnownReq(BaseModel):
 @app.post("/api/words/bulk-known")
 def words_bulk_known(req: BulkKnownReq):
     n = max(0, min(5000, req.top_n))
-    return {"marked": vocab.bulk_known(CON, n)}
+    return {"marked": vocab.bulk_known(CON, n, _lang())}
 
 
 # ---------- export / import de progreso ----------
@@ -675,7 +679,7 @@ def words_export():
     return JSONResponse(
         {"version": 1,
          "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-         "statuses": db.word_statuses(CON)},
+         "statuses": db.word_statuses(CON, _lang())},
         headers={"Content-Disposition":
                  "attachment; filename=catalaminer-paraules.json"})
 
@@ -687,7 +691,7 @@ class ImportReq(BaseModel):
 
 @app.post("/api/words/import")
 def words_import(req: ImportReq):
-    current = db.word_statuses(CON)
+    current = db.word_statuses(CON, _lang())
     imported = skipped = 0
     for lemma, st in req.statuses.items():
         lm = str(lemma).strip().lower()
@@ -697,7 +701,7 @@ def words_import(req: ImportReq):
         if not req.overwrite and lm in current:
             skipped += 1
             continue
-        db.set_word_status(CON, lm, st)
+        db.set_word_status(CON, lm, st, _lang())
         imported += 1
     return {"imported": imported, "skipped": skipped}
 
@@ -747,9 +751,17 @@ def define(word: str):
 
 # ---------- configuración ----------
 
+def _settings_payload() -> dict:
+    s = _settings()
+    s["languages"] = [{"code": c, "name": p["name"],
+                       "available": languages.available(c)}
+                      for c, p in languages.PROFILES.items()]
+    return s
+
+
 @app.get("/api/settings")
 def get_settings():
-    return _settings()
+    return _settings_payload()
 
 
 @app.post("/api/settings")
@@ -757,6 +769,9 @@ def post_settings(body: dict):
     unknown = set(body) - set(DEFAULT_SETTINGS)
     if unknown:
         return JSONResponse({"error": f"claves desconocidas: {sorted(unknown)}"},
+                            status_code=400)
+    if "language" in body and body["language"] not in languages.activable():
+        return JSONResponse({"error": "idioma no disponible todavía"},
                             status_code=400)
     if "keymap" in body:
         km = {**_settings()["keymap"], **body["keymap"]}
@@ -775,7 +790,7 @@ def post_settings(body: dict):
         else:
             saved[k] = v
     _save_settings(saved)
-    return _settings()
+    return _settings_payload()
 
 
 class DeckReq(BaseModel):
@@ -813,7 +828,7 @@ def stats():
         k = r["created_at"][:7]
         by_month[k] = by_month.get(k, 0) + 1
     status_counts: dict[str, int] = {}
-    for v in db.word_statuses(CON).values():
+    for v in db.word_statuses(CON, _lang()).values():
         status_counts[v] = status_counts.get(v, 0) + 1
     out = {"total_cards": len(rows), "by_month": by_month,
            "status_counts": status_counts,

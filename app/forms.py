@@ -11,11 +11,12 @@ import requests
 
 from . import config
 
-_TXT_PATH = config.MODELS_DIR / "diccionari-lt.txt"
-_DB_PATH = config.MODELS_DIR / "forms.sqlite"
+_TXT_PATH = config.MODELS_DIR / "diccionari-lt.txt"   # nombre legado (ca)
+_DB_PATH = config.MODELS_DIR / "forms.sqlite"         # nombre legado (ca)
 
 _CON = None
 _TRIED = False
+_LANG = None
 
 _POS = {"V": "VERB", "N": "NOUN", "A": "ADJ", "R": "ADV", "D": "DET",
         "P": "PRON", "C": "CONJ", "S": "ADP", "I": "INTJ", "M": "NUM",
@@ -46,18 +47,34 @@ def build(txt: str, db_path: Path):
     con.close()
 
 
+def _paths(code: str) -> tuple[Path, Path]:
+    if code == "ca":            # rutas legadas de instalaciones previas
+        return _TXT_PATH, _DB_PATH
+    return (config.MODELS_DIR / f"diccionari-lt-{code}.txt",
+            config.MODELS_DIR / f"forms-{code}.sqlite")
+
+
 def _con():
-    global _CON, _TRIED
+    global _CON, _TRIED, _LANG
+    from . import languages
+    code = languages.active_code()
+    if code != _LANG:
+        _CON, _TRIED, _LANG = None, False, code
     if _CON is None and not _TRIED:
         _TRIED = True
         try:
-            if not _DB_PATH.exists():
-                if not _TXT_PATH.exists():
-                    resp = requests.get(config.FORMS_URL, timeout=120)
+            url = languages.PROFILES[code].get("forms_url")
+            txt, dbp = _paths(code)
+            if not dbp.exists():
+                if not url:
+                    _CON = None
+                    return _CON
+                if not txt.exists():
+                    resp = requests.get(url, timeout=120)
                     resp.raise_for_status()
-                    _TXT_PATH.write_text(resp.text, encoding="utf-8")
-                build(_TXT_PATH.read_text(encoding="utf-8"), _DB_PATH)
-            _CON = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+                    txt.write_text(resp.text, encoding="utf-8")
+                build(txt.read_text(encoding="utf-8"), dbp)
+            _CON = sqlite3.connect(str(dbp), check_same_thread=False)
         except Exception:
             _CON = None
     return _CON
