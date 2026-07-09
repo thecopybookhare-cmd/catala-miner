@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/favicon.png?v=0.8.0">
-<link rel="apple-touch-icon" href="/favicon.png?v=0.8.0">
-<link rel="stylesheet" href="/style.css?v=0.8.0">
+<link rel="icon" href="/favicon.png?v=0.9.0">
+<link rel="apple-touch-icon" href="/favicon.png?v=0.9.0">
+<link rel="stylesheet" href="/style.css?v=0.9.0">
 </head>
 <body>
 <header>
@@ -31,7 +31,7 @@
       <div class="yt">
         <input type="url" id="yt-url" placeholder="URL de YouTube o enlace directo (.mp4, .m3u8)…">
         <button id="yt-btn" title="Descargar con yt-dlp (YouTube)">⬇️ Importar</button>
-        <button id="url-btn" title="Streaming directo sin descargar (enlaces .mp4/.m3u8)">🔗 Ver online</button>
+        <button id="url-btn" title="Streaming sin descargar: YouTube, 3cat o enlace directo">🔗 Ver online</button>
       </div>
     </div>
   </section>
@@ -70,9 +70,18 @@
         <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">⏮</button>
         <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">⟲</button>
         <button class="icon" id="next-btn" title="Frase siguiente (D / →)">⏭</button>
-        <span id="time-cur" class="tlabel">0:00</span>
-        <input type="range" id="seek" min="0" max="1000" value="0">
-        <span id="time-dur" class="tlabel">0:00</span>
+        <div id="seek-row">
+          <span id="time-cur" class="tlabel">0:00</span>
+          <div id="seek-wrap">
+            <div id="seek-marks"></div>
+            <input type="range" id="seek" min="0" max="1000" value="0">
+          </div>
+          <span id="time-dur" class="tlabel">0:00</span>
+        </div>
+        <div id="quality-wrap">
+          <button class="icon" id="quality-btn" title="Calidad de streaming" hidden>Auto</button>
+          <div id="quality-menu" hidden></div>
+        </div>
         <button class="icon" id="speed-btn" title="Velocidad de reproducción">1×</button>
         <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)">🇪🇸</button>
         <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">⏯</button>
@@ -248,6 +257,6 @@
   </form>
 </dialog>
 
-<script src="/app.js?v=0.8.0"></script>
+<script src="/app.js?v=0.9.0"></script>
 </body>
 </html>

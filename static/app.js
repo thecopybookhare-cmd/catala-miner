@@ -72,6 +72,17 @@ setInterval(syncStatuses, 60000);
 // ---------- biblioteca ----------
 const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", youtube_auto: "Subs auto YouTube", none: "sin transcribir", "-": "—" };
 
+// badge de origen (arriba a la izquierda de la miniatura)
+function sourceBadge(s) {
+  const p = (s.page_url || "").toLowerCase();
+  if (s.source_type === "stream" && p.includes("youtube")) return { t: "▶ YouTube", c: "yt" };
+  if (s.source_type === "stream" && (p.includes("3cat") || p.includes("ccma"))) return { t: "📺 3cat", c: "tv" };
+  if (s.source_type === "stream") return { t: "🔴 En vivo", c: "st" };
+  if (s.source_type === "youtube") return { t: "▶ YouTube", c: "yt" };
+  if (s.source_type === "url") return { t: "🔗 Enlace", c: "st" };
+  return { t: "📁 Local", c: "loc" };
+}
+
 function fmtTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
   const h = Math.floor(m / 60);
@@ -85,6 +96,7 @@ async function loadSessions() {
     <article class="scard" data-id="${s.id}">
       <div class="thumb" style="${s.thumb ? `background-image:url('${s.thumb}')` : ""}">
         ${s.thumb ? "" : "🎬"}
+        <span class="src-badge src-${sourceBadge(s).c}">${sourceBadge(s).t}</span>
         ${s.duration_secs ? `<span class="dur">${fmtTime(s.duration_secs)}</span>` : ""}
       </div>
       <div class="scard-body">
@@ -123,9 +135,9 @@ $("yt-btn").onclick = async () => {
 $("url-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
-  const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
+  const r = await api("/api/sessions/stream", { method: "POST", body: JSON.stringify({ url }) });
   if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
-  const res = await pollJob(r.job_id, "Comprobando el enlace…");
+  const res = await pollJob(r.job_id, "Resolviendo el enlace…");
   if (res) openSession(res.session_id);
 };
 
@@ -185,7 +197,13 @@ async function openSession(sid) {
   for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
-  $("video").src = s.media_url;
+  STALLS = [];
+  if (s.source_type === "stream") {
+    await loadStreamUrl(sid, 0);        // URL fresca (las de yt-dlp caducan)
+  } else {
+    $("quality-btn").hidden = true;
+    $("video").src = s.media_url;
+  }
   // preferencias por defecto de la configuración
   setDual(SETTINGS?.dual_default ?? DUAL);
   setAutopause(SETTINGS?.autopause_default ?? AUTOPAUSE);
@@ -195,11 +213,75 @@ async function openSession(sid) {
   $("speed-btn").textContent = sp + "×";
   renderSegs();
   renderOverlay();
+  renderSeekMarks();
   updateComp();
   syncStatuses();
 }
+
+// marcadores de subtítulo en la barra (estilo Language Reactor)
+function renderSeekMarks() {
+  const el = $("seek-marks");
+  const dur = SESSION?.duration_secs || 0;
+  if (!SEGS.length || dur <= 0) { el.innerHTML = ""; return; }
+  // muestrear hasta ~400 marcas para no saturar el DOM en videos largos
+  const step = Math.ceil(SEGS.length / 400);
+  let html = "";
+  for (let i = 0; i < SEGS.length; i += step) {
+    const left = Math.min(100, (SEGS[i].start / dur) * 100);
+    html += `<i style="left:${left.toFixed(3)}%"></i>`;
+  }
+  el.innerHTML = html;
+}
+// ---------- streaming (URL fresca + calidad + auto-bajada) ----------
+let STREAM_HEIGHTS = [], STREAM_H = 0, STALLS = [];
+
+async function loadStreamUrl(sid, height) {
+  showProgress(0.5, "Cargando el video…");
+  const r = await api(`/api/sessions/${sid}/stream-url?height=${height || 0}`);
+  hideProgress();
+  if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
+  const t = V.currentTime || 0, playing = !V.paused;
+  STREAM_HEIGHTS = r.heights || [];
+  STREAM_H = r.height || 0;
+  $("video").src = r.url;
+  if (height) {   // cambio de calidad: preservar el punto
+    V.addEventListener("loadedmetadata", () => {
+      V.currentTime = t; if (playing) V.play();
+    }, { once: true });
+  }
+  renderQualityMenu();
+}
+
+function renderQualityMenu() {
+  const btn = $("quality-btn");
+  if (!STREAM_HEIGHTS.length) { btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.textContent = STREAM_H ? STREAM_H + "p" : "Auto";
+  $("quality-menu").innerHTML = STREAM_HEIGHTS
+    .slice().sort((a, b) => b.height - a.height)
+    .map((h) => `<button data-h="${h.height}" class="${h.height === STREAM_H ? "on" : ""}">${h.label}</button>`).join("");
+  for (const b of $("quality-menu").querySelectorAll("button"))
+    b.onclick = () => { $("quality-menu").hidden = true; loadStreamUrl(SESSION.id, +b.dataset.h); };
+}
+$("quality-btn").onclick = () => { $("quality-menu").hidden = !$("quality-menu").hidden; };
+
+// auto-bajada: si se atasca repetidamente, baja un escalón de calidad
+$("video").addEventListener("waiting", () => {
+  if (SESSION?.source_type !== "stream" || STREAM_HEIGHTS.length < 2) return;
+  const now = Date.now();
+  STALLS = STALLS.filter((t) => now - t < 12000);
+  STALLS.push(now);
+  if (STALLS.length >= 3) {
+    STALLS = [];
+    const lower = STREAM_HEIGHTS.filter((h) => h.height < STREAM_H)
+      .sort((a, b) => b.height - a.height)[0];
+    if (lower) { toast(`📉 Bajando a ${lower.label} por conexión lenta`); loadStreamUrl(SESSION.id, lower.height); }
+  }
+});
+
 $("back").onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();
+  $("quality-menu").hidden = true;
   $("video-col").classList.remove("fake-fs");
   $("player").hidden = true; $("home").hidden = false;
   $("card-panel").hidden = true; $("word-pop").hidden = true;
@@ -776,29 +858,74 @@ function svgDonut(counts) {  // {status: n}
     <div class="legend">${legend}</div></div>`;
 }
 
+// gráfico de área: crecimiento de conocidas en el tiempo
+function svgArea(points, color = "#4fc383") {  // [{date,total}]
+  if (points.length < 2) return '<p class="dim">Marca más palabras como conocidas para ver tu progreso.</p>';
+  const w = 520, h = 150, pad = 8;
+  const max = Math.max(...points.map((p) => p.total));
+  const x = (i) => pad + (i / (points.length - 1)) * (w - 2 * pad);
+  const y = (v) => h - 18 - (v / max) * (h - 30);
+  const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.total).toFixed(1)}`).join(" ");
+  const area = `${pad},${h - 18} ${line} ${w - pad},${h - 18}`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%" preserveAspectRatio="none">
+    <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="${color}" stop-opacity=".35"/>
+      <stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#ga)"/>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="${x(points.length - 1)}" cy="${y(max)}" r="4" fill="${color}"/>
+    <text x="${w - pad}" y="14" text-anchor="end" class="sv" fill="${color}">${max}</text>
+  </svg>`;
+}
+
+// tira de actividad de minado (últimos días)
+function svgActivity(days, color = "#8b7cf8") {  // [{date,n}]
+  if (!days.length) return "";
+  const max = Math.max(1, ...days.map((d) => d.n));
+  const bw = 100 / days.length;
+  const bars = days.map((d, i) => {
+    const bh = (d.n / max) * 100;
+    return `<rect x="${(i * bw + bw * 0.12).toFixed(2)}" y="${(100 - bh).toFixed(2)}"
+      width="${(bw * 0.76).toFixed(2)}" height="${bh.toFixed(2)}" rx="1.2" fill="${color}">
+      <title>${d.date}: ${d.n}</title></rect>`;
+  }).join("");
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:56px">${bars}</svg>`;
+}
+
+function kpiTile(value, label, color) {
+  return `<div class="kpi"><div class="kpi-v" style="color:${color}">${value}</div>
+    <div class="kpi-l">${label}</div></div>`;
+}
+
 async function openStats() {
   $("stats-view").hidden = false;
   $("stats-body").innerHTML = '<p class="dim">Cargando…</p>';
   const s = await api("/api/stats");
-  const months = Object.entries(s.by_month).slice(-8)
-    .map(([m, v]) => [m.slice(2).replace("-", "/"), v]);
-  let html = `
-    <section><h3>Minado</h3>
-      <p><b>${s.total_cards}</b> tarjetas minadas en <b>${s.sessions}</b> sesiones.</p>
-      ${months.length ? svgBars(months) : '<p class="dim">Aún no has minado tarjetas.</p>'}
+  const sc = s.status_counts || {};
+  const growth = s.known_over_time || [];
+  const kpis = `<div class="kpi-row">
+    ${kpiTile(sc.known || 0, "conocidas", "#4fc383")}
+    ${kpiTile(sc.learning || 0, "aprendiendo", "#e5a04c")}
+    ${kpiTile(s.total_cards, "minadas", "#8b7cf8")}
+    ${kpiTile(s.anki && s.anki.retention !== null ? s.anki.retention + "%" : "—", "retención", "#6fb3ff")}
+  </div>`;
+  let html = kpis + `
+    <section><h3>Palabras conocidas · progreso</h3>
+      ${svgArea(growth)}
+    </section>
+    <section><h3>Actividad de minado</h3>
+      ${svgActivity(s.mined_by_day || [])}
+      <p class="dim" style="margin-top:4px">${s.total_cards} tarjetas en ${s.sessions} sesiones</p>
     </section>
     <section><h3>Palabras por estado</h3>
-      <p class="dim" title="Estados que asignas al minar/marcar; se sincronizan con Anki (intervalo ≥ 21 días → conocida)">ⓘ cómo se calcula</p>
-      ${svgDonut(s.status_counts)}
+      ${svgDonut(sc)}
     </section>`;
   if (s.anki) {
     html += `
-    <section><h3>En Anki (mazo de minado)</h3>
-      <p><b>${s.anki.total}</b> tarjetas · <b>${s.anki.mature}</b> maduras (≥ 21 días)
-      ${s.anki.retention !== null ? ` · retención <b>${s.anki.retention}%</b>` : ""}</p>
-      <p class="dim" title="retención = 1 − fallos/repasos, sobre todas las tarjetas del mazo">ⓘ retención = 1 − fallos/repasos</p>
+    <section><h3>Repasos en Anki (mazo de minado)</h3>
+      <p class="dim" title="retención = 1 − fallos/repasos, sobre todas las tarjetas del mazo">${s.anki.total} tarjetas · ${s.anki.mature} maduras (≥ 21 días)</p>
       ${svgBars([["hoy", s.anki.due_today], ["7 días", s.anki.due_7d], ["30 días", s.anki.due_30d]], "#e5a04c")}
-      <p class="dim">Tarjetas que te tocará repasar (carga futura).</p>
+      <p class="dim">Carga futura de repasos.</p>
     </section>`;
   } else {
     html += '<section><h3>En Anki</h3><p class="dim">Abre Anki para ver retención y pronóstico de repasos.</p></section>';
