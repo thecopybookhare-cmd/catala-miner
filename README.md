@@ -39,10 +39,11 @@ navegador ni terminal. `./install.sh` ya la genera al final. El modo `./run.sh` 
 disponible como alternativa. `espeak-ng` (se instala con `install.sh`) habilita la
 pronunciación IPA en el popup.
 
-1. Abre un archivo local (mp4/mkv/mp3…), pega una URL de YouTube (⬇️ descarga)
-   o un **enlace directo .mp4/.m3u8 con «🔗 Ver online»** (streaming sin descargar;
-   las tarjetas cortan audio e imagen desde la propia URL). HLS (.m3u8) reproduce
-   nativo en la app de escritorio/Safari; en Chrome usa mp4 directo.
+1. Abre un archivo local (mp4/mkv/mp3…), o pega una URL de **YouTube / 3cat / enlace
+   directo** y pulsa **«🔗 Ver online»**: se reproduce en streaming al instante (yt-dlp
+   resuelve el mejor formato progresivo; 3cat hasta 576p, YouTube 360p) y las tarjetas
+   cortan audio+imagen desde la URL, sin descargar. Selector de calidad + auto-bajada si
+   se atasca. Para HD offline, **⬇️ Importar** descarga (con barra de progreso real).
 2. Pulsa **🎙️ Transcriure** (el modelo catalán ≈3 GB se descarga la primera vez;
    usa `small` si quieres probar rápido). Si el video trae `.srt`/subtítulos de
    YouTube en catalán, puedes usarlos directamente.
