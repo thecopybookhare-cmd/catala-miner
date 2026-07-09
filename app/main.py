@@ -921,8 +921,23 @@ def stats():
     status_counts: dict[str, int] = {}
     for v in db.word_statuses(CON, _lang()).values():
         status_counts[v] = status_counts.get(v, 0) + 1
+    # crecimiento de palabras conocidas (acumulado por fecha, aprox. por updated_at)
+    kdays = CON.execute(
+        "SELECT substr(updated_at,1,10) d, COUNT(*) n FROM word_status "
+        "WHERE language=? AND status='known' GROUP BY d ORDER BY d", (_lang(),)
+    ).fetchall()
+    known_over_time, acc = [], 0
+    for r in kdays:
+        acc += r["n"]
+        known_over_time.append({"date": r["d"], "total": acc})
+    # actividad de minado por día (últimos 30)
+    mday = CON.execute(
+        "SELECT substr(created_at,1,10) d, COUNT(*) n FROM cards "
+        "GROUP BY d ORDER BY d DESC LIMIT 30").fetchall()
+    mined_by_day = [{"date": r["d"], "n": r["n"]} for r in reversed(mday)]
     out = {"total_cards": len(rows), "by_month": by_month,
            "status_counts": status_counts,
+           "known_over_time": known_over_time, "mined_by_day": mined_by_day,
            "sessions": len(db.list_sessions(CON)), "anki": None}
     if anki.is_up(_settings().get("anki_port")):
         try:

@@ -495,3 +495,37 @@ button.small { font-size: 12px; padding: 6px 10px; }
 #quality-menu[hidden] { display: none; }
 #quality-menu button { font-size: 12.5px; padding: 6px 14px; border-radius: 8px; }
 #quality-menu button.on { background: var(--vio); color: #14102b; border-color: transparent; }
+
+/* ---------- dashboard estadísticas (tipo Migaku) ---------- */
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 6px 0 16px; }
+.kpi {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 12px; text-align: center;
+}
+.kpi-v { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.kpi-l { font-size: 11.5px; color: var(--dim); margin-top: 2px; text-transform: lowercase; }
+#stats-box section { background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 14px; padding: 12px 16px; margin: 10px 0; }
+#stats-box section h3 { margin: 0 0 8px; font-size: 14px; }
+@media (max-width: 560px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- badge de origen en biblioteca ---------- */
+.src-badge {
+  position: absolute; left: 8px; top: 8px; z-index: 1;
+  font-family: var(--display); font-size: 10.5px; font-weight: 700;
+  padding: 3px 8px; border-radius: 7px; backdrop-filter: blur(4px);
+  background: #000000a6; color: #fff; letter-spacing: .01em;
+}
+.src-badge.src-yt { background: #c4302baa; }
+.src-badge.src-tv { background: #2a6df0aa; }
+.src-badge.src-st { background: #8b5cf6aa; }
+.src-badge.src-loc { background: #000000a0; color: #c8cbe0; }
+
+/* ---------- marcadores de subtítulo en la barra de progreso ---------- */
+#seek-row { flex: 1 1 100%; order: 9; display: flex; align-items: center; gap: 10px; padding: 2px 4px 4px; }
+#seek-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+#seek-wrap #seek { width: 100%; position: relative; z-index: 2; flex: none; min-width: 0; }
+#seek-marks { position: absolute; left: 0; right: 0; top: 50%; height: 8px;
+  transform: translateY(-50%); pointer-events: none; z-index: 1; }
+#seek-marks i { position: absolute; top: 0; width: 2px; height: 8px;
+  background: #8b7cf877; border-radius: 1px; }

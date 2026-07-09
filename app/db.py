@@ -111,7 +111,7 @@ def set_stream_height(con, sid, height):
 def list_sessions(con):
     rs = con.execute(
         "SELECT id,title,source_type,srt_source,model_size,duration_secs,"
-        "created_at,updated_at FROM sessions ORDER BY created_at DESC"
+        "created_at,updated_at,page_url FROM sessions ORDER BY created_at DESC"
     ).fetchall()
     return [dict(r) for r in rs]
 

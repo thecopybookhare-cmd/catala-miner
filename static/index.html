@@ -70,9 +70,14 @@
         <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">⏮</button>
         <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">⟲</button>
         <button class="icon" id="next-btn" title="Frase siguiente (D / →)">⏭</button>
-        <span id="time-cur" class="tlabel">0:00</span>
-        <input type="range" id="seek" min="0" max="1000" value="0">
-        <span id="time-dur" class="tlabel">0:00</span>
+        <div id="seek-row">
+          <span id="time-cur" class="tlabel">0:00</span>
+          <div id="seek-wrap">
+            <div id="seek-marks"></div>
+            <input type="range" id="seek" min="0" max="1000" value="0">
+          </div>
+          <span id="time-dur" class="tlabel">0:00</span>
+        </div>
         <div id="quality-wrap">
           <button class="icon" id="quality-btn" title="Calidad de streaming" hidden>Auto</button>
           <div id="quality-menu" hidden></div>
