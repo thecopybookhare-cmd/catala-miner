@@ -44,6 +44,13 @@ def connect(path: Path) -> sqlite3.Connection:
         con.execute("ALTER TABLE sessions ADD COLUMN tok_version "
                     "INTEGER NOT NULL DEFAULT 0")
     # migración multi-idioma: word_status pasa a PK (lemma, language)
+    # migración streaming: URL de página + altura para re-resolver
+    if "page_url" not in cols:
+        con.execute("ALTER TABLE sessions ADD COLUMN page_url TEXT NOT NULL "
+                    "DEFAULT ''")
+    if "stream_height" not in cols:
+        con.execute("ALTER TABLE sessions ADD COLUMN stream_height INTEGER "
+                    "NOT NULL DEFAULT 0")
     ws_cols = {r["name"] for r in con.execute("PRAGMA table_info(word_status)")}
     if "language" not in ws_cols:
         con.executescript("""
@@ -66,14 +73,17 @@ def connect(path: Path) -> sqlite3.Connection:
 
 
 def create_session(con, *, title, source_type, media_path, srt_source,
-                   model_size, duration_secs, transcript_json) -> str:
+                   model_size, duration_secs, transcript_json,
+                   page_url="", stream_height=0) -> str:
     sid = uuid.uuid4().hex[:12]
     con.execute(
         "INSERT INTO sessions (id, title, source_type, media_path, srt_source,"
         " language, model_size, duration_secs, transcript_json, created_at,"
-        " updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " updated_at, page_url, stream_height) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (sid, title, source_type, media_path, srt_source, "ca",
-         model_size, duration_secs, transcript_json, _now(), _now()))
+         model_size, duration_secs, transcript_json, _now(), _now(),
+         page_url, stream_height))
     con.commit()
     return sid
 
@@ -90,6 +100,12 @@ def update_transcript(con, sid, transcript_json, model_size, srt_source,
 def get_session(con, sid):
     r = con.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
     return dict(r) if r else None
+
+
+def set_stream_height(con, sid, height):
+    con.execute("UPDATE sessions SET stream_height=?, updated_at=? WHERE id=?",
+                (height, _now(), sid))
+    con.commit()
 
 
 def list_sessions(con):

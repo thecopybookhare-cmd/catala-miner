@@ -10,7 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               languages, media, nlp, subs, translate, tts, vocab, wikdict)
+               languages, media, nlp, stream, subs, translate, tts, vocab,
+               wikdict)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -231,8 +232,12 @@ def session_detail(sid: str):
                              nlp.TOK_VERSION)
         s["tok_version"] = nlp.TOK_VERSION
     s["word_statuses"] = db.word_statuses(CON, _lang())
-    s["media_url"] = (s["media_path"] if s["source_type"] == "url"
-                      else "/media-file/" + sid)
+    if s["source_type"] == "url":
+        s["media_url"] = s["media_path"]
+    elif s["source_type"] == "stream":
+        s["media_url"] = ""            # el frontend pide /stream-url (URL fresca)
+    else:
+        s["media_url"] = "/media-file/" + sid
     return s
 
 
@@ -297,6 +302,83 @@ def url_session(req: UrlReq):
         return {"session_id": sid}
 
     return {"job_id": jobs.start(work, label="url")}
+
+
+def _stream_subs_transcript(r: dict) -> tuple[str, str]:
+    """Descarga y tokeniza los subtítulos catalanes de un stream resuelto.
+    Devuelve (transcript_json, srt_source). '' si no hay."""
+    if not r.get("subs_url"):
+        return "[]", "none"
+    try:
+        import requests
+        from .transcribe import tokens_for_existing
+        vtt = requests.get(r["subs_url"], timeout=20).text
+        segs = subs.parse_subtitles(vtt)
+        if r.get("subs_auto"):
+            segs = subs.clean_auto(segs)
+        if not segs:
+            return "[]", "none"
+        kind = "youtube_auto" if r.get("subs_auto") else "youtube_subs"
+        return json.dumps(tokens_for_existing(segs)), kind
+    except Exception:
+        return "[]", "none"
+
+
+@app.post("/api/sessions/stream")
+def stream_session(req: UrlReq):
+    """«Ver online» inteligente: YouTube/3cat/directo → streaming sin descarga.
+    Resuelve la URL reproducible con yt-dlp y crea la sesión."""
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        return JSONResponse({"error": "la URL debe empezar por http(s)://"},
+                            status_code=400)
+
+    def work(jid):
+        jobs.set_progress(jid, 0.3, "Resolviendo el enlace…")
+        # enlace directo a un archivo → sesión url normal (streaming directo)
+        if stream.is_direct(url):
+            dur = media.duration(url)
+            if dur <= 0:
+                raise ValueError("no se pudo leer ese enlace directo de video")
+            title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
+            sid = db.create_session(
+                CON, title=title, source_type="url", media_path=url,
+                srt_source="none", model_size="-", duration_secs=dur,
+                transcript_json="[]")
+            return {"session_id": sid}
+        # sitio soportado (YouTube, 3cat…) → resolver stream progresivo
+        r = stream.resolve(url)
+        if not r:
+            raise ValueError(
+                "No pude extraer un stream reproducible de ese enlace. "
+                "Si es HD/720p+, usa ⬇️ Importar (descarga).")
+        jobs.set_progress(jid, 0.7, "Cargando subtítulos…")
+        transcript, srt_source = _stream_subs_transcript(r)
+        sid = db.create_session(
+            CON, title=r["title"], source_type="stream",
+            media_path=r["best_url"], srt_source=srt_source, model_size="-",
+            duration_secs=r["duration"], transcript_json=transcript,
+            page_url=url, stream_height=r["best_height"])
+        return {"session_id": sid}
+
+    return {"job_id": jobs.start(work, label="stream")}
+
+
+@app.get("/api/sessions/{sid}/stream-url")
+def session_stream_url(sid: str, height: int = 0):
+    """URL fresca de stream (las de yt-dlp caducan) + alturas disponibles."""
+    s = db.get_session(CON, sid)
+    if not s or s["source_type"] != "stream":
+        return JSONResponse({"error": "no es una sesión de streaming"},
+                            status_code=400)
+    url, heights = stream.stream_url(s["page_url"], height or s["stream_height"])
+    if not url:
+        return JSONResponse(
+            {"error": "el enlace ya no está disponible o cambió"},
+            status_code=502)
+    if height and height != s["stream_height"]:
+        db.set_stream_height(CON, sid, height)
+    return {"url": url, "height": height or s["stream_height"], "heights": heights}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:
@@ -498,24 +580,31 @@ def _build_preview(s: dict, segment_index: int, selection: str,
     start = segs[max(0, segment_index - pad_before)]["start"]
     end = segs[min(len(segs) - 1, segment_index + pad_after)]["end"]
 
+    # los streams tienen URL caducable: re-resolver una fresca para ffmpeg
+    src = s["media_path"]
+    if s.get("source_type") == "stream" and s.get("page_url"):
+        fresh, _ = stream.stream_url(s["page_url"], s.get("stream_height") or 0)
+        if fresh:
+            src = fresh
+
     base = uuid.uuid4().hex[:10]
     audio_name, image_name = f"cm-{base}.mp3", f"cm-{base}.jpg"
     clip_name = f"cm-{base}.gif"
     audio_ok = image_ok = clip_ok = True
     try:
-        media.cut_audio(s["media_path"], start, end,
+        media.cut_audio(src, start, end,
                         str(config.MEDIA_DIR / audio_name))
     except Exception:
         audio_ok = False
     try:
-        media.snapshot(s["media_path"], (seg["start"] + seg["end"]) / 2,
+        media.snapshot(src, (seg["start"] + seg["end"]) / 2,
                        str(config.MEDIA_DIR / image_name))
     except Exception:
         image_ok = False
     try:
         # animated clip only makes sense for video sources
         if image_ok:
-            media.animated_clip(s["media_path"], seg["start"], seg["end"],
+            media.animated_clip(src, seg["start"], seg["end"],
                                 str(config.MEDIA_DIR / clip_name))
         else:
             clip_ok = False

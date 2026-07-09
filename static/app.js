@@ -123,9 +123,9 @@ $("yt-btn").onclick = async () => {
 $("url-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
-  const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
+  const r = await api("/api/sessions/stream", { method: "POST", body: JSON.stringify({ url }) });
   if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
-  const res = await pollJob(r.job_id, "Comprobando el enlace…");
+  const res = await pollJob(r.job_id, "Resolviendo el enlace…");
   if (res) openSession(res.session_id);
 };
 
@@ -185,7 +185,13 @@ async function openSession(sid) {
   for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
   $("home").hidden = true; $("player").hidden = false;
-  $("video").src = s.media_url;
+  STALLS = [];
+  if (s.source_type === "stream") {
+    await loadStreamUrl(sid, 0);        // URL fresca (las de yt-dlp caducan)
+  } else {
+    $("quality-btn").hidden = true;
+    $("video").src = s.media_url;
+  }
   // preferencias por defecto de la configuración
   setDual(SETTINGS?.dual_default ?? DUAL);
   setAutopause(SETTINGS?.autopause_default ?? AUTOPAUSE);
@@ -198,8 +204,56 @@ async function openSession(sid) {
   updateComp();
   syncStatuses();
 }
+// ---------- streaming (URL fresca + calidad + auto-bajada) ----------
+let STREAM_HEIGHTS = [], STREAM_H = 0, STALLS = [];
+
+async function loadStreamUrl(sid, height) {
+  showProgress(0.5, "Cargando el video…");
+  const r = await api(`/api/sessions/${sid}/stream-url?height=${height || 0}`);
+  hideProgress();
+  if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
+  const t = V.currentTime || 0, playing = !V.paused;
+  STREAM_HEIGHTS = r.heights || [];
+  STREAM_H = r.height || 0;
+  $("video").src = r.url;
+  if (height) {   // cambio de calidad: preservar el punto
+    V.addEventListener("loadedmetadata", () => {
+      V.currentTime = t; if (playing) V.play();
+    }, { once: true });
+  }
+  renderQualityMenu();
+}
+
+function renderQualityMenu() {
+  const btn = $("quality-btn");
+  if (!STREAM_HEIGHTS.length) { btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.textContent = STREAM_H ? STREAM_H + "p" : "Auto";
+  $("quality-menu").innerHTML = STREAM_HEIGHTS
+    .slice().sort((a, b) => b.height - a.height)
+    .map((h) => `<button data-h="${h.height}" class="${h.height === STREAM_H ? "on" : ""}">${h.label}</button>`).join("");
+  for (const b of $("quality-menu").querySelectorAll("button"))
+    b.onclick = () => { $("quality-menu").hidden = true; loadStreamUrl(SESSION.id, +b.dataset.h); };
+}
+$("quality-btn").onclick = () => { $("quality-menu").hidden = !$("quality-menu").hidden; };
+
+// auto-bajada: si se atasca repetidamente, baja un escalón de calidad
+$("video").addEventListener("waiting", () => {
+  if (SESSION?.source_type !== "stream" || STREAM_HEIGHTS.length < 2) return;
+  const now = Date.now();
+  STALLS = STALLS.filter((t) => now - t < 12000);
+  STALLS.push(now);
+  if (STALLS.length >= 3) {
+    STALLS = [];
+    const lower = STREAM_HEIGHTS.filter((h) => h.height < STREAM_H)
+      .sort((a, b) => b.height - a.height)[0];
+    if (lower) { toast(`📉 Bajando a ${lower.label} por conexión lenta`); loadStreamUrl(SESSION.id, lower.height); }
+  }
+});
+
 $("back").onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();
+  $("quality-menu").hidden = true;
   $("video-col").classList.remove("fake-fs");
   $("player").hidden = true; $("home").hidden = false;
   $("card-panel").hidden = true; $("word-pop").hidden = true;
