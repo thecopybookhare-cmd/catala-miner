@@ -285,8 +285,10 @@ def url_session(req: UrlReq):
         jobs.set_progress(jid, 0.3, "Comprobando el enlace…")
         dur = media.duration(url)
         if dur <= 0:
-            raise ValueError("no se pudo leer el video de esa URL (¿es un "
-                             "enlace directo a .mp4/.m3u8?)")
+            raise ValueError(
+                "Ese enlace no es un video directo (parece una página web). "
+                "«Ver online» solo sirve para enlaces .mp4/.m3u8. Para sitios "
+                "como YouTube o 3cat, usa el botón ⬇️ Importar.")
         title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
         sid = db.create_session(
             CON, title=title, source_type="url", media_path=url,

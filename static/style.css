@@ -472,8 +472,13 @@ button.small { font-size: 12px; padding: 6px 10px; }
   box-shadow: 0 10px 34px #00000080; animation: toast-in .18s ease;
 }
 #progress-pill[hidden] { display: none; }
+#gp-bar[hidden] { display: none; }
 #gp-bar { width: 180px; accent-color: var(--vio); }
-#gp-msg { font-family: var(--display); font-size: 13px; font-weight: 600; }
+#gp-msg { font-family: var(--display); font-size: 13px; font-weight: 600; max-width: 460px; }
+#progress-pill.err { background: #2a1416; border-color: #63292e; }
+#progress-pill.err #gp-msg { color: #f2b8b4; font-weight: 500; }
+#gp-close { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
+#gp-close[hidden] { display: none; }
 
 /* ---------- glosas Wikcionario ---------- */
 .wp-gl { font-size: 12.5px; color: var(--dim); margin: 4px 0; line-height: 1.4; }

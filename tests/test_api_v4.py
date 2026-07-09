@@ -46,7 +46,7 @@ def test_url_session_rejects_unreadable(_dur, tmp_path):
                json={"url": "https://example.com/nada.mp4"}).json()
     j = _wait_job(r["job_id"])
     assert j["status"] == "error"
-    assert "no se pudo leer" in j["message"]
+    assert "no es un video directo" in j["message"]
 
 
 def test_url_session_rejects_non_http(tmp_path):

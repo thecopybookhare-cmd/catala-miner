@@ -32,5 +32,10 @@ def set_progress(jid: str, p: float, message: str = ""):
             JOBS[jid]["message"] = message
 
 
+def set_message(jid: str, message: str):
+    if jid in JOBS and message:
+        JOBS[jid]["message"] = message
+
+
 def get(jid: str) -> dict | None:
     return JOBS.get(jid)

@@ -107,7 +107,7 @@ $("file-input").onchange = async (e) => {
   fd.append("file", f);
   const r = await uploadWithProgress("/api/sessions/upload", fd).catch(() => null);
   e.target.value = "";
-  if (!r || r.error) { hideProgress(); toast(r?.error || "Error subiendo el archivo", "err"); return; }
+  if (!r || r.error) { showProgress(1, "⚠️ " + (r?.error || "Error subiendo el archivo"), true); return; }
   const res = await pollJob(r.job_id, "Procesando el video…");
   if (res) openSession(res.session_id);
 };
@@ -124,18 +124,26 @@ $("url-btn").onclick = async () => {
   const url = $("yt-url").value.trim();
   if (!url) return;
   const r = await api("/api/sessions/url", { method: "POST", body: JSON.stringify({ url }) });
-  if (r.error) { toast(r.error, "err"); return; }
+  if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
   const res = await pollJob(r.job_id, "Comprobando el enlace…");
   if (res) openSession(res.session_id);
 };
 
 // ---------- jobs (progreso global, visible también en la home) ----------
-function showProgress(v, msg) {
-  $("progress-pill").hidden = false;
+function showProgress(v, msg, isError = false) {
+  const pill = $("progress-pill");
+  pill.hidden = false;
+  pill.classList.toggle("err", isError);
+  $("gp-bar").hidden = isError;
   $("gp-bar").value = v || 0;
   $("gp-msg").textContent = msg || "";
+  $("gp-close").hidden = !isError;   // solo se puede cerrar en estado de error
 }
-function hideProgress() { $("progress-pill").hidden = true; }
+function hideProgress() {
+  $("progress-pill").hidden = true;
+  $("progress-pill").classList.remove("err");
+}
+$("gp-close").onclick = hideProgress;
 
 async function pollJob(jid, label) {
   showProgress(0, label);
@@ -143,7 +151,11 @@ async function pollJob(jid, label) {
     const j = await api("/api/jobs/" + jid);
     showProgress(j.progress || 0, j.message || label);
     if (j.status === "done") { hideProgress(); return j.result; }
-    if (j.status === "error") { hideProgress(); toast("Error: " + j.message, "err"); return null; }
+    if (j.status === "error") {
+      // error persistente en la píldora (no un toast que se esfuma)
+      showProgress(1, "⚠️ " + (j.message || "algo falló"), true);
+      return null;
+    }
     await new Promise((r) => setTimeout(r, 800));
   }
 }
