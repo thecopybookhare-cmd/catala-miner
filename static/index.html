@@ -3,10 +3,16 @@
 <head>
 <meta charset="utf-8">
 <title>CatalàMiner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/favicon.png?v=0.9.1">
-<link rel="apple-touch-icon" href="/favicon.png?v=0.9.1">
-<link rel="stylesheet" href="/style.css?v=0.9.1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="/favicon.png?v=0.9.3">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0c0d13">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CatalàMiner">
+<link rel="stylesheet" href="/style.css?v=0.9.3">
 </head>
 <body>
 <header>
@@ -184,6 +190,16 @@
       <div class="set-row"><label>Idioma de estudio</label>
         <select id="set-language"></select></div>
     </section>
+    <section id="share-section">
+      <h3>📡 Compartir con amigos</h3>
+      <p class="dim">Sirve la app a tu red local o a tu <b>Tailscale</b> para que un amigo (o tu móvil) la use en el navegador. Solo mientras esté activo — nada se expone hasta que lo enciendes.</p>
+      <div class="set-row"><label>Modo compartir</label>
+        <input id="set-share" type="checkbox"></div>
+      <div id="share-info" hidden>
+        <div id="share-urls"></div>
+      </div>
+      <p class="dim" id="share-note"></p>
+    </section>
     <section>
       <h3>Anki</h3>
       <div class="set-row"><label>Mazo de minado</label><select id="set-deck"></select></div>
@@ -271,6 +287,15 @@
   </form>
 </dialog>
 
-<script src="/app.js?v=0.9.1"></script>
+<script>
+  // PWA: registra el service worker (solo en contexto seguro: localhost o
+  // https del modo compartir por Tailscale). Falla en silencio donde no aplica.
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
+</script>
+<script src="/app.js?v=0.9.3"></script>
 </body>
 </html>

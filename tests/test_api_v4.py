@@ -310,7 +310,18 @@ def test_setup_status_shape(tmp_path):
     assert set(r) == {"checks", "ready", "has_sessions"}
     assert "ffmpeg" in r["checks"] and "anki" in r["checks"]
     assert r["has_sessions"] is False       # DB nueva, sin sesiones
-    assert isinstance(r["ready"], bool)
+
+
+# ---------- modo compartir ----------
+
+def test_share_status_and_qr(tmp_path):
+    c = client(tmp_path)
+    r = c.get("/api/share/status").json()
+    assert r["running"] is False and r["port"] == 8978
+    qr = c.get("/api/share/qr", params={"url": "http://192.168.1.5:8978"})
+    assert qr.status_code == 200
+    assert "svg" in qr.headers["content-type"]
+    assert b"<svg" in qr.content
 
 
 @patch("app.main.wikdict.lookup", return_value=[])

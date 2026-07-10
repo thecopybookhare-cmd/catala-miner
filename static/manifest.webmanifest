@@ -1,0 +1,17 @@
+{
+  "name": "CatalàMiner",
+  "short_name": "CatalàMiner",
+  "description": "Minero local de flashcards estilo Migaku para aprender catalán y francés desde español.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0d13",
+  "theme_color": "#0c0d13",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
