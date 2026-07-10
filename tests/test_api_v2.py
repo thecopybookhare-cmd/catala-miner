@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
+
 import app.main as main
 
 SRT = """1
@@ -54,7 +56,8 @@ def test_attach_subtitles_tokenizes_and_saves(tmp_path):
 @patch("app.main.anki.send_card")
 @patch("app.main.anki.is_up", return_value=True)
 def test_flush_skips_duplicates_and_continues(_up, send, tmp_path):
-    from app import anki as anki_mod, db as db_mod
+    from app import anki as anki_mod
+    from app import db as db_mod
     c = client(tmp_path)
     sid = _session(tmp_path)
     for w in ("u", "dos"):

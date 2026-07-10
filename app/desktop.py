@@ -31,6 +31,7 @@ def _setup_logging():
 
 def _serve():
     import uvicorn
+
     from .main import app
     uvicorn.run(app, host="127.0.0.1", port=config.PORT, log_level="info",
                 log_config=None)

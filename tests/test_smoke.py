@@ -1,8 +1,10 @@
 import shutil
 import subprocess
 from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
+
 import app.main as main
 
 

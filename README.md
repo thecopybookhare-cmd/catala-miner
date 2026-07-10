@@ -1,5 +1,7 @@
 # 🐈 CatalàMiner
 
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.0-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
 subtítulos palabra a palabra, y de un clic crea tarjetas de Anki con:
@@ -93,3 +95,21 @@ bidix de [apertium/apertium-spa-cat](https://github.com/apertium/apertium-spa-ca
 spaCy `ca_core_news_sm`, wordfreq, yt-dlp, AnkiConnect.
 
 Datos en `~/Library/Application Support/CatalaMiner/`.
+
+## Desarrollo
+
+```bash
+uv pip install -p .venv/bin/python -e . --group dev
+.venv/bin/ruff check app/ tests/     # lint
+.venv/bin/python -m pytest tests/    # 74 tests
+```
+
+Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.
+
+## Licencia y uso
+
+Código bajo licencia [MIT](LICENSE) © 2026 Tomás Plaza.
+
+⚠️ **Solo para uso personal y educativo.** La herramienta reproduce contenido de
+YouTube/3cat para estudio de idiomas; respeta los derechos de autor y los términos
+de cada plataforma. No redistribuyas el contenido descargado.

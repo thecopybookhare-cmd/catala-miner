@@ -159,7 +159,7 @@ def test_import_respects_local_without_overwrite(tmp_path):
 # ---------- vocabulario (Language Reactor) ----------
 
 def test_vocab_ranks_lemmatizes_and_caches(monkeypatch):
-    from app import vocab, forms
+    from app import forms, vocab
     monkeypatch.setattr(vocab, "_RANKS", {})
     monkeypatch.setattr(forms, "lookup",
                         lambda w: [("ser", "VERB")] if w in ("és", "sóc") else [])
@@ -204,7 +204,8 @@ def test_backup_daily_creates_and_prunes(tmp_path):
     con = adb.connect(tmp_path / "app.db")
     adb.set_word_status(con, "gos", "known")
     # 9 backups falsos antiguos
-    bdir = tmp_path / "backups"; bdir.mkdir()
+    bdir = tmp_path / "backups"
+    bdir.mkdir()
     for i in range(9):
         (bdir / f"app-2026010{i}.db").write_bytes(b"x")
     adb.backup_daily(con, tmp_path)
@@ -221,6 +222,7 @@ def test_backup_daily_creates_and_prunes(tmp_path):
 
 def test_wikdict_build_and_lookup(tmp_path, monkeypatch):
     import sqlite3
+
     from app import wikdict
     sample = "\n".join([
         '{"word": "gos", "pos": "noun", "senses": [{"glosses": ["Perro, animal doméstico."]}]}',
@@ -256,6 +258,7 @@ def test_lookup_includes_glosses(_tr, _sen, _ipa, tmp_path, monkeypatch):
 
 def test_word_status_migration_preserves_data(tmp_path):
     import sqlite3
+
     from app import db as adb
     path = tmp_path / "old.db"
     old = sqlite3.connect(str(path))
@@ -277,7 +280,8 @@ def test_word_status_migration_preserves_data(tmp_path):
     INSERT INTO word_status VALUES ('gos', 'known', '2026-07-01T00:00:00');
     INSERT INTO word_status VALUES ('casa', 'learning', '2026-07-01T00:00:00');
     """)
-    old.commit(); old.close()
+    old.commit()
+    old.close()
     con = adb.connect(path)                       # migra al conectar
     assert adb.word_statuses(con) == {"gos": "known", "casa": "learning"}
     # la PK compuesta permite el mismo lema en otro idioma
@@ -289,7 +293,7 @@ def test_word_status_migration_preserves_data(tmp_path):
 def test_language_fr_not_selectable_yet(tmp_path):
     c = client(tmp_path)
     s = c.get("/api/settings").json()
-    frs = [l for l in s["languages"] if l["code"] == "fr"]
+    frs = [lang for lang in s["languages"] if lang["code"] == "fr"]
     assert frs and frs[0]["available"] is False
     assert c.post("/api/settings", json={"language": "fr"}).status_code == 400
     assert c.post("/api/settings", json={"language": "ca"}).status_code == 200

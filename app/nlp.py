@@ -58,6 +58,7 @@ def freq_badge(zipf_value: float) -> str:
 def zipf(word: str) -> float:
     try:
         from wordfreq import zipf_frequency
+
         from . import languages
         return zipf_frequency(word, languages.profile()["wordfreq"])
     except Exception:

@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 PORT = 8977
 # AnkiConnect default port is 8765, but on this machine another local

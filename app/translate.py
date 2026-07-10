@@ -48,6 +48,7 @@ def is_downloaded() -> bool:
 
 def download():
     from huggingface_hub import snapshot_download
+
     from . import languages
     repo = languages.profile()["translate_repo"]
     if repo:
