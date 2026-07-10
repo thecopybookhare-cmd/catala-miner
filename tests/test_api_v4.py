@@ -297,3 +297,28 @@ def test_language_fr_not_selectable_yet(tmp_path):
     assert frs and frs[0]["available"] is False
     assert c.post("/api/settings", json={"language": "fr"}).status_code == 400
     assert c.post("/api/settings", json={"language": "ca"}).status_code == 200
+
+
+# ---------- asistente de primer arranque ----------
+
+def test_setup_status_shape(tmp_path):
+    c = client(tmp_path)
+    r = c.get("/api/setup-status").json()
+    assert set(r) == {"checks", "ready", "has_sessions"}
+    assert "ffmpeg" in r["checks"] and "anki" in r["checks"]
+    assert r["has_sessions"] is False       # DB nueva, sin sesiones
+    assert isinstance(r["ready"], bool)
+
+
+@patch("app.main.wikdict.lookup", return_value=[])
+@patch("app.main.forms.lookup", return_value=[])
+@patch("app.main._dict")
+@patch("app.main.translate.download")
+@patch("app.main.translate.is_downloaded", return_value=False)
+def test_setup_download_runs_job(_isdl, _dl, _d, _f, _w, tmp_path):
+    c = client(tmp_path)
+    r = c.post("/api/setup/download").json()
+    j = _wait_job(r["job_id"])
+    assert j["status"] == "done", j.get("message")
+    assert j["result"] == {"ok": True}
+    _dl.assert_called_once()                # descargó el traductor (no estaba)

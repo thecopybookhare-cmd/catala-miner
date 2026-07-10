@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/favicon.png?v=0.9.0">
-<link rel="apple-touch-icon" href="/favicon.png?v=0.9.0">
-<link rel="stylesheet" href="/style.css?v=0.9.0">
+<link rel="icon" href="/favicon.png?v=0.9.1">
+<link rel="apple-touch-icon" href="/favicon.png?v=0.9.1">
+<link rel="stylesheet" href="/style.css?v=0.9.1">
 </head>
 <body>
 <header>
@@ -35,8 +35,22 @@
       </div>
     </div>
   </section>
+  <section id="onboarding" hidden>
+    <div class="onb-card">
+      <div class="onb-head">
+        <h3>👋 Primeros pasos</h3>
+        <button id="onb-dismiss" class="small" title="Ocultar">✕</button>
+      </div>
+      <ul id="onb-checks"></ul>
+      <div class="onb-actions">
+        <button id="onb-download" class="primary" hidden>⬇️ Descargar traductor y diccionarios</button>
+        <button id="onb-recheck" class="small">↻ Volver a comprobar</button>
+      </div>
+    </div>
+  </section>
   <section>
     <div id="session-list" class="scard-grid"></div>
+    <p id="library-empty" class="dim" hidden>Tu biblioteca está vacía. Abre un archivo, o pega un enlace de <b>YouTube / 3cat</b> y pulsa <b>🔗 Ver online</b> para empezar.</p>
   </section>
 </main>
 
@@ -257,6 +271,6 @@
   </form>
 </dialog>
 
-<script src="/app.js?v=0.9.0"></script>
+<script src="/app.js?v=0.9.1"></script>
 </body>
 </html>
