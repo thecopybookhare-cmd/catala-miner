@@ -162,12 +162,58 @@ def _fmt_ts(secs: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-# ---------- health / sessions ----------
+# ---------- health / setup ----------
 
 @app.get("/api/health")
 def health():
     return {"ok": True, "anki": anki.is_up(),
             "translator": translate.is_downloaded()}
+
+
+def _setup_checks() -> dict:
+    """Estado de preparación para el asistente de primer arranque."""
+    import importlib.util
+    import shutil
+    prof = languages.profile()
+    dl = config.MODELS_DIR
+    return {
+        "ffmpeg": bool(shutil.which("ffmpeg")),
+        "espeak": bool(shutil.which("espeak-ng") or shutil.which("espeak")),
+        "spacy": importlib.util.find_spec(prof["spacy"]) is not None,
+        "translator": translate.is_downloaded(),
+        "forms": (dl / "forms.sqlite").exists()
+                 or (dl / f"forms-{_lang()}.sqlite").exists(),
+        "dictionary": (dl / prof["bidix_file"]).exists(),
+        "anki": anki.is_up(_settings().get("anki_port")),
+    }
+
+
+@app.get("/api/setup-status")
+def setup_status():
+    c = _setup_checks()
+    # "listo para minar" = lo esencial (media + traducción); Anki y espeak
+    # son deseables pero la app funciona en cola / sin IPA.
+    ready = c["ffmpeg"] and c["translator"] and c["dictionary"]
+    return {"checks": c, "ready": ready,
+            "has_sessions": len(db.list_sessions(CON)) > 0}
+
+
+@app.post("/api/setup/download")
+def setup_download():
+    """Pre-descarga traductor + diccionarios (evita la sorpresa del primer uso)."""
+    def work(jid):
+        jobs.set_progress(jid, 0.1, "Descargando el traductor (~1.5 GB)…")
+        if not translate.is_downloaded():
+            translate.download()
+        jobs.set_progress(jid, 0.6, "Diccionario de acepciones…")
+        _dict()
+        jobs.set_progress(jid, 0.75, "Diccionario de formas (~66 MB)…")
+        forms.lookup("hola")          # dispara descarga+build
+        jobs.set_progress(jid, 0.9, "Glosas del Wikcionario (~4 MB)…")
+        wikdict.lookup("hola")
+        return {"ok": True}
+
+    return {"job_id": jobs.start(work, label="setup")}
 
 
 # caché de stats de la home: releer todas las transcripciones en cada

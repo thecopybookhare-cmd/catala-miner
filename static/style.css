@@ -529,3 +529,18 @@ button.small { font-size: 12px; padding: 6px 10px; }
   transform: translateY(-50%); pointer-events: none; z-index: 1; }
 #seek-marks i { position: absolute; top: 0; width: 2px; height: 8px;
   background: #8b7cf877; border-radius: 1px; }
+
+/* ---------- asistente de primer arranque ---------- */
+#onboarding { margin-bottom: 22px; }
+.onb-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px 20px; box-shadow: 0 8px 28px #00000044;
+}
+.onb-head { display: flex; justify-content: space-between; align-items: center; }
+.onb-head h3 { margin: 0; font-size: 16px; }
+#onb-checks { list-style: none; padding: 0; margin: 10px 0 12px; display: grid; gap: 6px; }
+#onb-checks li { display: flex; flex-direction: column; gap: 1px; font-size: 14px; }
+#onb-checks li.ok { color: var(--dim); }
+#onb-checks li small { color: var(--dim); font-size: 12px; margin-left: 24px; }
+.onb-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#library-empty { text-align: center; padding: 30px 10px; font-size: 15px; }

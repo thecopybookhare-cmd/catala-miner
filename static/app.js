@@ -110,7 +110,50 @@ async function loadSessions() {
     </article>`).join("");
   for (const card of $("session-list").children)
     card.onclick = () => openSession(card.dataset.id);
+  $("library-empty").hidden = list.length > 0;
+  refreshOnboarding();
 }
+
+// ---------- asistente de primer arranque ----------
+const ONB_LABEL = {
+  ffmpeg: ["ffmpeg (recorte de audio/imagen)", "Instala con: brew install ffmpeg"],
+  translator: ["Traductor catalán→español", "Se descarga (~1.5 GB) — pulsa el botón"],
+  dictionary: ["Diccionario de acepciones", "Se descarga con el traductor"],
+  forms: ["Diccionario de formas (lemas)", "Se descarga con el traductor"],
+  spacy: ["Modelo lingüístico spaCy", "Ejecuta install.sh de nuevo si falta"],
+  anki: ["Anki + AnkiConnect (para las tarjetas)", "Abre Anki con el complemento 2055492159; sin él, las tarjetas quedan en cola"],
+  espeak: ["espeak-ng (pronunciación IPA, opcional)", "Opcional: brew install espeak-ng"],
+};
+const ONB_ORDER = ["ffmpeg", "translator", "dictionary", "forms", "spacy", "anki", "espeak"];
+const ONB_OPTIONAL = new Set(["espeak"]);
+let ONB_DISMISSED = false;
+
+async function refreshOnboarding() {
+  const s = await api("/api/setup-status").catch(() => null);
+  if (!s) return;
+  const allReady = ONB_ORDER.every((k) => s.checks[k] || ONB_OPTIONAL.has(k));
+  // mostrar mientras no esté todo listo, o si la biblioteca está vacía
+  const show = !ONB_DISMISSED && (!allReady || !s.has_sessions);
+  $("onboarding").hidden = !show;
+  if (!show) return;
+  $("onb-checks").innerHTML = ONB_ORDER.map((k) => {
+    const ok = s.checks[k];
+    const [label, hint] = ONB_LABEL[k];
+    const icon = ok ? "✅" : (ONB_OPTIONAL.has(k) ? "⚪" : "⚠️");
+    return `<li class="${ok ? "ok" : ""}"><span>${icon} ${label}</span>${ok ? "" : `<small>${hint}</small>`}</li>`;
+  }).join("");
+  // botón de descarga si falta el traductor o los diccionarios
+  const needsDl = !s.checks.translator || !s.checks.dictionary || !s.checks.forms;
+  $("onb-download").hidden = !needsDl;
+}
+
+$("onb-download").onclick = async () => {
+  const r = await api("/api/setup/download", { method: "POST" });
+  const res = await pollJob(r.job_id, "Descargando…");
+  if (res) { toast("✅ Todo descargado"); refreshOnboarding(); }
+};
+$("onb-recheck").onclick = () => { refreshAnki(); refreshOnboarding(); };
+$("onb-dismiss").onclick = () => { ONB_DISMISSED = true; $("onboarding").hidden = true; };
 
 $("file-input").onchange = async (e) => {
   const f = e.target.files[0];
