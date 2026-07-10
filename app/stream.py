@@ -5,8 +5,23 @@ archivo, proto http) que un <video> puede reproducir directo y ffmpeg puede
 leer para las tarjetas. Las URLs caducan y van atadas a la IP, así que se
 re-resuelven al abrir la sesión y al minar."""
 import re
+import time
 
 _DIRECT = re.compile(r"\.(mp4|m3u8|webm|mov|m4v)(\?|$)", re.I)
+
+# Abrir una sesión de streaming dispara varias llamadas a yt-dlp seguidas
+# (resolver + cambiar calidad + minar), cada una ~1-3 s. Las URLs de yt-dlp
+# caducan en horas, así que cachear el resultado unos minutos es seguro y
+# recorta la latencia de esas ráfagas.
+_CACHE: dict[str, tuple[float, dict]] = {}
+_TTL = 240.0
+
+
+def _cache_get(url: str) -> dict | None:
+    hit = _CACHE.get(url)
+    if hit and time.time() - hit[0] < _TTL:
+        return hit[1]
+    return None
 
 
 def is_direct(url: str) -> bool:
@@ -66,7 +81,10 @@ def _extract(url: str) -> dict:
 
 def resolve(url: str) -> dict:
     """{title, duration, formats:[{height,label,url}], best_url, subs_url,
-    subs_auto} — o {} si no se pudo resolver."""
+    subs_auto} — o {} si no se pudo resolver. Cacheado con TTL."""
+    cached = _cache_get(url)
+    if cached is not None:
+        return cached
     try:
         info = _extract(url)
     except Exception:
@@ -75,12 +93,14 @@ def resolve(url: str) -> dict:
     if not formats:
         return {}
     subs_url, subs_auto = _subs_url(info)
-    return {"title": info.get("title") or url,
-            "duration": float(info.get("duration") or 0),
-            "formats": formats,
-            "best_url": formats[-1]["url"],
-            "best_height": formats[-1]["height"],
-            "subs_url": subs_url, "subs_auto": subs_auto}
+    r = {"title": info.get("title") or url,
+         "duration": float(info.get("duration") or 0),
+         "formats": formats,
+         "best_url": formats[-1]["url"],
+         "best_height": formats[-1]["height"],
+         "subs_url": subs_url, "subs_auto": subs_auto}
+    _CACHE[url] = (time.time(), r)          # solo éxitos; los fallos reintentan
+    return r
 
 
 def stream_url(url: str, height: int = 0) -> tuple[str, list[dict]]:

@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS word_status (
   PRIMARY KEY (lemma, language));
 """
 
+# Índices creados tras las migraciones (word_status puede recrearse). Aceleran
+# el panel de vocabulario y las stats en bibliotecas grandes.
+INDICES = """
+CREATE INDEX IF NOT EXISTS ix_cards_session ON cards(session_id);
+CREATE INDEX IF NOT EXISTS ix_cards_status ON cards(status);
+CREATE INDEX IF NOT EXISTS ix_ws_lang_status ON word_status(language, status);
+"""
+
 WORD_STATUSES = {"unknown", "learning", "known", "ignored", "tracking"}
 
 
@@ -37,6 +45,8 @@ def connect(path: Path) -> sqlite3.Connection:
     con = sqlite3.connect(str(path), check_same_thread=False)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")   # seguro con WAL, menos fsync
+    con.execute("PRAGMA temp_store=MEMORY")
     con.executescript(SCHEMA)
     # migración: versión del tokenizador con que se guardó la transcripción
     cols = {r["name"] for r in con.execute("PRAGMA table_info(sessions)")}
@@ -68,6 +78,7 @@ def connect(path: Path) -> sqlite3.Connection:
         "INSERT OR IGNORE INTO word_status "
         "SELECT DISTINCT lema, 'ca', 'learning', ? FROM cards WHERE lema != ''",
         (_now(),))
+    con.executescript(INDICES)             # tras migraciones (ver INDICES)
     con.commit()
     return con
 

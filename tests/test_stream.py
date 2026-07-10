@@ -33,6 +33,39 @@ def test_is_direct():
     assert not stream.is_direct("https://youtube.com/watch?v=abc")
 
 
+_FAKE_INFO = {"title": "T", "duration": 10, "formats": [
+    {"height": 360, "vcodec": "avc1", "acodec": "mp4a",
+     "protocol": "https", "format_note": "360p", "url": "u360"}]}
+
+
+def test_resolve_caches_within_ttl():
+    stream._CACHE.clear()
+    calls = {"n": 0}
+
+    def fake_extract(url):
+        calls["n"] += 1
+        return _FAKE_INFO
+    with patch("app.stream._extract", side_effect=fake_extract):
+        r1 = stream.resolve("https://x/v")
+        r2 = stream.resolve("https://x/v")
+    assert r1 and r1 == r2
+    assert calls["n"] == 1                      # la 2ª vez viene de la caché
+    stream._CACHE.clear()
+
+
+def test_resolve_does_not_cache_failures():
+    stream._CACHE.clear()
+    calls = {"n": 0}
+
+    def boom(url):
+        calls["n"] += 1
+        raise RuntimeError("x")
+    with patch("app.stream._extract", side_effect=boom):
+        assert stream.resolve("https://y/v") == {}
+        assert stream.resolve("https://y/v") == {}
+    assert calls["n"] == 2                       # los fallos reintentan, no se cachean
+
+
 def _client(tmp_path):
     main.CON = main.db.connect(tmp_path / "t.db")
     return TestClient(main.app)
