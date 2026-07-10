@@ -1,11 +1,12 @@
 """faster-whisper transcription with word timestamps + spaCy tokens."""
-from . import config, jobs, nlp
+from . import jobs, nlp
 
 _MODELS: dict[str, object] = {}
 
 
 def _model(key: str):
     from faster_whisper import WhisperModel
+
     from . import languages
     code = languages.active_code()
     models = languages.PROFILES[code]["whisper_models"]

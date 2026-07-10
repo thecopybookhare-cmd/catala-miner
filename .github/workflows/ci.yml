@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Create venv and install deps
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install -p .venv/bin/python -e . --group dev
+
+      - name: Lint (ruff)
+        run: .venv/bin/ruff check app/ tests/
+
+      - name: Tests (pytest)
+        run: .venv/bin/python -m pytest tests/ -q

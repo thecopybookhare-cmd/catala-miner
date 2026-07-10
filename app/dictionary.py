@@ -45,13 +45,13 @@ def parse_bidix(xml_text: str) -> dict[str, list[tuple[str, str]]]:
         p = e.find("p")
         if p is None:
             continue
-        l, r = p.find("l"), p.find("r")
-        if l is None or r is None:
+        left, right = p.find("l"), p.find("r")
+        if left is None or right is None:
             continue
-        ca, es = _side_text(r), _side_text(l)
+        ca, es = _side_text(right), _side_text(left)
         if not ca or not es:
             continue
-        entry = (es, _first_symbol(l))
+        entry = (es, _first_symbol(left))
         bucket = index.setdefault(ca.lower(), [])
         if entry not in bucket:
             bucket.append(entry)

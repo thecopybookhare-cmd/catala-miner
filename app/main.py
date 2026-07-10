@@ -4,14 +4,30 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import (anki, config, db, dictionary, examples, forms, ipa, jobs,
-               languages, media, nlp, stream, subs, translate, tts, vocab,
-               wikdict)
+from . import (
+    anki,
+    config,
+    db,
+    dictionary,
+    examples,
+    forms,
+    ipa,
+    jobs,
+    languages,
+    media,
+    nlp,
+    stream,
+    subs,
+    translate,
+    tts,
+    vocab,
+    wikdict,
+)
 
 app = FastAPI(title="CatalaMiner")
 
@@ -311,6 +327,7 @@ def _stream_subs_transcript(r: dict) -> tuple[str, str]:
         return "[]", "none"
     try:
         import requests
+
         from .transcribe import tokens_for_existing
         vtt = requests.get(r["subs_url"], timeout=20).text
         segs = subs.parse_subtitles(vtt)

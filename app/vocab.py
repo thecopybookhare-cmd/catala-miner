@@ -13,6 +13,7 @@ def ranks(n: int = _N) -> dict[str, int]:
     code = languages.active_code()
     if code not in _RANKS:
         from wordfreq import top_n_list
+
         from . import forms
         out: dict[str, int] = {}
         for i, w in enumerate(

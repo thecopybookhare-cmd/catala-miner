@@ -1,4 +1,4 @@
-from app.dictionary import parse_bidix, Dictionary
+from app.dictionary import Dictionary, parse_bidix
 
 BIDIX = """<?xml version="1.0"?>
 <dictionary>

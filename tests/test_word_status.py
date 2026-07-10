@@ -1,8 +1,9 @@
-import json
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
-from app import db, anki
+
 import app.main as main
+from app import anki, db
 
 
 def client(tmp_path):

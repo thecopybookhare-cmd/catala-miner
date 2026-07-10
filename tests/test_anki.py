@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from app import anki
 
 
@@ -39,11 +41,9 @@ def test_invoke_ok_and_error(post):
     post.return_value = _resp(result=["Default"])
     assert anki.invoke("deckNames") == ["Default"]
     post.return_value = _resp(error="boom")
-    try:
+    import pytest
+    with pytest.raises(anki.AnkiError):
         anki.invoke("deckNames")
-        assert False
-    except anki.AnkiError:
-        pass
 
 
 @patch("app.anki.requests.post")
