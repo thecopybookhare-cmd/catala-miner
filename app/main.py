@@ -202,6 +202,15 @@ def setup_status():
 def setup_download():
     """Pre-descarga traductor + diccionarios (evita la sorpresa del primer uso)."""
     def work(jid):
+        import importlib.util
+        prof = languages.profile()
+        if importlib.util.find_spec(prof["spacy"]) is None:
+            jobs.set_progress(jid, 0.05, f"Modelo lingüístico {prof['name']}…")
+            try:
+                import spacy.cli
+                spacy.cli.download(prof["spacy"])
+            except Exception:
+                pass                      # degrada a tokenizador regex
         jobs.set_progress(jid, 0.1, "Descargando el traductor (~1.5 GB)…")
         if not translate.is_downloaded():
             translate.download()

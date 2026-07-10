@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.0-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.2-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -12,6 +12,11 @@ subtítulos palabra a palabra, y de un clic crea tarjetas de Anki con:
 - 📖 palabra objetivo con lema, POS, acepciones del diccionario Apertium y frecuencia
 
 Todo corre **100% local** — sin cuentas, sin APIs de pago.
+
+🇫🇷 **También francés → español.** Cámbialo en ⚙️ *Ajustes → Idioma*. Al elegir francés
+la app usa el traductor OPUS-MT fr→es, spaCy `fr_core_news_sm`, el bidix Apertium fra-spa
+y las glosas del Wikcionario en español; se descargan solos la primera vez (o desde el
+asistente de primer arranque).
 
 ## Instalación
 
@@ -94,6 +99,10 @@ con [projecte-aina/faster-whisper-large-v3-ca-3catparla](https://huggingface.co/
 bidix de [apertium/apertium-spa-cat](https://github.com/apertium/apertium-spa-cat),
 spaCy `ca_core_news_sm`, wordfreq, yt-dlp, AnkiConnect.
 
+Multi-idioma: los perfiles viven en [`app/languages.py`](app/languages.py). El francés añade
+[gaudi/opus-mt-fr-es-ctranslate2](https://huggingface.co/gaudi/opus-mt-fr-es-ctranslate2),
+`fr_core_news_sm` y el bidix [apertium/apertium-fr-es](https://github.com/apertium/apertium-fr-es).
+
 Datos en `~/Library/Application Support/CatalaMiner/`.
 
 ## Desarrollo
@@ -101,7 +110,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 74 tests
+.venv/bin/python -m pytest tests/    # 79 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.

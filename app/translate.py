@@ -12,14 +12,26 @@ def detok(pieces: list[str]) -> str:
     return out.replace("<unk>", "").strip()
 
 
+def _find_sp(model_dir: Path) -> Path:
+    """SentencePiece del modelo. OPUS-MT trae source.spm/target.spm por
+    separado (codificamos con el de origen); Softcatalà trae un único
+    sp_m.model compartido."""
+    src = next(iter(model_dir.glob("**/source.spm")), None)
+    if src:
+        return src
+    for pat in ("**/*.model", "**/*.spm"):
+        hits = sorted(model_dir.glob(pat))
+        if hits:
+            return hits[0]
+    raise FileNotFoundError("no SentencePiece model in " + str(model_dir))
+
+
 class _Engine:
-    def __init__(self, model_dir: Path):
+    def __init__(self, model_dir: Path, eos: bool = False):
         import ctranslate2
         import sentencepiece as spm
-        sp_files = sorted(model_dir.glob("**/*.model"))
-        if not sp_files:
-            raise FileNotFoundError("no SentencePiece model in " + str(model_dir))
-        self.sp = spm.SentencePieceProcessor(model_file=str(sp_files[0]))
+        self.sp = spm.SentencePieceProcessor(model_file=str(_find_sp(model_dir)))
+        self.eos = eos                        # OPUS-MT necesita </s> en la fuente
         ct2_dir = model_dir
         if not (model_dir / "model.bin").exists():
             cands = list(model_dir.glob("**/model.bin"))
@@ -33,6 +45,8 @@ class _Engine:
         if not text:
             return ""
         toks = self.sp.encode(text, out_type=str)
+        if self.eos:
+            toks = toks + ["</s>"]
         res = self.tr.translate_batch([toks], beam_size=2, max_batch_size=1)
         return detok(res[0].hypotheses[0])
 
@@ -66,7 +80,8 @@ def translate(text: str) -> str:
         try:
             if not is_downloaded():
                 download()
-            _ENGINES[code] = _Engine(model_dir())
+            eos = bool(languages.profile().get("translate_eos"))
+            _ENGINES[code] = _Engine(model_dir(), eos=eos)
         except Exception:
             _ENGINES[code] = None
     eng = _ENGINES[code]
