@@ -12,6 +12,35 @@ def test_audio_cmd_pads_and_reencodes():
     assert "-ss 9.75" in s and "-t 2.5" in s and "libmp3lame" in s
 
 
+def test_audio_cmd_trim_adds_silenceremove():
+    raw = media.audio_cmd("/v.mp4", 1.0, 2.0, "/o.mp3", trim=False)
+    trimmed = media.audio_cmd("/v.mp4", 1.0, 2.0, "/o.mp3", trim=True)
+    assert "-af" not in raw
+    assert "-af" in trimmed
+    assert any("silenceremove" in a for a in trimmed)
+
+
+def test_real_trim_removes_silence(tmp_path):
+    if shutil.which("ffmpeg") is None:
+        return
+    src = tmp_path / "s.mp3"
+    # 1s silencio + 1s tono + 1s silencio
+    subprocess.run(
+        ["ffmpeg", "-y",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+         "-f", "lavfi", "-t", "1", "-i", "anullsrc=r=44100:cl=mono",
+         "-f", "lavfi", "-t", "1", "-i", "anullsrc=r=44100:cl=mono",
+         "-filter_complex", "[1:a][0:a][2:a]concat=n=3:v=0:a=1",
+         "-c:a", "libmp3lame", str(src)],
+        check=True, capture_output=True)
+    out = tmp_path / "t.mp3"
+    media.cut_audio(str(src), 0.0, 3.0, str(out), pad=0.0, trim=True)
+    dur = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout)
+    assert dur < 1.8                       # de 3 s a ~1.2 s (tono + 0.1 s aire)
+
+
 def test_frame_cmd_midpoint_scale():
     cmd = media.frame_cmd("/v.mp4", 11.0, "/out.jpg")
     s = " ".join(cmd)

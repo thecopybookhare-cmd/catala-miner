@@ -336,3 +336,33 @@ def test_setup_download_runs_job(_isdl, _dl, _d, _f, _w, tmp_path):
     assert j["status"] == "done", j.get("message")
     assert j["result"] == {"ok": True}
     _dl.assert_called_once()                # descargó el traductor (no estaba)
+
+
+# ---------- desfase de subtítulos (offset) en el audio de tarjeta ----------
+
+def test_offset_shifts_card_audio(tmp_path, monkeypatch):
+    main.CON = main.db.connect(tmp_path / "t.db")
+    segs = [{"start": 10.0, "end": 12.0, "text": "hola"}]
+    sid = main.db.create_session(
+        main.CON, title="V", source_type="local", media_path="/x/v.mp4",
+        srt_source="whisper", model_size="small", duration_secs=20,
+        transcript_json=json.dumps(segs))
+    cap = {}
+    monkeypatch.setattr(main.media, "cut_audio",
+                        lambda *a, **k: cap.__setitem__("audio", (a, k)))
+    monkeypatch.setattr(main.media, "snapshot",
+                        lambda *a, **k: cap.__setitem__("snap", a))
+    monkeypatch.setattr(main.media, "animated_clip", lambda *a, **k: None)
+    monkeypatch.setattr(main.nlp, "analyze_selection", lambda *a: ("hola", "INTJ"))
+    monkeypatch.setattr(main.nlp, "zipf", lambda w: 5.0)
+    monkeypatch.setattr(main.nlp, "freq_badge", lambda z: "common")
+    monkeypatch.setattr(main, "_senses", lambda *a: [])
+    monkeypatch.setattr(main, "_active_sense", lambda *a: 0)
+    monkeypatch.setattr(main.translate, "sentence", lambda t: "hola-es")
+    monkeypatch.setattr(main, "_word_es", lambda *a: "hola-es")
+    s = main.db.get_session(main.CON, sid)
+    main._build_preview(s, 0, "hola", offset=1.5)
+    args, _ = cap["audio"]                 # (src, start, end, out)
+    assert abs(args[1] - 11.5) < 1e-6      # 10 + 1.5
+    assert abs(args[2] - 13.5) < 1e-6      # 12 + 1.5
+    assert abs(cap["snap"][1] - 12.5) < 1e-6   # punto medio 11 + 1.5
