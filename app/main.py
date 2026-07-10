@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -21,6 +21,7 @@ from . import (
     languages,
     media,
     nlp,
+    share,
     stream,
     subs,
     translate,
@@ -223,6 +224,28 @@ def setup_download():
         return {"ok": True}
 
     return {"job_id": jobs.start(work, label="setup")}
+
+
+# ---------- modo compartir (red local / tailnet) ----------
+
+@app.get("/api/share/status")
+def share_status():
+    return share.status()
+
+
+@app.post("/api/share/start")
+def share_start():
+    return share.start()
+
+
+@app.post("/api/share/stop")
+def share_stop():
+    return share.stop()
+
+
+@app.get("/api/share/qr")
+def share_qr(url: str):
+    return Response(share.qr_svg(url), media_type="image/svg+xml")
 
 
 # caché de stats de la home: releer todas las transcripciones en cada

@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.2-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.3-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -17,6 +17,12 @@ Todo corre **100% local** — sin cuentas, sin APIs de pago.
 la app usa el traductor OPUS-MT fr→es, spaCy `fr_core_news_sm`, el bidix Apertium fra-spa
 y las glosas del Wikcionario en español; se descargan solos la primera vez (o desde el
 asistente de primer arranque).
+
+📡 **Compartir con amigos.** En ⚙️ *Ajustes → Compartir* enciendes un servidor bajo demanda
+en tu red local o [Tailscale](https://tailscale.com), con enlace + código QR para que un
+amigo (o tu móvil) la use en el navegador. Es una **PWA instalable** (icono en pantalla,
+arranque offline del shell). Nada se expone hasta que lo activas; el acceso es completo, así
+que compártela solo con gente de confianza en tu red privada.
 
 ## Instalación
 
@@ -110,7 +116,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 79 tests
+.venv/bin/python -m pytest tests/    # 83 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.

@@ -1,6 +1,6 @@
 [project]
 name = "catala-miner"
-version = "0.9.2"
+version = "0.9.3"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.115",
@@ -15,6 +15,7 @@ dependencies = [
   "spacy>=3.7",
   "wordfreq>=3.1",
   "pywebview>=5.0",
+  "qrcode>=7.4",
 ]
 
 [dependency-groups]

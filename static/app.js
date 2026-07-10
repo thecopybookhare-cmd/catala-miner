@@ -1048,11 +1048,52 @@ $("set-keys-reset").onclick = () => saveSettings({ keymap: { ...DEFAULT_KEYMAP }
 
 async function openSettings() {
   $("settings-view").hidden = false;
+  refreshShare();
   const st = await api("/api/anki/status");
   $("set-deck").innerHTML = (st.decks || []).map((d) =>
     `<option${d === st.deck ? " selected" : ""}>${d}</option>`).join("")
     || `<option>${SETTINGS?.deck || ""}</option>`;
 }
+
+function renderShare(s) {
+  $("set-share").checked = s.running;
+  const info = $("share-info");
+  info.hidden = !(s.running && s.urls.length);
+  $("share-urls").innerHTML = (s.running ? s.urls : []).map((u) => `
+    <div class="share-url">
+      <img class="share-qr" alt="QR ${u.label}" src="/api/share/qr?url=${encodeURIComponent(u.url)}">
+      <div class="share-url-body">
+        <div class="share-url-label">${u.label}</div>
+        <code>${u.url}</code>
+        <button class="small share-copy" data-url="${u.url}">Copiar enlace</button>
+      </div>
+    </div>`).join("");
+  info.querySelectorAll(".share-copy").forEach((b) => {
+    b.onclick = () => { navigator.clipboard?.writeText(b.dataset.url); toast("📋 Enlace copiado"); };
+  });
+  let note = "";
+  if (s.running) note += "⚠️ Quien abra el enlace en tu red o tailnet tiene acceso completo — compártelo solo con amigos de confianza. ";
+  if (!s.tailscale) note += "Instala Tailscale para que entren amigos fuera de tu wifi (y para HTTPS + instalación como app).";
+  else if (!s.tailscale_up) note += "Tailscale está instalado pero apagado: ábrelo para obtener un enlace 100.x accesible desde cualquier sitio.";
+  else note += "Tailscale activo ✓ — usa su enlace para amigos remotos.";
+  $("share-note").textContent = note;
+}
+
+async function refreshShare() {
+  try { renderShare(await api("/api/share/status")); }
+  catch { $("share-section").hidden = true; }
+}
+
+$("set-share").onchange = async () => {
+  $("set-share").disabled = true;
+  const path = $("set-share").checked ? "/api/share/start" : "/api/share/stop";
+  try {
+    const s = await api(path, { method: "POST" });
+    renderShare(s);
+    toast(s.running ? "📡 Modo compartir activado" : "Modo compartir desactivado", s.running ? "ok" : "");
+  } catch { toast("No se pudo cambiar el modo compartir", "err"); refreshShare(); }
+  $("set-share").disabled = false;
+};
 $("settings-btn").onclick = openSettings;
 $("settings-close").onclick = () => { $("settings-view").hidden = true; };
 $("settings-view").onclick = (e) => { if (e.target === $("settings-view")) $("settings-view").hidden = true; };
