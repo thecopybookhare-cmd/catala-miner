@@ -290,13 +290,16 @@ def test_word_status_migration_preserves_data(tmp_path):
     assert adb.word_statuses(con)["gos"] == "known"   # ca intacto
 
 
-def test_language_fr_not_selectable_yet(tmp_path):
+def test_language_fr_selectable(tmp_path):
     c = client(tmp_path)
     s = c.get("/api/settings").json()
     frs = [lang for lang in s["languages"] if lang["code"] == "fr"]
-    assert frs and frs[0]["available"] is False
-    assert c.post("/api/settings", json={"language": "fr"}).status_code == 400
+    assert frs and frs[0]["available"] is True
+    assert c.post("/api/settings", json={"language": "fr"}).status_code == 200
+    assert c.get("/api/settings").json()["language"] == "fr"
     assert c.post("/api/settings", json={"language": "ca"}).status_code == 200
+    # un idioma inexistente sigue rechazándose
+    assert c.post("/api/settings", json={"language": "de"}).status_code == 400
 
 
 # ---------- asistente de primer arranque ----------

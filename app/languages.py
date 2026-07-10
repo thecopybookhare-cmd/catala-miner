@@ -30,11 +30,15 @@ PROFILES = {
         "spacy": "fr_core_news_sm",
         "whisper_models": {"large-v3": "large-v3", "small": "small"},
         "default_whisper": "large-v3",
-        "translate_repo": None,                   # ← pendiente de validar → inactivo
+        # OPUS-MT fr→es convertido a CTranslate2 (Marian → necesita </s>).
+        "translate_repo": "gaudi/opus-mt-fr-es-ctranslate2",
+        "translate_eos": True,
         "translate_dir": "translate-fra-spa",
-        "bidix_url": None,
+        "bidix_url": ("https://raw.githubusercontent.com/apertium/apertium-fr-es/"
+                      "master/apertium-fra-spa.fra-spa.dix"),
         "bidix_file": "apertium-fra-spa.dix",
-        "forms_url": None,
+        "bidix_src": "l",                         # <l>=fra, <r>=spa (fra→spa)
+        "forms_url": None,                        # spaCy fr_core_news_sm lematiza
         "wikdict_url": ("https://kaikki.org/eswiktionary/Franc%C3%A9s/"
                         "kaikki.org-dictionary-Franc%C3%A9s.jsonl"),
     },
