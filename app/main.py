@@ -2,6 +2,7 @@
 import json
 import shutil
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile
@@ -30,7 +31,32 @@ from . import (
     wikdict,
 )
 
-app = FastAPI(title="CatalaMiner")
+
+def _warm_models():
+    """Precarga en background lo ya descargado para que el primer popup no
+    espere a cargar el motor de traducción / el bidix. Nunca dispara
+    descargas nuevas: solo toca recursos ya presentes en disco."""
+    prof = languages.profile()
+    try:
+        if translate.is_downloaded():
+            translate.translate("hola")            # carga el motor CT2
+    except Exception:
+        pass
+    try:
+        if (config.MODELS_DIR / prof["bidix_file"]).exists():
+            _dict()                                # carga el bidix en memoria
+    except Exception:
+        pass
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    import threading
+    threading.Thread(target=_warm_models, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="CatalaMiner", lifespan=lifespan)
 
 
 @app.middleware("http")

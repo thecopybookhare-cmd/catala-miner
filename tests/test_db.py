@@ -46,3 +46,10 @@ def test_tok_version_column_and_update(tmp_path):
     assert db.get_session(con, sid)["tok_version"] == 0
     db.update_transcript(con, sid, "[]", "small", "whisper", tok_version=3)
     assert db.get_session(con, sid)["tok_version"] == 3
+
+
+def test_perf_indices_created(tmp_path):
+    con = db.connect(tmp_path / "t.db")
+    idx = {r["name"] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'")}
+    assert {"ix_cards_session", "ix_cards_status", "ix_ws_lang_status"} <= idx
