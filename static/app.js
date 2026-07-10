@@ -15,6 +15,8 @@ let SESSION = null, SEGS = [], CARD = null, PAD = { b: 0, a: 0 };
 let STATUS = {};              // lemma -> learning|known|ignored|tracking (ausente = desconocida)
 let CUR = -1;
 let DUAL = false, AUTOPAUSE = false, HIDE_CA = false, HIDE_ES = false;
+let OFFSET = 0;               // desfase subtítulo↔media (s); + = subs más tarde
+let CONDENSED = false;        // saltar huecos sin diálogo al reproducir
 let POP = null, HOVER = null;
 let PINNED = false, RESUME = false, HOVER_TIMER = null, CLOSE_TIMER = null;
 const ES_CACHE = {};
@@ -236,6 +238,7 @@ async function openSession(sid) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
   CUR = -1; POP = null; HOVER = null; PINNED = false; $("word-pop").hidden = true;
+  setOffset(0);                         // el desfase es por sesión
   for (const k in ES_CACHE) delete ES_CACHE[k];
   for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
@@ -396,6 +399,9 @@ function updateComp() {
 // ---------- toggles ----------
 $("dual-btn").onclick = () => setDual(!DUAL);
 $("autopause-btn").onclick = () => setAutopause(!AUTOPAUSE);
+$("condensed-btn").onclick = () => setCondensed(!CONDENSED);
+$("offset-minus").onclick = () => bumpOffset(-0.1);
+$("offset-plus").onclick = () => bumpOffset(0.1);
 $("browser-btn").onclick = () => toggleBrowser();
 $("fs-btn").onclick = () => toggleFullscreen();
 $("speed-btn").onclick = () => {
@@ -414,6 +420,17 @@ function setAutopause(v) {
   AUTOPAUSE = v;
   $("autopause-btn").classList.toggle("on", v);
 }
+function setCondensed(v) {
+  CONDENSED = v;
+  $("condensed-btn").classList.toggle("on", v);
+  if (v) toast("⚡ Condensado: se saltan los silencios entre frases");
+}
+function setOffset(v) {
+  OFFSET = Math.round(v * 10) / 10;      // pasos de 0.1 s
+  $("offset-val").textContent = (OFFSET > 0 ? "+" : "") + OFFSET.toFixed(1) + "s";
+  $("offset-ctl").classList.toggle("on", OFFSET !== 0);
+}
+function bumpOffset(d) { setOffset(OFFSET + d); }
 function toggleBrowser() {
   const p = $("side-panel");
   p.hidden = !p.hidden;
@@ -483,7 +500,7 @@ function renderSegs() {
   }).join("");
   for (const div of el.querySelectorAll(".seg")) {
     const i = +div.dataset.i;
-    div.querySelector(".time").onclick = () => { $("video").currentTime = SEGS[i].start; $("video").play(); };
+    div.querySelector(".time").onclick = () => { $("video").currentTime = SEGS[i].start + OFFSET; $("video").play(); };
     bindTokenEvents(div, i);
   }
 }
@@ -548,7 +565,7 @@ function setCur(i) {
 function gotoSeg(i) {
   if (!SEGS.length) return;
   const j = Math.min(SEGS.length - 1, Math.max(0, i));
-  V.currentTime = SEGS[j].start + 0.01;
+  V.currentTime = SEGS[j].start + OFFSET + 0.01;
   // actualizar CUR ya: si no, el timeupdate con auto-pausa cree que nos
   // "escapamos" del segmento viejo y rebota al final de este.
   setCur(j);
@@ -558,21 +575,21 @@ function gotoSeg(i) {
 function nextSeg() {
   if (!SEGS.length) return;
   if (CUR >= 0) { gotoSeg(CUR + 1); return; }
-  const t = V.currentTime;
+  const t = V.currentTime - OFFSET;
   for (let i = 0; i < SEGS.length; i++)
     if (SEGS[i].start > t + 0.05) { gotoSeg(i); return; }
 }
 function prevSeg() {
   if (!SEGS.length) return;
   if (CUR >= 0) { gotoSeg(CUR - 1); return; }
-  const t = V.currentTime;
+  const t = V.currentTime - OFFSET;
   for (let i = SEGS.length - 1; i >= 0; i--)
     if (SEGS[i].end < t) { gotoSeg(i); return; }
   gotoSeg(0);
 }
 function replaySeg() {
   if (CUR < 0) return;
-  V.currentTime = SEGS[CUR].start + 0.01;
+  V.currentTime = SEGS[CUR].start + OFFSET + 0.01;
   V.play();
 }
 
@@ -587,11 +604,18 @@ V.addEventListener("timeupdate", () => {
   const t = V.currentTime;
   if (!seeking && V.duration) $("seek").value = Math.round((t / V.duration) * 1000);
   $("time-cur").textContent = fmtTime(t);
-  const i = SEGS.findIndex((s) => t >= s.start && t <= s.end);
+  const te = t - OFFSET;                 // tiempo en el reloj de los subtítulos
+  const i = SEGS.findIndex((s) => te >= s.start && te <= s.end);
   if (AUTOPAUSE && !V.paused && CUR >= 0 && i !== CUR) {
     V.pause();
-    V.currentTime = Math.max(SEGS[CUR].end - 0.02, SEGS[CUR].start);
+    V.currentTime = Math.max(SEGS[CUR].end + OFFSET - 0.02, SEGS[CUR].start + OFFSET);
     return;
+  }
+  // condensado: en un hueco sin diálogo, saltar al inicio del próximo segmento
+  if (CONDENSED && !V.paused && !AUTOPAUSE && i < 0) {
+    const nxt = SEGS.find((s) => s.start > te);
+    if (nxt) { V.currentTime = nxt.start + OFFSET; }
+    else if (te > SEGS[SEGS.length - 1].end) { V.pause(); }
   }
   setCur(i);
 });
@@ -709,7 +733,7 @@ document.addEventListener("click", (e) => {
   if (!$("word-pop").hidden && !$("word-pop").contains(e.target) && !e.target.classList?.contains("t"))
     closePopup();
 });
-$("wp-replay").onclick = () => { if (POP) { V.currentTime = SEGS[POP.segIndex].start; V.play(); } };
+$("wp-replay").onclick = () => { if (POP) { V.currentTime = SEGS[POP.segIndex].start + OFFSET; V.play(); } };
 $("wp-card").onclick = () => mineFromPopup();
 $("wp-edit").onclick = () => editFromPopup();
 $("wp-say").onclick = async () => {
@@ -748,7 +772,7 @@ async function mineQuick(segIndex, selection, paraula_es = "") {
   const r = await api("/api/cards/mine", {
     method: "POST",
     body: JSON.stringify({ session_id: SESSION.id, segment_index: segIndex,
-      selection, paraula_es }),
+      selection, paraula_es, offset: OFFSET }),
   });
   if (r.error) { toast(r.error, "err"); return; }
   if (r.word_status) STATUS[r.lema] = r.word_status;
@@ -765,7 +789,7 @@ async function mine(segIndex, selection, padB = 0, padA = 0, extra = {}) {
   const p = await api("/api/cards/preview", {
     method: "POST",
     body: JSON.stringify({ session_id: SESSION.id, segment_index: segIndex,
-      selection, pad_before: padB, pad_after: padA }),
+      selection, pad_before: padB, pad_after: padA, offset: OFFSET }),
   });
   CARD = { ...p, session_id: SESSION.id, segment_index: segIndex };
   // el clip animado (WebP) sustituye a la captura estática cuando existe
@@ -834,6 +858,9 @@ document.addEventListener("keydown", (e) => {
     else toast("Pasa el ratón por una palabra y pulsa " + e.key, "err");
     return;
   }
+  if (e.key === "[") { e.preventDefault(); bumpOffset(-0.1); return; }
+  if (e.key === "]") { e.preventDefault(); bumpOffset(0.1); return; }
+  if (k === "k") { setCondensed(!CONDENSED); return; }
   // teclas de letra remapeables (⚙️) + flechas fijas
   const act = KEY2ACTION[k] ||
     ({ ArrowLeft: "prev", ArrowRight: "next", ArrowDown: "replay", ArrowUp: "subs" })[e.key];
@@ -1005,6 +1032,7 @@ function applySettings() {
   $("set-speed").value = String(SETTINGS.speed_default);
   $("set-ipa").checked = SETTINGS.ipa_enabled;
   $("set-online").checked = SETTINGS.online_enabled;
+  $("set-audio-trim").checked = SETTINGS.audio_trim;
   $("set-port").value = SETTINGS.anki_port ?? "";
   // idioma: el selector solo aparece cuando hay más de un perfil activable
   const langs = (SETTINGS.languages || []).filter((l) => l.available);
@@ -1119,6 +1147,7 @@ $("set-autopause").onchange = () => saveSettings({ autopause_default: $("set-aut
 $("set-speed").onchange = () => saveSettings({ speed_default: parseFloat($("set-speed").value) });
 $("set-ipa").onchange = () => saveSettings({ ipa_enabled: $("set-ipa").checked });
 $("set-online").onchange = () => saveSettings({ online_enabled: $("set-online").checked });
+$("set-audio-trim").onchange = () => saveSettings({ audio_trim: $("set-audio-trim").checked });
 $("set-language").onchange = async () => {
   await saveSettings({ language: $("set-language").value });
   toast("🌍 Idioma cambiado — recarga las sesiones de ese idioma");

@@ -156,6 +156,7 @@ DEFAULT_SETTINGS = {
     "deck": "Català::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
+    "audio_trim": False,
     "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
                "subs": "w", "browser": "g", "copy": "c", "dual": "e",
                "autopause": "p", "fullscreen": "f", "recommended": "r"},
@@ -692,14 +693,17 @@ class PreviewReq(BaseModel):
     selection: str
     pad_before: int = 0   # extend audio N segments back
     pad_after: int = 0
+    offset: float = 0.0   # desfase subtítulo↔media en segundos (srt desajustado)
 
 
 def _build_preview(s: dict, segment_index: int, selection: str,
-                   pad_before: int = 0, pad_after: int = 0) -> dict:
+                   pad_before: int = 0, pad_after: int = 0,
+                   offset: float = 0.0) -> dict:
     segs = json.loads(s["transcript_json"])
     seg = segs[segment_index]
-    start = segs[max(0, segment_index - pad_before)]["start"]
-    end = segs[min(len(segs) - 1, segment_index + pad_after)]["end"]
+    start = max(0.0, segs[max(0, segment_index - pad_before)]["start"] + offset)
+    end = max(0.0, segs[min(len(segs) - 1, segment_index + pad_after)]["end"] + offset)
+    mid = max(0.0, (seg["start"] + seg["end"]) / 2 + offset)
 
     # los streams tienen URL caducable: re-resolver una fresca para ffmpeg
     src = s["media_path"]
@@ -714,18 +718,18 @@ def _build_preview(s: dict, segment_index: int, selection: str,
     audio_ok = image_ok = clip_ok = True
     try:
         media.cut_audio(src, start, end,
-                        str(config.MEDIA_DIR / audio_name))
+                        str(config.MEDIA_DIR / audio_name),
+                        trim=bool(_settings().get("audio_trim")))
     except Exception:
         audio_ok = False
     try:
-        media.snapshot(src, (seg["start"] + seg["end"]) / 2,
-                       str(config.MEDIA_DIR / image_name))
+        media.snapshot(src, mid, str(config.MEDIA_DIR / image_name))
     except Exception:
         image_ok = False
     try:
         # animated clip only makes sense for video sources
         if image_ok:
-            media.animated_clip(src, seg["start"], seg["end"],
+            media.animated_clip(src, start, end,
                                 str(config.MEDIA_DIR / clip_name))
         else:
             clip_ok = False
@@ -759,7 +763,7 @@ def card_preview(req: PreviewReq):
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
     return _build_preview(s, req.segment_index, req.selection,
-                          req.pad_before, req.pad_after)
+                          req.pad_before, req.pad_after, req.offset)
 
 
 class MineReq(BaseModel):
@@ -767,6 +771,7 @@ class MineReq(BaseModel):
     segment_index: int
     selection: str
     paraula_es: str = ""
+    offset: float = 0.0
 
 
 @app.post("/api/cards/mine")
@@ -775,7 +780,7 @@ def card_mine(req: MineReq):
     s = db.get_session(CON, req.session_id)
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
-    p = _build_preview(s, req.segment_index, req.selection)
+    p = _build_preview(s, req.segment_index, req.selection, offset=req.offset)
     active_es = (p["senses"][p["active"]]["es"]
                  if p["senses"] and p["active"] >= 0 else "")
     paraula_es = req.paraula_es or p["paraula_es"] or active_es

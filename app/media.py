@@ -6,12 +6,25 @@ FFMPEG = "ffmpeg"
 BROWSER_OK = {".mp4", ".m4v", ".mov", ".webm", ".mp3", ".m4a", ".wav", ".aac", ".ogg"}
 
 
+# Recorta silencio de cabeza y cola dejando ~0.1 s de aire (VAD por umbral de
+# ffmpeg, sin dependencias). areverse permite tratar el final como si fuera el
+# principio. Umbral conservador (-40 dB) para no comerse habla suave.
+_SILENCEREMOVE = (
+    "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-40dB:"
+    "detection=peak,areverse,"
+    "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-40dB:"
+    "detection=peak,areverse"
+)
+
+
 def audio_cmd(src: str, start: float, end: float, out: str,
-              pad: float = 0.25) -> list[str]:
+              pad: float = 0.25, trim: bool = False) -> list[str]:
     s = max(0.0, start - pad)
     dur = round(end + pad - s, 3)
-    return [FFMPEG, "-y", "-ss", str(round(s, 3)), "-i", src,
-            "-t", str(dur), "-vn", "-c:a", "libmp3lame", "-q:a", "4", out]
+    cmd = [FFMPEG, "-y", "-ss", str(round(s, 3)), "-i", src, "-t", str(dur)]
+    if trim:
+        cmd += ["-af", _SILENCEREMOVE]
+    return cmd + ["-vn", "-c:a", "libmp3lame", "-q:a", "4", out]
 
 
 def frame_cmd(src: str, ts: float, out: str) -> list[str]:
@@ -42,8 +55,8 @@ def _run(cmd: list[str]):
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-def cut_audio(src, start, end, out, pad=0.25):
-    _run(audio_cmd(src, start, end, out, pad))
+def cut_audio(src, start, end, out, pad=0.25, trim=False):
+    _run(audio_cmd(src, start, end, out, pad, trim))
 
 
 def snapshot(src, ts, out):

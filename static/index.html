@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="/favicon.png?v=0.9.3">
+<link rel="icon" href="/favicon.png?v=0.9.4">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0c0d13">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CatalàMiner">
-<link rel="stylesheet" href="/style.css?v=0.9.3">
+<link rel="stylesheet" href="/style.css?v=0.9.4">
 </head>
 <body>
 <header>
@@ -105,10 +105,16 @@
         <button class="icon" id="speed-btn" title="Velocidad de reproducción">1×</button>
         <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)">🇪🇸</button>
         <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">⏯</button>
+        <button class="icon toggle" id="condensed-btn" title="Reproducción condensada: salta los silencios entre frases (K)">⚡</button>
+        <div id="offset-ctl" title="Desfase de subtítulos — teclas [ y ]">
+          <button class="icon" id="offset-minus" title="Subtítulos antes ([)">−</button>
+          <span id="offset-val" class="tlabel">0.0s</span>
+          <button class="icon" id="offset-plus" title="Subtítulos después (])">+</button>
+        </div>
         <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">📜</button>
         <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · G transcripción · F pantalla completa · ⚙️ para cambiar atajos</div>
+      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · K condensado · [ ] sincronía · G transcripción · F pantalla completa · ⚙️ para cambiar atajos</div>
 
       <aside id="card-panel" hidden>
         <h3>Nueva tarjeta</h3>
@@ -224,6 +230,12 @@
         <input id="set-autopause" type="checkbox"></div>
     </section>
     <section>
+      <h3>Audio de tarjetas</h3>
+      <div class="set-row"><label>Recortar silencio (VAD)
+        <br><small class="dim">Ajusta el audio al habla real, sin silencios al inicio/final</small></label>
+        <input id="set-audio-trim" type="checkbox"></div>
+    </section>
+    <section>
       <h3>Diccionario</h3>
       <div class="set-row"><label>Pronunciación IPA</label>
         <input id="set-ipa" type="checkbox"></div>
@@ -296,6 +308,6 @@
     });
   }
 </script>
-<script src="/app.js?v=0.9.3"></script>
+<script src="/app.js?v=0.9.4"></script>
 </body>
 </html>

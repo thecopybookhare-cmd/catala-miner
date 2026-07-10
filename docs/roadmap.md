@@ -27,11 +27,16 @@ Marcado a medida que se implementa.
   - [~] *distil-whisper descartado*: es solo-inglés; para ca/fr el modelo `small`
         ya es la opción rápida
 
-## 🟡 En curso / siguiente (alto valor)
+## ✅ Hecho (features de estudio)
 
-- [ ] **Ajuste de sincronía de subtítulos** (offset ±ms) — para `.srt` desfasados
-- [ ] **Reproducción condensada** — saltar tramos sin diálogo
-- [ ] **Recorte de audio con VAD** (`webrtcvad`) — clips cortados al habla real
+- [x] **Ajuste de sincronía de subtítulos** (offset ±0.1 s, teclas `[` `]`) —
+      desplaza visualización, navegación y el audio/imagen de la tarjeta
+- [x] **Reproducción condensada** (tecla `K`) — salta los huecos sin diálogo
+- [x] **Recorte de silencio del audio** de tarjeta — ffmpeg `silenceremove`
+      (VAD por umbral, sin dependencias nuevas), opt-in en ⚙️
+
+## 🟡 Siguiente (alto valor)
+
 - [ ] **TTS catalán natural** (Matcha / projecte-aina, ONNX offline) — sustituye
       al espeak robótico en la pronunciación de las tarjetas
 - [ ] **Overlay de ayuda de atajos** (tecla `?`)
