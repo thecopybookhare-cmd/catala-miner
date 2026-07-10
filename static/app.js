@@ -845,10 +845,11 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.key === "Escape") {
     closePopup(); $("card-panel").hidden = true;
-    $("stats-view").hidden = true; $("settings-view").hidden = true;
+    $("stats-view").hidden = true; $("settings-view").hidden = true; $("help-view").hidden = true;
     if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
     return;
   }
+  if (e.key === "?") { e.preventDefault(); toggleHelp(); return; }
   if ($("player").hidden || !$("settings-view").hidden || CAPTURING) return;
   const k = e.key.toLowerCase();
   const statusKeys = { "1": "unknown", "2": "learning", "3": "known", "4": "ignored", "5": "tracking" };
@@ -1062,6 +1063,37 @@ function renderKeyEditor() {
   for (const b of $("set-keys").querySelectorAll(".keybtn"))
     b.onclick = () => { CAPTURING = b.dataset.act; renderKeyEditor(); };
 }
+
+// ---------- overlay de ayuda de atajos (tecla ?) ----------
+const HELP_FIXED = [
+  ["Espacio", "Reproducir / pausar"],
+  ["1 – 5", "Estado: nueva · aprendiendo · conocida · ignorar · seguir"],
+  ["Q / ⇧Q", "Crear tarjeta / editar y crear"],
+  ["[  ]", "Sincronía de subtítulos (−/+ 0,1 s)"],
+  ["K", "Reproducción condensada (saltar silencios)"],
+  ["⏎", "Enviar la tarjeta a Anki"],
+  ["? ", "Esta ayuda · Esc cierra"],
+];
+function renderHelp() {
+  const km = SETTINGS?.keymap || DEFAULT_KEYMAP;
+  const row = (k, d) => `<div class="help-row"><kbd>${k}</kbd><span>${d}</span></div>`;
+  const remap = Object.keys(ACTION_LABEL)
+    .map((a) => row((km[a] || "?").toUpperCase(), ACTION_LABEL[a])).join("");
+  const fixed = HELP_FIXED.map(([k, d]) => row(k, d)).join("");
+  $("help-body").innerHTML =
+    `<div class="help-cols">
+       <div><h3>Reproducción y minado</h3>${remap}</div>
+       <div><h3>Teclas fijas</h3>${fixed}</div>
+     </div>
+     <p class="dim">Las letras se cambian en ⚙️ → Atajos de teclado.</p>`;
+}
+function toggleHelp() {
+  const v = $("help-view");
+  if (v.hidden) renderHelp();
+  v.hidden = !v.hidden;
+}
+$("help-close").onclick = () => { $("help-view").hidden = true; };
+$("help-view").onclick = (e) => { if (e.target === $("help-view")) $("help-view").hidden = true; };
 
 // captura de tecla nueva (fase capture: le gana al handler global)
 document.addEventListener("keydown", (e) => {

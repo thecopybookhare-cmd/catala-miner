@@ -1,7 +1,7 @@
 // Service worker de CatalàMiner. Convierte la web en PWA instalable y da un
 // arranque offline del "shell". Nunca cachea /api/ ni /media/ (dinámicos y
 // pesados). Sube CACHE al publicar para invalidar el shell viejo.
-const CACHE = "catalaminer-0.9.5";
+const CACHE = "catalaminer-0.9.6";
 const SHELL = [
   "/",
   "/index.html",
