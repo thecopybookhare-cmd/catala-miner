@@ -22,6 +22,7 @@ from . import (
     languages,
     media,
     nlp,
+    piper_tts,
     share,
     stream,
     subs,
@@ -212,6 +213,7 @@ def _setup_checks() -> dict:
         "forms": (dl / "forms.sqlite").exists()
                  or (dl / f"forms-{_lang()}.sqlite").exists(),
         "dictionary": (dl / prof["bidix_file"]).exists(),
+        "tts": piper_tts.is_downloaded(),
         "anki": anki.is_up(_settings().get("anki_port")),
     }
 
@@ -248,6 +250,12 @@ def setup_download():
         forms.lookup("hola")          # dispara descarga+build
         jobs.set_progress(jid, 0.9, "Glosas del Wikcionario (~4 MB)…")
         wikdict.lookup("hola")
+        jobs.set_progress(jid, 0.95, "Voz neural (Piper, ~20 MB)…")
+        try:
+            if not piper_tts.is_downloaded():
+                piper_tts.download()
+        except Exception:
+            pass                          # degrada a espeak
         return {"ok": True}
 
     return {"job_id": jobs.start(work, label="setup")}
@@ -670,6 +678,7 @@ def lookup(req: LookupReq):
         "word_es": word_es,
         "sentence_es": sentence_es,
         "ipa": ipa.ipa(req.selection),
+        "tts": piper_tts.available(),
     }
 
 

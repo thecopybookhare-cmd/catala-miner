@@ -102,8 +102,9 @@ def test_examples_from_own_content_excludes_current(tmp_path):
     assert "El gos corre" not in texts          # frase actual excluida
 
 
-@patch("app.tts.shutil.which", return_value=None)
-def test_tts_degrades_without_espeak(_which, tmp_path):
+@patch("app.piper_tts.speak", return_value="")      # sin voz neural
+@patch("app.tts.shutil.which", return_value=None)   # sin espeak
+def test_tts_degrades_without_any_voice(_which, _piper, tmp_path):
     c = client(tmp_path)
     assert c.get("/api/tts?text=gos").json() == {"file": ""}
 

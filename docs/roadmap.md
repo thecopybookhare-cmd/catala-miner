@@ -34,11 +34,12 @@ Marcado a medida que se implementa.
 - [x] **Reproducción condensada** (tecla `K`) — salta los huecos sin diálogo
 - [x] **Recorte de silencio del audio** de tarjeta — ffmpeg `silenceremove`
       (VAD por umbral, sin dependencias nuevas), opt-in en ⚙️
+- [x] **Voz neural (TTS)** con **Piper** (ONNX, sin torch) para la pronunciación
+      del popup 🗣, en catalán y francés; degrada a espeak. Elegí Piper sobre
+      Matcha por ser torch-free, rápido (~0.1 s) y cubrir ambos idiomas.
 
 ## 🟡 Siguiente (alto valor)
 
-- [ ] **TTS catalán natural** (Matcha / projecte-aina, ONNX offline) — sustituye
-      al espeak robótico en la pronunciación de las tarjetas
 - [ ] **Overlay de ayuda de atajos** (tecla `?`)
 
 ## 🟢 Nice-to-have
