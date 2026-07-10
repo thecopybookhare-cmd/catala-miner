@@ -125,9 +125,10 @@ const ONB_LABEL = {
   spacy: ["Modelo lingüístico spaCy", "Ejecuta install.sh de nuevo si falta"],
   anki: ["Anki + AnkiConnect (para las tarjetas)", "Abre Anki con el complemento 2055492159; sin él, las tarjetas quedan en cola"],
   espeak: ["espeak-ng (pronunciación IPA, opcional)", "Opcional: brew install espeak-ng"],
+  tts: ["Voz neural Piper (pronunciación, opcional)", "Se descarga (~20 MB) con el botón"],
 };
-const ONB_ORDER = ["ffmpeg", "translator", "dictionary", "forms", "spacy", "anki", "espeak"];
-const ONB_OPTIONAL = new Set(["espeak"]);
+const ONB_ORDER = ["ffmpeg", "translator", "dictionary", "forms", "spacy", "anki", "tts", "espeak"];
+const ONB_OPTIONAL = new Set(["espeak", "tts"]);
 let ONB_DISMISSED = false;
 
 async function refreshOnboarding() {
@@ -687,7 +688,7 @@ function renderPopupLookup(r) {
   $("wp-gloss").hidden = !gl.length;
   $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${g.es}</div>`).join("");
   $("wp-word-es").textContent = r.word_es || "";
-  $("wp-say").hidden = !r.ipa;                       // espeak-ng presente
+  $("wp-say").hidden = !(r.ipa || r.tts);            // voz Piper o espeak
   $("wp-dict").hidden = !(SETTINGS?.online_enabled);
   renderExamples(r);
 }

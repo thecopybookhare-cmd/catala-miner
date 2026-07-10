@@ -22,6 +22,8 @@ PROFILES = {
         "forms_url": config.FORMS_URL,
         "wikdict_url": ("https://kaikki.org/eswiktionary/Catal%C3%A1n/"
                         "kaikki.org-dictionary-Catal%C3%A1n.jsonl"),
+        # voz neural Piper (ONNX) para la pronunciación; ruta en rhasspy/piper-voices
+        "piper_voice": "ca/ca_ES/upc_ona/x_low/ca_ES-upc_ona-x_low.onnx",
     },
     "fr": {
         "name": "Français",
@@ -41,6 +43,7 @@ PROFILES = {
         "forms_url": None,                        # spaCy fr_core_news_sm lematiza
         "wikdict_url": ("https://kaikki.org/eswiktionary/Franc%C3%A9s/"
                         "kaikki.org-dictionary-Franc%C3%A9s.jsonl"),
+        "piper_voice": "fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
     },
 }
 
