@@ -561,3 +561,12 @@ button.small { font-size: 12px; padding: 6px 10px; }
 #offset-ctl #offset-minus, #offset-ctl #offset-plus { min-width: 26px; padding: 4px 6px; }
 #offset-val { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
 #offset-ctl.on #offset-val { color: var(--vio); font-weight: 600; }
+
+/* Overlay de ayuda de atajos (?) */
+#help-body .help-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+#help-body h3 { margin: 4px 0 8px; font-size: 14px; color: var(--vio); }
+.help-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 14px; }
+.help-row kbd { flex: 0 0 auto; min-width: 58px; text-align: center; padding: 3px 8px;
+  background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--fg); }
+@media (max-width: 640px) { #help-body .help-cols { grid-template-columns: 1fr; } }

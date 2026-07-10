@@ -37,17 +37,17 @@ Marcado a medida que se implementa.
 - [x] **Voz neural (TTS)** con **Piper** (ONNX, sin torch) para la pronunciación
       del popup 🗣, en catalán y francés; degrada a espeak. Elegí Piper sobre
       Matcha por ser torch-free, rápido (~0.1 s) y cubrir ambos idiomas.
-
-## 🟡 Siguiente (alto valor)
-
-- [ ] **Overlay de ayuda de atajos** (tecla `?`)
+- [x] **Overlay de ayuda de atajos** (tecla `?`) — modal con el keymap actual
+      (remapeable) + teclas fijas, se cierra con Esc/clic fuera.
+- [x] **Estilos de subtítulo por estado** — ya existían: los tokens se subrayan/
+      colorean por estado (nueva=rojo, aprendiendo=ámbar, seguir=violeta,
+      ignorada=atenuada) en el overlay y el navegador.
 
 ## 🟢 Nice-to-have
 
 - [ ] Modo lectura (texto/EPUB) estilo Lute/VocabSieve
 - [ ] Tablas de conjugación en el popup (conjugador de Softcatalà)
 - [ ] Importar diccionarios StarDict/Yomitan (`pyglossary`)
-- [ ] Estilos de subtítulo por estado (color/subrayado/contorno)
 - [ ] Forvo (audio de hablantes reales) como fuente de pronunciación
 - [ ] UI multi-idioma (interfaz en catalán/inglés, hoy solo español)
 - [ ] `py-fsrs` — *evaluado*: Anki ya hace el SRS; aportaría poco sin registro
