@@ -1,7 +1,7 @@
 // Service worker de CatalàMiner. Convierte la web en PWA instalable y da un
 // arranque offline del "shell". Nunca cachea /api/ ni /media/ (dinámicos y
 // pesados). Sube CACHE al publicar para invalidar el shell viejo.
-const CACHE = "catalaminer-0.9.10";
+const CACHE = "catalaminer-0.9.11";
 const SHELL = [
   "/",
   "/index.html",
@@ -49,17 +49,19 @@ self.addEventListener("fetch", (e) => {
   }
 
   // Recursos estáticos: stale-while-revalidate (rápido y se actualiza solo).
+  // ignoreSearch: el shell se precachea SIN query pero la página pide
+  // /app.js?v=x.y.z — sin esto, el arranque offline moría tras actualizar.
   e.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
       const net = fetch(req)
         .then((res) => {
           if (res && res.ok) {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
+            caches.open(CACHE).then((c) => c.put(url.pathname, copy));
           }
           return res;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
       return cached || net;
     })
   );

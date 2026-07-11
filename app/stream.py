@@ -18,8 +18,11 @@ _TTL = 240.0
 
 
 def _cache_get(url: str) -> dict | None:
+    now = time.time()
+    for k in [k for k, (t, _) in _CACHE.items() if now - t >= _TTL]:
+        del _CACHE[k]                     # poda: que no crezca sin límite
     hit = _CACHE.get(url)
-    if hit and time.time() - hit[0] < _TTL:
+    if hit and now - hit[0] < _TTL:
         return hit[1]
     return None
 

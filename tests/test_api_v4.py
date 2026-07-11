@@ -367,3 +367,59 @@ def test_offset_shifts_card_audio(tmp_path, monkeypatch):
     assert abs(args[1] - 11.5) < 1e-6      # 10 + 1.5
     assert abs(args[2] - 13.5) < 1e-6      # 12 + 1.5
     assert abs(cap["snap"][1] - 12.5) < 1e-6   # punto medio 11 + 1.5
+
+
+# ---------- revisión Fable: gate de invitados y robustez ----------
+
+def test_guest_gate_helpers():
+    from types import SimpleNamespace as NS
+    local = NS(client=NS(host="127.0.0.1"), headers={})
+    guest = NS(client=NS(host="192.168.1.77"), headers={})
+    assert main._is_local_client(local) is True
+    assert main._is_local_client(guest) is False
+
+    def mk(h):
+        return NS(headers={"host": h})
+    assert main._host_allowed(mk("localhost:8977"))
+    assert main._host_allowed(mk("127.0.0.1:8977"))
+    assert main._host_allowed(mk("192.168.1.20:8978"))       # LAN
+    assert main._host_allowed(mk("100.101.1.2:8978"))        # tailnet CGNAT
+    assert main._host_allowed(mk("mimac.tail1234.ts.net"))   # MagicDNS
+    assert not main._host_allowed(mk("evil.example.com"))    # DNS rebinding
+    assert not main._host_allowed(mk("8.8.8.8"))
+
+
+def test_mine_rejects_bad_segment_index(tmp_path):
+    c = client(tmp_path)
+    sid = main.db.create_session(
+        main.CON, title="V", source_type="local", media_path="/x/v.mp4",
+        srt_source="whisper", model_size="small", duration_secs=10,
+        transcript_json=json.dumps([{"start": 0, "end": 2, "text": "hola"}]))
+    for idx in (-1, 1, 99):
+        r = c.post("/api/cards/mine", json={
+            "session_id": sid, "segment_index": idx, "selection": "hola"})
+        assert r.status_code == 400, idx
+    r = c.post("/api/cards/preview", json={
+        "session_id": sid, "segment_index": -1, "selection": "hola"})
+    assert r.status_code == 400
+
+
+def test_settings_type_validation(tmp_path):
+    c = client(tmp_path)
+    assert c.post("/api/settings", json={"sub_scale": "grande"}).status_code == 400
+    assert c.post("/api/settings", json={"speed_default": 99}).status_code == 400
+    assert c.post("/api/settings", json={"dual_default": 1}).status_code == 400
+    assert c.post("/api/settings", json={"deck": 42}).status_code == 400
+    assert c.post("/api/settings", json={"ui_lang": "de"}).status_code == 400
+    assert c.post("/api/settings", json={"sub_scale": 1.2}).status_code == 200
+
+
+def test_sessions_filtered_by_language(tmp_path):
+    main.CON = main.db.connect(tmp_path / "t.db")
+    kw = dict(source_type="local", media_path="/x.mp4", srt_source="none",
+              model_size="-", duration_secs=1, transcript_json="[]")
+    main.db.create_session(main.CON, title="CA", language="ca", **kw)
+    main.db.create_session(main.CON, title="FR", language="fr", **kw)
+    assert {s["title"] for s in main.db.list_sessions(main.CON, "ca")} == {"CA"}
+    assert {s["title"] for s in main.db.list_sessions(main.CON, "fr")} == {"FR"}
+    assert len(main.db.list_sessions(main.CON)) == 2

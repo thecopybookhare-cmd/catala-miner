@@ -71,7 +71,10 @@ async function syncStatuses() {
     toast(`🔄 ${r.synced} palabras actualizadas desde Anki`);
   }
 }
-setInterval(syncStatuses, 60000);
+// cada 10 min y al volver a la ventana: pedir cardsInfo de TODAS las tarjetas
+// cada minuto era un martilleo innecesario a Anki (y peor con invitados).
+setInterval(syncStatuses, 600000);
+window.addEventListener("focus", () => syncStatuses());
 
 // ---------- biblioteca ----------
 const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", youtube_auto: "Subs auto YouTube", none: "sin transcribir", "-": "—" };
@@ -81,7 +84,7 @@ function sourceBadge(s) {
   const p = (s.page_url || "").toLowerCase();
   if (s.source_type === "stream" && p.includes("youtube")) return { t: "▶ YouTube", c: "yt" };
   if (s.source_type === "stream" && (p.includes("3cat") || p.includes("ccma"))) return { t: "📺 3cat", c: "tv" };
-  if (s.source_type === "stream") return { t: "🔴 En vivo", c: "st" };
+  if (s.source_type === "stream") return { t: "📡 Streaming", c: "st" };
   if (s.source_type === "youtube") return { t: "▶ YouTube", c: "yt" };
   if (s.source_type === "url") return { t: "🔗 Enlace", c: "st" };
   return { t: "📁 Local", c: "loc" };
@@ -104,7 +107,7 @@ async function loadSessions() {
         ${s.duration_secs ? `<span class="dur">${fmtTime(s.duration_secs)}</span>` : ""}
       </div>
       <div class="scard-body">
-        <div class="scard-title" title="${s.title}">${s.title}</div>
+        <div class="scard-title" title="${esc(s.title)}">${esc(s.title)}</div>
         <div class="pills">
           ${s.comp_pct !== null && s.comp_pct !== undefined ? `<span class="pill comp">📊 ${s.comp_pct}% conocido</span>` : ""}
           ${s.new_words ? `<span class="pill new">${s.new_words} nuevas</span>` : ""}
@@ -208,7 +211,11 @@ $("gp-close").onclick = hideProgress;
 async function pollJob(jid, label) {
   showProgress(0, label);
   while (true) {
-    const j = await api("/api/jobs/" + jid);
+    const j = await api("/api/jobs/" + jid).catch(() => null);
+    if (!j || j.error) {                 // server reiniciado: el job ya no existe
+      showProgress(1, "⚠️ trabajo perdido (¿se reinició la app?)", true);
+      return null;
+    }
     showProgress(j.progress || 0, j.message || label);
     if (j.status === "done") { hideProgress(); return j.result; }
     if (j.status === "error") {
@@ -308,7 +315,7 @@ function renderQualityMenu() {
   btn.textContent = STREAM_H ? STREAM_H + "p" : "Auto";
   $("quality-menu").innerHTML = STREAM_HEIGHTS
     .slice().sort((a, b) => b.height - a.height)
-    .map((h) => `<button data-h="${h.height}" class="${h.height === STREAM_H ? "on" : ""}">${h.label}</button>`).join("");
+    .map((h) => `<button data-h="${h.height}" class="${h.height === STREAM_H ? "on" : ""}">${esc(h.label)}</button>`).join("");
   for (const b of $("quality-menu").querySelectorAll("button"))
     b.onclick = () => { $("quality-menu").hidden = true; loadStreamUrl(SESSION.id, +b.dataset.h); };
 }
@@ -619,7 +626,19 @@ $("seek").oninput = () => { seeking = true; };
 $("seek").onchange = () => {
   V.currentTime = ($("seek").value / 1000) * (V.duration || 0);
   seeking = false;
+  // actualizar CUR ya: si no, la auto-pausa cree que "escapamos" del segmento
+  // antiguo y devuelve la reproducción al punto de partida.
+  const te = V.currentTime - OFFSET;
+  setCur(SEGS.findIndex((s) => te >= s.start && te <= s.end));
 };
+
+// Auto-pausa sin rebote: al reanudar aparcados en el final del segmento (ahí
+// nos deja la auto-pausa), soltamos CUR para que el guard no vuelva a pausar
+// y la reproducción siga hasta el final de la SIGUIENTE frase.
+V.addEventListener("play", () => {
+  if (CUR >= 0 && SEGS[CUR] && (V.currentTime - OFFSET) >= SEGS[CUR].end - 0.05)
+    setCur(-1);
+});
 
 V.addEventListener("timeupdate", () => {
   const t = V.currentTime;
@@ -699,14 +718,14 @@ function renderPopupLookup(r) {
   $("wp-meta").textContent = `${r.lemma}${r.pos ? " · " + r.pos : ""}`;
   $("wp-sentence-es").textContent = r.sentence_es || "";
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
-    .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("")
+    .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${esc(s.es)}">${esc(s.es)} <small>${esc(s.pos)}</small></span>`).join("")
     || '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>';
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
   const gl = (r.glosses || []).slice(0, 3);
   $("wp-gloss").hidden = !gl.length;
-  $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${g.es}</div>`).join("");
+  $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${esc(g.es)}</div>`).join("");
   const uds = (r.userdefs || []).slice(0, 4);
   $("wp-userdefs").hidden = !uds.length;
   $("wp-userdefs").innerHTML = uds.map((u) =>
@@ -755,7 +774,7 @@ async function renderExamples(r) {
   }
   if (!POP || POP.lookup !== r) return;
   $("wp-examples").innerHTML = r._examples.slice(0, 3).map((e) =>
-    `<div class="wp-ex" title="${e.session_title}">${e.text}</div>`).join("");
+    `<div class="wp-ex" title="${esc(e.session_title)}">${esc(e.text)}</div>`).join("");
 }
 
 for (const b of $("wp-status").querySelectorAll("button"))
@@ -854,7 +873,7 @@ async function mine(segIndex, selection, padB = 0, padA = 0, extra = {}) {
   $("c-frase-es").value = p.frase_es;
   $("c-meta").textContent = `${p.lema} · ${p.pos} · ${p.freq_rank} (zipf ${p.freq_zipf.toFixed(1)}) · ${p.font}`;
   $("senses").innerHTML = p.senses.map((s) =>
-    `<span class="sense" data-es="${s.es}">${s.es} <small>${s.pos}</small></span>`).join("");
+    `<span class="sense" data-es="${esc(s.es)}">${esc(s.es)} <small>${esc(s.pos)}</small></span>`).join("");
   for (const sp of $("senses").children)
     sp.onclick = () => { $("c-paraula-es").value = sp.dataset.es; };
   $("c-audio").src = p.audio_file ? "/media/" + p.audio_file : "";
@@ -1076,12 +1095,25 @@ function rebuildKeymap() {
   for (const [act, key] of Object.entries(km)) KEY2ACTION[key] = act;
 }
 
+function renderHelpLine() {
+  // la línea de ayuda refleja el keymap real (tras remapear en ⚙️ no miente)
+  const km = SETTINGS?.keymap || DEFAULT_KEYMAP;
+  const U = (a) => (km[a] || "?").toUpperCase();
+  $("help-line").textContent =
+    `${U("prev")}/${U("next")} frase · ${U("replay")} repetir · ${U("mine")} tarjeta` +
+    ` · ⇧${U("mine")} editar · ${U("recommended")} recomendada ⭐ · 1-4 estado` +
+    ` · ${U("subs")} subs · ${U("dual")} dual · K condensado · [ ] sincronía` +
+    ` · ${U("browser")} transcripción · ${U("fullscreen")} pantalla completa` +
+    " · ? ayuda · ⚙️ atajos";
+}
+
 function applySettings() {
   document.documentElement.style.setProperty("--sub-scale", SETTINGS.sub_scale);
   setUILang(SETTINGS.ui_lang || "es");           // idioma de la interfaz
   $("set-ui-lang").value = SETTINGS.ui_lang || "es";
   rebuildKeymap();
   renderKeyEditor();
+  renderHelpLine();
   $("set-sub-scale").value = Math.round(SETTINGS.sub_scale * 100);
   $("set-sub-val").textContent = Math.round(SETTINGS.sub_scale * 100);
   $("set-dual").checked = SETTINGS.dual_default;
