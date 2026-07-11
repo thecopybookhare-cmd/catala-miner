@@ -1060,6 +1060,8 @@ function rebuildKeymap() {
 
 function applySettings() {
   document.documentElement.style.setProperty("--sub-scale", SETTINGS.sub_scale);
+  setUILang(SETTINGS.ui_lang || "es");           // idioma de la interfaz
+  $("set-ui-lang").value = SETTINGS.ui_lang || "es";
   rebuildKeymap();
   renderKeyEditor();
   $("set-sub-scale").value = Math.round(SETTINGS.sub_scale * 100);
@@ -1242,6 +1244,7 @@ $("set-autopause").onchange = () => saveSettings({ autopause_default: $("set-aut
 $("set-speed").onchange = () => saveSettings({ speed_default: parseFloat($("set-speed").value) });
 $("set-ipa").onchange = () => saveSettings({ ipa_enabled: $("set-ipa").checked });
 $("set-online").onchange = () => saveSettings({ online_enabled: $("set-online").checked });
+$("set-ui-lang").onchange = () => saveSettings({ ui_lang: $("set-ui-lang").value });
 $("set-audio-trim").onchange = () => saveSettings({ audio_trim: $("set-audio-trim").checked });
 $("set-language").onchange = async () => {
   await saveSettings({ language: $("set-language").value });

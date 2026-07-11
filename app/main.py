@@ -158,7 +158,7 @@ DEFAULT_SETTINGS = {
     "deck": "Català::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
-    "audio_trim": False,
+    "audio_trim": False, "ui_lang": "es",
     "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
                "subs": "w", "browser": "g", "copy": "c", "dual": "e",
                "autopause": "p", "fullscreen": "f", "recommended": "r"},

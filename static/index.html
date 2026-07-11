@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="/favicon.png?v=0.9.8">
+<link rel="icon" href="/favicon.png?v=0.9.9">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0c0d13">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CatalàMiner">
-<link rel="stylesheet" href="/style.css?v=0.9.8">
+<link rel="stylesheet" href="/style.css?v=0.9.9">
 </head>
 <body>
 <header>
@@ -20,56 +20,56 @@
   <div class="header-right">
     <div id="rec-chip" class="badge" hidden title="Frases con exactamente 1 palabra nueva (i+1) — clic o tecla R para saltar entre ellas"></div>
     <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
-    <div id="stats-btn" class="badge" title="Estadísticas">📊</div>
-    <div id="settings-btn" class="badge" title="Configuración">⚙️</div>
+    <div id="stats-btn" class="badge" title="Estadísticas" data-i18n-title="hdr.stats">📊</div>
+    <div id="settings-btn" class="badge" title="Configuración" data-i18n-title="hdr.settings">⚙️</div>
     <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
   </div>
 </header>
 
 <main id="home">
   <section class="hero">
-    <h2>Tu biblioteca</h2>
-    <p class="hero-sub">Mina catalán desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.</p>
+    <h2 data-i18n="hero.title">Tu biblioteca</h2>
+    <p class="hero-sub" data-i18n="hero.sub">Mina catalán desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.</p>
     <div class="new-session">
-      <label class="filebtn primary">📁 Abrir archivo
+      <label class="filebtn primary"><span data-i18n="hero.open">📁 Abrir archivo</span>
         <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
       </label>
       <div class="yt">
-        <input type="url" id="yt-url" placeholder="URL de YouTube o enlace directo (.mp4, .m3u8)…">
-        <button id="yt-btn" title="Descargar con yt-dlp (YouTube)">⬇️ Importar</button>
-        <button id="url-btn" title="Streaming sin descargar: YouTube, 3cat o enlace directo">🔗 Ver online</button>
+        <input type="url" id="yt-url" placeholder="URL de YouTube o enlace directo (.mp4, .m3u8)…" data-i18n-ph="hero.url_ph">
+        <button id="yt-btn" title="Descargar con yt-dlp (YouTube)" data-i18n="hero.import">⬇️ Importar</button>
+        <button id="url-btn" title="Streaming sin descargar: YouTube, 3cat o enlace directo" data-i18n="hero.online">🔗 Ver online</button>
       </div>
     </div>
   </section>
   <section id="onboarding" hidden>
     <div class="onb-card">
       <div class="onb-head">
-        <h3>👋 Primeros pasos</h3>
+        <h3 data-i18n="onb.title">👋 Primeros pasos</h3>
         <button id="onb-dismiss" class="small" title="Ocultar">✕</button>
       </div>
       <ul id="onb-checks"></ul>
       <div class="onb-actions">
-        <button id="onb-download" class="primary" hidden>⬇️ Descargar traductor y diccionarios</button>
-        <button id="onb-recheck" class="small">↻ Volver a comprobar</button>
+        <button id="onb-download" class="primary" hidden data-i18n="onb.download">⬇️ Descargar traductor y diccionarios</button>
+        <button id="onb-recheck" class="small" data-i18n="onb.recheck">↻ Volver a comprobar</button>
       </div>
     </div>
   </section>
   <section>
     <div id="session-list" class="scard-grid"></div>
-    <p id="library-empty" class="dim" hidden>Tu biblioteca está vacía. Abre un archivo, o pega un enlace de <b>YouTube / 3cat</b> y pulsa <b>🔗 Ver online</b> para empezar.</p>
+    <p id="library-empty" class="dim" hidden data-i18n="lib.empty">Tu biblioteca está vacía. Abre un archivo, o pega un enlace de <b>YouTube / 3cat</b> y pulsa <b>🔗 Ver online</b> para empezar.</p>
   </section>
 </main>
 
 <main id="player" hidden>
   <div id="player-top">
-    <button id="back">← Biblioteca</button>
+    <button id="back" data-i18n="pl.back">← Biblioteca</button>
     <div id="transcribe-bar">
       <select id="model-select">
         <option value="catala-large">Whisper large-v3 catalán (AINA) — máxima calidad</option>
         <option value="large-v3">Whisper large-v3 genérico</option>
         <option value="small">Whisper small — rápido</option>
       </select>
-      <button id="transcribe-btn">🎙️ Transcribir</button>
+      <button id="transcribe-btn" data-i18n="pl.transcribe">🎙️ Transcribir</button>
       <label class="filebtn small">📎 .srt
         <input type="file" id="subs-input" accept=".srt,.vtt">
       </label>
@@ -117,12 +117,12 @@
       <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · K condensado · [ ] sincronía · G transcripción · F pantalla completa · ? ayuda · ⚙️ atajos</div>
 
       <aside id="card-panel" hidden>
-        <h3>Nueva tarjeta</h3>
-        <div class="row"><label>Palabra</label><input id="c-paraula"></div>
-        <div class="row"><label>Palabra ES</label><input id="c-paraula-es"></div>
+        <h3 data-i18n="card.new">Nueva tarjeta</h3>
+        <div class="row"><label data-i18n="card.word">Palabra</label><input id="c-paraula"></div>
+        <div class="row"><label data-i18n="card.word_es">Palabra ES</label><input id="c-paraula-es"></div>
         <div id="senses"></div>
-        <div class="row"><label>Frase</label><textarea id="c-frase" rows="2"></textarea></div>
-        <div class="row"><label>Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
+        <div class="row"><label data-i18n="card.sentence">Frase</label><textarea id="c-frase" rows="2"></textarea></div>
+        <div class="row"><label data-i18n="card.sentence_es">Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
         <div class="row meta"><span id="c-meta"></span></div>
         <div class="row">
           <audio id="c-audio" controls></audio>
@@ -131,8 +131,8 @@
         </div>
         <img id="c-image" alt="">
         <div class="row actions">
-          <button id="c-cancel">Cancelar</button>
-          <button id="c-send" class="primary">➕ Añadir a Anki (⏎)</button>
+          <button id="c-cancel" data-i18n="card.cancel">Cancelar</button>
+          <button id="c-send" class="primary" data-i18n="card.add">➕ Añadir a Anki (⏎)</button>
         </div>
       </aside>
 
@@ -159,17 +159,17 @@
         <div id="wp-senses"></div>
         <div id="wp-gloss" hidden></div>
         <div id="wp-userdefs" hidden></div>
-        <button id="wp-conj-btn" class="wp-conj-btn" hidden>📖 Conjugació</button>
+        <button id="wp-conj-btn" class="wp-conj-btn" hidden data-i18n="conj.btn">📖 Conjugació</button>
         <div id="wp-examples"></div>
         <div id="wp-def" class="dim" hidden></div>
         <div id="wp-foot"><span class="dim">→</span>
           <span id="wp-word-es" contenteditable="true" spellcheck="false"
                 title="Haz clic para editar la traducción de la tarjeta"></span></div>
         <div id="wp-status">
-          <button data-st="unknown" title="Atajo: 1">Nueva</button>
-          <button data-st="learning" title="Atajo: 2">Aprendiendo</button>
-          <button data-st="known" title="Atajo: 3">Conocida</button>
-          <button data-st="ignored" title="Atajo: 4">Ignorar</button>
+          <button data-st="unknown" title="Atajo: 1" data-i18n="st.unknown">Nueva</button>
+          <button data-st="learning" title="Atajo: 2" data-i18n="st.learning">Aprendiendo</button>
+          <button data-st="known" title="Atajo: 3" data-i18n="st.known">Conocida</button>
+          <button data-st="ignored" title="Atajo: 4" data-i18n="st.ignored">Ignorar</button>
         </div>
       </div>
 
@@ -192,16 +192,24 @@
 
 <div id="settings-view" class="modal-view" hidden>
   <div id="settings-box" class="modal-box">
-    <div class="stats-head"><h2>⚙️ Configuración</h2><button id="settings-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="set.title">⚙️ Configuración</h2><button id="settings-close">✕</button></div>
+    <section>
+      <h3 data-i18n="set.sec_lang">Idioma</h3>
+      <div class="set-row"><label data-i18n="set.ui_lang">Idioma de la interfaz</label>
+        <select id="set-ui-lang">
+          <option value="es">Español</option>
+          <option value="ca">Català</option>
+          <option value="en">English</option>
+        </select></div>
+    </section>
     <section id="set-lang-section" hidden>
-      <h3>Idioma</h3>
-      <div class="set-row"><label>Idioma de estudio</label>
+      <div class="set-row"><label data-i18n="set.study_lang">Idioma de estudio</label>
         <select id="set-language"></select></div>
     </section>
     <section id="share-section">
-      <h3>📡 Compartir con amigos</h3>
-      <p class="dim">Sirve la app a tu red local o a tu <b>Tailscale</b> para que un amigo (o tu móvil) la use en el navegador. Solo mientras esté activo — nada se expone hasta que lo enciendes.</p>
-      <div class="set-row"><label>Modo compartir</label>
+      <h3 data-i18n="set.sec_share">📡 Compartir con amigos</h3>
+      <p class="dim" data-i18n="set.share_desc">Sirve la app a tu red local o a tu <b>Tailscale</b> para que un amigo (o tu móvil) la use en el navegador. Solo mientras esté activo — nada se expone hasta que lo enciendes.</p>
+      <div class="set-row"><label data-i18n="set.share_row">Modo compartir</label>
         <input id="set-share" type="checkbox"></div>
       <div id="share-info" hidden>
         <div id="share-urls"></div>
@@ -209,60 +217,59 @@
       <p class="dim" id="share-note"></p>
     </section>
     <section>
-      <h3>Anki</h3>
-      <div class="set-row"><label>Mazo de minado</label><select id="set-deck"></select></div>
-      <div class="set-row"><label>Puerto AnkiConnect</label>
+      <h3 data-i18n="set.sec_anki">Anki</h3>
+      <div class="set-row"><label data-i18n="set.deck">Mazo de minado</label><select id="set-deck"></select></div>
+      <div class="set-row"><label data-i18n="set.port">Puerto AnkiConnect</label>
         <input id="set-port" type="number" min="1" max="65535" placeholder="automático"></div>
     </section>
     <section>
-      <h3>Subtítulos</h3>
-      <div class="set-row"><label>Tamaño (<span id="set-sub-val">100</span>%)</label>
+      <h3 data-i18n="set.sec_subs">Subtítulos</h3>
+      <div class="set-row"><label><span data-i18n="set.sub_size">Tamaño</span> (<span id="set-sub-val">100</span>%)</label>
         <input id="set-sub-scale" type="range" min="60" max="160" step="5"></div>
-      <div class="set-row"><label>Dual español al abrir</label>
+      <div class="set-row"><label data-i18n="set.dual_open">Dual español al abrir</label>
         <input id="set-dual" type="checkbox"></div>
     </section>
     <section>
-      <h3>Reproducción</h3>
-      <div class="set-row"><label>Velocidad al abrir</label>
+      <h3 data-i18n="set.sec_play">Reproducción</h3>
+      <div class="set-row"><label data-i18n="set.speed_open">Velocidad al abrir</label>
         <select id="set-speed">
           <option value="0.75">0.75×</option><option value="1">1×</option>
           <option value="1.25">1.25×</option><option value="1.5">1.5×</option>
         </select></div>
-      <div class="set-row"><label>Auto-pausa al abrir</label>
+      <div class="set-row"><label data-i18n="set.autopause_open">Auto-pausa al abrir</label>
         <input id="set-autopause" type="checkbox"></div>
     </section>
     <section>
-      <h3>Audio de tarjetas</h3>
-      <div class="set-row"><label>Recortar silencio (VAD)
-        <br><small class="dim">Ajusta el audio al habla real, sin silencios al inicio/final</small></label>
+      <h3 data-i18n="set.sec_cardaudio">Audio de tarjetas</h3>
+      <div class="set-row"><label data-i18n="set.trim">Recortar silencio (VAD)</label>
         <input id="set-audio-trim" type="checkbox"></div>
     </section>
     <section>
-      <h3>Diccionario</h3>
-      <div class="set-row"><label>Pronunciación IPA</label>
+      <h3 data-i18n="set.sec_dict">Diccionario</h3>
+      <div class="set-row"><label data-i18n="set.ipa">Pronunciación IPA</label>
         <input id="set-ipa" type="checkbox"></div>
-      <div class="set-row"><label>Funciones online (Viccionari)</label>
+      <div class="set-row"><label data-i18n="set.online">Funciones online (Viccionari)</label>
         <input id="set-online" type="checkbox"></div>
     </section>
     <section>
-      <h3>Diccionarios propios</h3>
-      <p class="dim">Importa un diccionario <b>StarDict</b> (.ifo) o <b>Yomitan</b> (.zip) de tu equipo; sus definiciones aparecerán en el popup.</p>
+      <h3 data-i18n="set.sec_userdict">Diccionarios propios</h3>
+      <p class="dim" data-i18n="set.userdict_desc">Importa un diccionario <b>StarDict</b> (.ifo) o <b>Yomitan</b> (.zip) de tu equipo; sus definiciones aparecerán en el popup.</p>
       <div class="set-row">
-        <input id="set-userdict-path" type="text" placeholder="Ruta del archivo (.ifo / .zip)…">
-        <button id="set-userdict-import" class="small">Importar</button>
+        <input id="set-userdict-path" type="text" placeholder="Ruta del archivo (.ifo / .zip)…" data-i18n-ph="set.userdict_ph">
+        <button id="set-userdict-import" class="small" data-i18n="set.userdict_import">Importar</button>
       </div>
       <div id="set-userdict-list"></div>
     </section>
     <section>
-      <h3>Atajos de teclado</h3>
+      <h3 data-i18n="set.sec_keys">Atajos de teclado</h3>
       <div id="set-keys"></div>
-      <button id="set-keys-reset" class="small">Restaurar predeterminados</button>
+      <button id="set-keys-reset" class="small" data-i18n="set.keys_reset">Restaurar predeterminados</button>
     </section>
     <section>
-      <h3>Datos</h3>
+      <h3 data-i18n="set.sec_data">Datos</h3>
       <div class="set-row">
-        <a id="set-export" href="/api/words/export" download>⬇️ Exportar palabras conocidas</a>
-        <label class="filebtn small">⬆️ Importar
+        <a id="set-export" href="/api/words/export" download data-i18n="set.export">⬇️ Exportar palabras conocidas</a>
+        <label class="filebtn small"><span data-i18n="set.import">⬆️ Importar</span>
           <input type="file" id="set-import" accept=".json">
         </label>
       </div>
@@ -272,14 +279,14 @@
 
 <div id="stats-view" hidden>
   <div id="stats-box">
-    <div class="stats-head"><h2>📊 Estadísticas</h2><button id="stats-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="stats.title">📊 Estadísticas</h2><button id="stats-close">✕</button></div>
     <div id="stats-body"></div>
   </div>
 </div>
 
 <div id="help-view" class="modal-view" hidden>
   <div class="modal-box">
-    <div class="stats-head"><h2>⌨️ Atajos de teclado</h2><button id="help-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="help.title">⌨️ Atajos de teclado</h2><button id="help-close">✕</button></div>
     <div id="help-body"></div>
   </div>
 </div>
@@ -333,6 +340,7 @@
     });
   }
 </script>
-<script src="/app.js?v=0.9.8"></script>
+<script src="/i18n.js?v=0.9.9"></script>
+<script src="/app.js?v=0.9.9"></script>
 </body>
 </html>

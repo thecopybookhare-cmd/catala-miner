@@ -1,6 +1,6 @@
 [project]
 name = "catala-miner"
-version = "0.9.8"
+version = "0.9.9"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.115",

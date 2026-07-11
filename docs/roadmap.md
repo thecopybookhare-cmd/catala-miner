@@ -51,9 +51,15 @@ Marcado a medida que se implementa.
 - [x] **Importar diccionarios propios** (StarDict/Yomitan) con `pyglossary` — se
       vuelcan a sqlite y sus definiciones salen en el popup (📕). Import/lista/
       quitar en ⚙️ → Diccionarios propios (por ruta local, app de escritorio).
+- [x] **UI multi-idioma** (es/ca/en) — sistema i18n ligero (`i18n.js`: `t()` +
+      `data-i18n`/`-ph`/`-title`) y selector en ⚙️. Traducida la interfaz
+      persistente: cabecera, portada, primeros pasos, reproductor, panel de
+      tarjeta, estados, y todo el panel de ajustes (secciones, etiquetas,
+      descripciones) + títulos de modales. *Pendiente incremental*: cadenas
+      dinámicas (toasts, insignias de las tarjetas de sesión, checklist de
+      onboarding, contenido de stats, nombres de atajos).
 - [ ] Modo lectura (texto/EPUB) estilo Lute/VocabSieve — *no seleccionado*
 - [ ] Forvo (audio de hablantes reales) como fuente de pronunciación
-- [ ] **UI multi-idioma** (interfaz en catalán/inglés, hoy solo español) — **siguiente**
 - [ ] `py-fsrs` — *evaluado*: Anki ya hace el SRS; aportaría poco sin registro
       de repasos propio. Diferido.
 - [ ] `sentry-sdk` opt-in (off por defecto) para reporte de errores entre amigos
