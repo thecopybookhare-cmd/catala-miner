@@ -28,6 +28,7 @@ from . import (
     subs,
     translate,
     tts,
+    userdict,
     vocab,
     wikdict,
 )
@@ -668,6 +669,7 @@ def lookup(req: LookupReq):
     if not sentence_es and req.sentence:
         sentence_es = translate.sentence(req.sentence)
     glosses = wikdict.lookup(lemma) or wikdict.lookup(req.selection)
+    userdefs = userdict.lookup(lemma) or userdict.lookup(req.selection)
     return {
         "selection": req.selection,
         "lemma": lemma, "pos": pos,
@@ -675,11 +677,40 @@ def lookup(req: LookupReq):
         "senses": [{"es": es, "pos": p} for es, p in senses[:8]],
         "active": _active_sense(senses[:8], sentence_es, word_es),
         "glosses": [{"es": g, "pos": p} for g, p in glosses[:4]],
+        "userdefs": [{"text": d, "source": s} for d, s in userdefs[:4]],
         "word_es": word_es,
         "sentence_es": sentence_es,
         "ipa": ipa.ipa(req.selection),
         "tts": piper_tts.available(),
     }
+
+
+class UserDictReq(BaseModel):
+    path: str = ""
+    slug: str = ""
+
+
+@app.get("/api/userdict/list")
+def userdict_list():
+    return {"dicts": userdict.list_dicts()}
+
+
+@app.post("/api/userdict/import")
+def userdict_import(req: UserDictReq):
+    p = Path(req.path.strip()).expanduser()
+    if not p.exists():
+        return JSONResponse({"error": "no encuentro ese archivo"}, status_code=400)
+    try:
+        info = userdict.import_file(str(p))
+    except Exception as e:
+        return JSONResponse({"error": f"no se pudo importar: {e}"}, status_code=400)
+    return {"ok": True, **info, "dicts": userdict.list_dicts()}
+
+
+@app.post("/api/userdict/remove")
+def userdict_remove(req: UserDictReq):
+    userdict.remove(req.slug)
+    return {"ok": True, "dicts": userdict.list_dicts()}
 
 
 @app.get("/api/conjugation")
