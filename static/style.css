@@ -209,12 +209,22 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
 .t.st-tracking { border-bottom: 2px solid #b678f0; background: #b678f024; }
 .t.st-ignored { opacity: .45; border-bottom: 2px solid transparent; }
 
-/* control bar */
+/* control bar — overlay flotante sobre el video (estilo reproductor):
+   visible con el ratón o en pausa, se desvanece reproduciendo */
 #controls {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 6;
   display: flex; align-items: center; gap: 5px;
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: 16px; padding: 7px 12px; margin-top: 10px; flex-wrap: wrap;
+  background: #0c0d13d9; backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 16px; padding: 7px 12px; flex-wrap: wrap;
+  transition: opacity .25s ease, transform .25s ease;
 }
+#video-wrap.hide-ctl #controls {
+  opacity: 0; pointer-events: none; transform: translateY(6px);
+}
+#video-col:fullscreen #video-wrap.hide-ctl,
+#video-col.fake-fs #video-wrap.hide-ctl { cursor: none; }
 #controls .icon {
   font-size: 15.5px; padding: 8px 12px; line-height: 1;
   background: transparent; border-color: transparent; border-radius: 11px;
@@ -247,8 +257,10 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
   max-height: none; height: 100%; width: 100%; object-fit: contain;
 }
 #video-col:fullscreen #help-line, #video-col.fake-fs #help-line { display: none; }
-#video-col:fullscreen #controls, #video-col.fake-fs #controls { margin-bottom: 2px; }
-#video-col:fullscreen #overlay-sub, #video-col.fake-fs #overlay-sub { bottom: 9%; }
+#video-col:fullscreen #controls, #video-col.fake-fs #controls {
+  left: 14px; right: 14px; bottom: 12px;
+}
+#video-col:fullscreen #overlay-sub, #video-col.fake-fs #overlay-sub { bottom: 11%; }
 
 /* subtitle browser rows */
 .seg {
@@ -585,3 +597,14 @@ button.small { font-size: 12px; padding: 6px 10px; }
 .conj-tbl td.conj-t { text-align: left; color: var(--dim); font-size: 12px; }
 .conj-tbl tr.conj-mrow td { text-align: left; color: var(--vio); font-weight: 600;
   padding-top: 12px; border-top: none; }
+
+/* Iconos SVG de la barra de controles (sustituyen glifos unicode que WKWebView
+   no siempre tiene: ⛶ salía como "?"). currentColor hereda el estado .on. */
+#controls .icon svg { width: 17px; height: 17px; display: block; }
+#controls .icon .ic-b { display: none; }
+#controls .icon.alt .ic-a { display: none; }
+#controls .icon.alt .ic-b { display: block; }
+#controls .icon { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Píldoras de subtítulo: nada que mostrar → nada de fondo flotando en el video */
+#overlay-ca:empty, #overlay-es:empty { display: none; }

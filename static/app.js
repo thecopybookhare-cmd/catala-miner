@@ -443,15 +443,15 @@ function toggleBrowser() {
 function toggleFullscreen() {
   const col = $("video-col");
   if (document.fullscreenElement) { document.exitFullscreen(); return; }
-  if (col.classList.contains("fake-fs")) { col.classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; return; }
+  if (col.classList.contains("fake-fs")) { col.classList.remove("fake-fs"); $("fs-btn").classList.remove("alt"); return; }
   const p = col.requestFullscreen ? col.requestFullscreen() : Promise.reject();
   Promise.resolve(p).catch(() => {
     col.classList.add("fake-fs");
-    $("fs-btn").textContent = "🗗";
+    $("fs-btn").classList.add("alt");
   });
 }
 document.addEventListener("fullscreenchange", () => {
-  $("fs-btn").textContent = document.fullscreenElement ? "🗗" : "⛶";
+  $("fs-btn").classList.toggle("alt", !!document.fullscreenElement);
 });
 
 // ---------- render ----------
@@ -548,8 +548,26 @@ function scrollBrowserTo(i) {
 // ---------- video ----------
 const V = $("video");
 V.addEventListener("click", () => { V.paused ? V.play() : V.pause(); });
-V.addEventListener("play", () => { $("play-btn").textContent = "⏸"; RESUME = false; });
-V.addEventListener("pause", () => { $("play-btn").textContent = "▶"; });
+V.addEventListener("play", () => { $("play-btn").classList.add("alt"); RESUME = false; });
+V.addEventListener("pause", () => { $("play-btn").classList.remove("alt"); });
+
+// controles auto-ocultables (estilo reproductor): visibles con el ratón o en
+// pausa; se desvanecen tras 2.6 s reproduciendo, y al salir del video.
+let CTL_TIMER = null;
+function wakeControls() {
+  $("video-wrap").classList.remove("hide-ctl");
+  clearTimeout(CTL_TIMER);
+  if (!V.paused)
+    CTL_TIMER = setTimeout(() => $("video-wrap").classList.add("hide-ctl"), 2600);
+}
+$("video-wrap").addEventListener("mousemove", wakeControls);
+$("video-wrap").addEventListener("touchstart", wakeControls, { passive: true });
+$("video-wrap").addEventListener("mouseleave", () => {
+  if (!V.paused) { clearTimeout(CTL_TIMER); $("video-wrap").classList.add("hide-ctl"); }
+});
+V.addEventListener("play", wakeControls);
+V.addEventListener("pause", wakeControls);
+V.addEventListener("seeked", wakeControls);   // saltos con A/D también los muestran
 V.addEventListener("loadedmetadata", () => { $("time-dur").textContent = fmtTime(V.duration || 0); });
 $("play-btn").onclick = () => { V.paused ? V.play() : V.pause(); };
 $("prev-btn").onclick = () => prevSeg();
@@ -881,7 +899,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closePopup(); $("card-panel").hidden = true;
     $("stats-view").hidden = true; $("settings-view").hidden = true; $("help-view").hidden = true; $("conj-view").hidden = true;
-    if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
+    if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").classList.remove("alt"); }
     return;
   }
   if (e.key === "?") { e.preventDefault(); toggleHelp(); return; }
