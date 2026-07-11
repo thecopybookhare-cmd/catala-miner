@@ -30,21 +30,34 @@ def _pos_of(tag: str) -> str:
 
 
 def build(txt: str, db_path: Path):
-    """One-shot dump of diccionari.txt into an indexed SQLite file."""
+    """One-shot dump of diccionari.txt into an indexed SQLite file.
+    Guarda también el tag morfológico crudo (VMIP3S00…) para las tablas de
+    conjugación, e indexa por lema."""
     if db_path.exists():
         db_path.unlink()
     con = sqlite3.connect(str(db_path))
-    con.execute("CREATE TABLE forms (form TEXT, lemma TEXT, pos TEXT)")
+    con.execute("CREATE TABLE forms (form TEXT, lemma TEXT, pos TEXT, tag TEXT)")
 
     def rows():
         for line in txt.splitlines():
             p = line.split(" ")
             if len(p) >= 3 and p[0] and p[1]:
-                yield p[0], p[1], _pos_of(p[2])
-    con.executemany("INSERT INTO forms VALUES (?,?,?)", rows())
+                yield p[0], p[1], _pos_of(p[2]), p[2]
+    con.executemany("INSERT INTO forms VALUES (?,?,?,?)", rows())
     con.execute("CREATE INDEX ix_form ON forms(form)")
+    con.execute("CREATE INDEX ix_lemma ON forms(lemma)")
     con.commit()
     con.close()
+
+
+def _has_tag_column(dbp: Path) -> bool:
+    try:
+        c = sqlite3.connect(str(dbp))
+        cols = {r[1] for r in c.execute("PRAGMA table_info(forms)")}
+        c.close()
+        return "tag" in cols
+    except Exception:
+        return False
 
 
 def _paths(code: str) -> tuple[Path, Path]:
@@ -65,6 +78,8 @@ def _con():
         try:
             url = languages.PROFILES[code].get("forms_url")
             txt, dbp = _paths(code)
+            if dbp.exists() and not _has_tag_column(dbp):
+                dbp.unlink()          # esquema viejo sin 'tag' → reconstruir
             if not dbp.exists():
                 if not url:
                     _CON = None
@@ -91,6 +106,18 @@ def lookup(form: str) -> list[tuple[str, str]]:
         if rs:
             return [(r[0], r[1]) for r in rs]
     return []
+
+
+def verb_forms(lemma: str) -> list[tuple[str, str]]:
+    """[(form, tag)] de todas las formas verbales de un lema (tag empieza por V).
+    Vacío si no hay diccionario de formas para el idioma activo."""
+    con = _con()
+    if con is None or not lemma:
+        return []
+    rs = con.execute(
+        "SELECT form, tag FROM forms WHERE lemma=? AND tag LIKE 'V%'",
+        (lemma.strip().lower(),)).fetchall()
+    return [(r[0], r[1]) for r in rs]
 
 
 def known_exact(form: str) -> bool:

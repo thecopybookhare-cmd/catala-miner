@@ -45,9 +45,11 @@ Marcado a medida que se implementa.
 
 ## 🟢 Nice-to-have
 
-- [ ] Modo lectura (texto/EPUB) estilo Lute/VocabSieve
-- [ ] Tablas de conjugación en el popup (conjugador de Softcatalà)
-- [ ] Importar diccionarios StarDict/Yomitan (`pyglossary`)
+- [x] **Tablas de conjugación** — botón 📖 en el popup de un verbo (catalán) abre
+      un modal con la conjugación completa, derivada *offline* del diccionario de
+      formas (tags LanguageTool); prefiere la variante central sobre valenciana/balear.
+- [ ] Modo lectura (texto/EPUB) estilo Lute/VocabSieve — *no seleccionado*
+- [ ] Importar diccionarios StarDict/Yomitan (`pyglossary`) — **en curso**
 - [ ] Forvo (audio de hablantes reales) como fuente de pronunciación
 - [ ] UI multi-idioma (interfaz en catalán/inglés, hoy solo español)
 - [ ] `py-fsrs` — *evaluado*: Anki ya hace el SRS; aportaría poco sin registro

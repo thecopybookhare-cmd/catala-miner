@@ -682,6 +682,14 @@ def lookup(req: LookupReq):
     }
 
 
+@app.get("/api/conjugation")
+def conjugation_table(lemma: str):
+    """Tabla de conjugación del verbo (del diccionario de formas, offline).
+    {} si no hay formas (idioma sin diccionario o no es verbo conocido)."""
+    from . import conjugation
+    return conjugation.table(lemma)
+
+
 @app.post("/api/sessions/{sid}/segments/{idx}/translate")
 def translate_segment(sid: str, idx: int):
     """Dual-subtitle line (Language Reactor style), cached in the transcript."""
