@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const api = async (path, opts = {}) => {
   const r = await fetch(path, {
     headers: { "Content-Type": "application/json" }, ...opts,
@@ -687,6 +689,10 @@ function renderPopupLookup(r) {
   const gl = (r.glosses || []).slice(0, 3);
   $("wp-gloss").hidden = !gl.length;
   $("wp-gloss").innerHTML = gl.map((g) => `<div class="wp-gl">📖 ${g.es}</div>`).join("");
+  const uds = (r.userdefs || []).slice(0, 4);
+  $("wp-userdefs").hidden = !uds.length;
+  $("wp-userdefs").innerHTML = uds.map((u) =>
+    `<div class="wp-gl">📕 ${esc(u.text)} <small class="dim">${esc(u.source)}</small></div>`).join("");
   $("wp-word-es").textContent = r.word_es || "";
   $("wp-say").hidden = !(r.ipa || r.tts);            // voz Piper o espeak
   $("wp-dict").hidden = !(SETTINGS?.online_enabled);
@@ -1136,9 +1142,36 @@ document.addEventListener("keydown", (e) => {
 
 $("set-keys-reset").onclick = () => saveSettings({ keymap: { ...DEFAULT_KEYMAP } });
 
+function renderUserdicts(dicts) {
+  $("set-userdict-list").innerHTML = dicts.length
+    ? dicts.map((d) => `<div class="set-row"><label>${esc(d.name)} <small class="dim">(${d.entries} entradas)</small></label><button class="small ud-rm" data-slug="${esc(d.slug)}">Quitar</button></div>`).join("")
+    : '<p class="dim" style="font-size:13px">— ninguno importado —</p>';
+  for (const b of $("set-userdict-list").querySelectorAll(".ud-rm"))
+    b.onclick = async () => {
+      const r = await api("/api/userdict/remove", { method: "POST", body: JSON.stringify({ slug: b.dataset.slug }) });
+      renderUserdicts(r.dicts || []);
+    };
+}
+async function refreshUserdicts() {
+  try { renderUserdicts((await api("/api/userdict/list")).dicts || []); } catch { /* noop */ }
+}
+$("set-userdict-import").onclick = async () => {
+  const path = $("set-userdict-path").value.trim();
+  if (!path) return;
+  $("set-userdict-import").disabled = true;
+  toast("Importando diccionario…");
+  const r = await api("/api/userdict/import", { method: "POST", body: JSON.stringify({ path }) });
+  $("set-userdict-import").disabled = false;
+  if (r.error) { toast(r.error, "err"); return; }
+  toast(`✅ ${r.name}: ${r.entries} entradas`);
+  $("set-userdict-path").value = "";
+  renderUserdicts(r.dicts || []);
+};
+
 async function openSettings() {
   $("settings-view").hidden = false;
   refreshShare();
+  refreshUserdicts();
   const st = await api("/api/anki/status");
   $("set-deck").innerHTML = (st.decks || []).map((d) =>
     `<option${d === st.deck ? " selected" : ""}>${d}</option>`).join("")

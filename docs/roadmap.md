@@ -48,10 +48,12 @@ Marcado a medida que se implementa.
 - [x] **Tablas de conjugación** — botón 📖 en el popup de un verbo (catalán) abre
       un modal con la conjugación completa, derivada *offline* del diccionario de
       formas (tags LanguageTool); prefiere la variante central sobre valenciana/balear.
+- [x] **Importar diccionarios propios** (StarDict/Yomitan) con `pyglossary` — se
+      vuelcan a sqlite y sus definiciones salen en el popup (📕). Import/lista/
+      quitar en ⚙️ → Diccionarios propios (por ruta local, app de escritorio).
 - [ ] Modo lectura (texto/EPUB) estilo Lute/VocabSieve — *no seleccionado*
-- [ ] Importar diccionarios StarDict/Yomitan (`pyglossary`) — **en curso**
 - [ ] Forvo (audio de hablantes reales) como fuente de pronunciación
-- [ ] UI multi-idioma (interfaz en catalán/inglés, hoy solo español)
+- [ ] **UI multi-idioma** (interfaz en catalán/inglés, hoy solo español) — **siguiente**
 - [ ] `py-fsrs` — *evaluado*: Anki ya hace el SRS; aportaría poco sin registro
       de repasos propio. Diferido.
 - [ ] `sentry-sdk` opt-in (off por defecto) para reporte de errores entre amigos
