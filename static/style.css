@@ -608,3 +608,27 @@ button.small { font-size: 12px; padding: 6px 10px; }
 
 /* Píldoras de subtítulo: nada que mostrar → nada de fondo flotando en el video */
 #overlay-ca:empty, #overlay-es:empty { display: none; }
+
+/* Reanudar: barra de progreso en la miniatura de la biblioteca */
+.resume-bar { position: absolute; left: 0; bottom: 0; height: 3px;
+  background: var(--vio); box-shadow: 0 0 6px var(--vio); border-radius: 0 2px 0 0; }
+
+/* Búsqueda en subtítulos */
+#lib-search-sec { margin: 0 0 18px; }
+#lib-search { width: 100%; box-sizing: border-box; background: var(--panel);
+  color: var(--fg); border: 1px solid var(--line); border-radius: 12px;
+  padding: 11px 16px; font-size: 15px; font-family: inherit; }
+#lib-search:focus { outline: none; border-color: var(--vio); background: var(--panel2); }
+#search-results { margin-top: 12px; }
+.search-count, .search-none { font-size: 13px; margin: 2px 2px 12px; }
+.search-group { margin-bottom: 16px; }
+.search-gt { font-size: 12.5px; color: var(--dim); font-weight: 600;
+  margin-bottom: 5px; padding-left: 2px; }
+.search-hit { display: flex; gap: 12px; width: 100%; text-align: left;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 13px; margin-bottom: 5px; cursor: pointer; align-items: baseline; }
+.search-hit:hover { border-color: var(--vio); background: var(--vio-soft); }
+.search-ts { flex: 0 0 auto; font-family: var(--display); font-size: 12px;
+  font-weight: 600; color: var(--vio); font-variant-numeric: tabular-nums; }
+.search-tx { color: var(--fg); font-size: 14px; line-height: 1.4; }
+.search-tx mark { background: #8b7cf855; color: #fff; border-radius: 3px; padding: 0 1px; }

@@ -423,3 +423,34 @@ def test_sessions_filtered_by_language(tmp_path):
     assert {s["title"] for s in main.db.list_sessions(main.CON, "ca")} == {"CA"}
     assert {s["title"] for s in main.db.list_sessions(main.CON, "fr")} == {"FR"}
     assert len(main.db.list_sessions(main.CON)) == 2
+
+
+# ---------- reanudar + búsqueda en subtítulos ----------
+
+def test_resume_position_roundtrip(tmp_path):
+    c = client(tmp_path)
+    sid = main.db.create_session(
+        main.CON, title="V", source_type="local", media_path="/x.mp4",
+        srt_source="none", model_size="-", duration_secs=200,
+        transcript_json="[]")
+    assert c.get("/api/sessions/" + sid).json()["resume_pos"] == 0
+    assert c.post(f"/api/sessions/{sid}/position", json={"pos": 87.5}).json()["ok"]
+    assert c.get("/api/sessions/" + sid).json()["resume_pos"] == 87.5
+    # aparece en la lista de la biblioteca (para la barra de progreso)
+    assert any(s["resume_pos"] == 87.5 for s in c.get("/api/sessions").json())
+
+
+def test_subtitle_search(tmp_path):
+    c = client(tmp_path)
+    tj = json.dumps([{"start": 3.0, "end": 5.0, "text": "Bon dia a tothom"},
+                     {"start": 9.0, "end": 11.0, "text": "El camí és llarg"}])
+    main.db.create_session(
+        main.CON, title="Cap1", source_type="local", media_path="/x.mp4",
+        srt_source="srt", model_size="-", duration_secs=20, transcript_json=tj)
+    r = c.get("/api/search?q=bon dia").json()["results"]
+    assert len(r) == 1 and r[0]["hits"][0]["index"] == 0
+    # acento-insensible: 'cami' encuentra 'camí'
+    r2 = c.get("/api/search?q=cami").json()["results"]
+    assert r2 and r2[0]["hits"][0]["index"] == 1
+    # consulta corta -> vacío
+    assert c.get("/api/search?q=a").json()["results"] == []

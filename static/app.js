@@ -105,6 +105,7 @@ async function loadSessions() {
         ${s.thumb ? "" : "🎬"}
         <span class="src-badge src-${sourceBadge(s).c}">${sourceBadge(s).t}</span>
         ${s.duration_secs ? `<span class="dur">${fmtTime(s.duration_secs)}</span>` : ""}
+        ${s.resume_pos && s.duration_secs ? `<span class="resume-bar" style="width:${Math.min(100, s.resume_pos / s.duration_secs * 100).toFixed(1)}%"></span>` : ""}
       </div>
       <div class="scard-body">
         <div class="scard-title" title="${esc(s.title)}">${esc(s.title)}</div>
@@ -118,7 +119,51 @@ async function loadSessions() {
   for (const card of $("session-list").children)
     card.onclick = () => openSession(card.dataset.id);
   $("library-empty").hidden = list.length > 0;
+  $("lib-search-sec").hidden = list.length === 0;
   refreshOnboarding();
+}
+
+// ---------- búsqueda en subtítulos ----------
+let SEARCH_TIMER = null;
+$("lib-search").oninput = () => {
+  clearTimeout(SEARCH_TIMER);
+  SEARCH_TIMER = setTimeout(runSearch, 250);
+};
+$("lib-search").addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { $("lib-search").value = ""; runSearch(); }
+});
+
+async function runSearch() {
+  const q = $("lib-search").value.trim();
+  const box = $("search-results");
+  if (q.length < 2) {
+    box.hidden = true; box.innerHTML = "";
+    $("session-list").hidden = false;
+    return;
+  }
+  const r = await api("/api/search?q=" + encodeURIComponent(q)).catch(() => null);
+  const results = (r && r.results) || [];
+  $("session-list").hidden = true;
+  box.hidden = false;
+  if (!results.length) {
+    box.innerHTML = `<p class="dim search-none">Sin resultados para «${esc(q)}»</p>`;
+    return;
+  }
+  const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+  const total = results.reduce((n, g) => n + g.hits.length, 0);
+  box.innerHTML =
+    `<p class="dim search-count">${total} líneas en ${results.length} videos</p>` +
+    results.map((g) => `
+      <div class="search-group">
+        <div class="search-gt">${sourceBadge(g).t} · ${esc(g.title)}</div>
+        ${g.hits.map((h) => `
+          <button class="search-hit" data-sid="${g.session_id}" data-seg="${h.index}">
+            <span class="search-ts">${fmtTime(h.start)}</span>
+            <span class="search-tx">${esc(h.text).replace(re, "<mark>$1</mark>")}</span>
+          </button>`).join("")}
+      </div>`).join("");
+  for (const b of box.querySelectorAll(".search-hit"))
+    b.onclick = () => openSession(b.dataset.sid, { seg: +b.dataset.seg });
 }
 
 // ---------- asistente de primer arranque ----------
@@ -244,11 +289,19 @@ function uploadWithProgress(url, fd) {
 }
 
 // ---------- sesión ----------
-async function openSession(sid) {
+let PENDING_SEEK = 0;                    // reanudar / saltar desde búsqueda
+async function openSession(sid, opts = {}) {
   const s = await api("/api/sessions/" + sid);
   SESSION = s; SEGS = s.transcript; STATUS = s.word_statuses || {};
   CUR = -1; POP = null; HOVER = null; PINNED = false; $("word-pop").hidden = true;
   setOffset(0);                         // el desfase es por sesión
+  // a dónde saltar al cargar: línea buscada > reanudar donde se dejó > inicio
+  PENDING_SEEK = 0;
+  if (opts.seg != null && SEGS[opts.seg]) PENDING_SEEK = SEGS[opts.seg].start;
+  else {
+    const rp = s.resume_pos || 0;
+    if (rp > 5 && rp < (s.duration_secs || 0) - 15) PENDING_SEEK = rp;
+  }
   for (const k in ES_CACHE) delete ES_CACHE[k];
   for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
   SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
@@ -336,12 +389,15 @@ $("video").addEventListener("waiting", () => {
 });
 
 $("back").onclick = () => {
+  saveResume(true);                     // recordar dónde lo dejamos
   if (document.fullscreenElement) document.exitFullscreen();
   $("quality-menu").hidden = true;
   $("video-col").classList.remove("fake-fs");
   $("player").hidden = true; $("home").hidden = false;
   $("card-panel").hidden = true; $("word-pop").hidden = true;
   $("comp-chip").hidden = true; $("rec-chip").hidden = true;
+  $("lib-search").value = ""; $("search-results").hidden = true;
+  $("session-list").hidden = false;     // volver a la biblioteca limpia
   loadSessions();
 };
 
@@ -576,6 +632,35 @@ V.addEventListener("play", wakeControls);
 V.addEventListener("pause", wakeControls);
 V.addEventListener("seeked", wakeControls);   // saltos con A/D también los muestran
 V.addEventListener("loadedmetadata", () => { $("time-dur").textContent = fmtTime(V.duration || 0); });
+
+// reanudar / saltar: aplicar el punto pendiente cuando el video ya tiene duración
+V.addEventListener("loadedmetadata", () => {
+  if (PENDING_SEEK > 0) {
+    const target = PENDING_SEEK; PENDING_SEEK = 0;
+    V.currentTime = target;
+    const te = target - OFFSET;
+    setCur(SEGS.findIndex((s) => te >= s.start && te <= s.end));
+    if (target > 5) toast(`⏱️ Reanudado en ${fmtTime(target)}`);
+  }
+});
+
+// guardar la posición para reanudar (limitado a 1 vez / 5 s, y en pausa/salir)
+let LAST_SAVE = 0;
+function saveResume(force) {
+  if (!SESSION || !V.duration || V.currentTime < 1) return;
+  const now = Date.now();
+  if (!force && now - LAST_SAVE < 5000) return;
+  LAST_SAVE = now;
+  const body = JSON.stringify({ pos: V.currentTime });
+  const url = "/api/sessions/" + SESSION.id + "/position";
+  if (force && navigator.sendBeacon)
+    navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+  else
+    api(url, { method: "POST", body }).catch(() => {});
+}
+V.addEventListener("timeupdate", () => saveResume(false));
+V.addEventListener("pause", () => saveResume(true));
+window.addEventListener("pagehide", () => saveResume(true));
 $("play-btn").onclick = () => { V.paused ? V.play() : V.pause(); };
 $("prev-btn").onclick = () => prevSeg();
 $("next-btn").onclick = () => nextSeg();

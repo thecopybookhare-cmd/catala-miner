@@ -473,6 +473,53 @@ def media_file(sid: str):
     return FileResponse(s["media_path"])
 
 
+class PosReq(BaseModel):
+    pos: float
+
+
+@app.post("/api/sessions/{sid}/position")
+def save_position(sid: str, req: PosReq):
+    """Guarda dónde se dejó el video para reanudar la próxima vez."""
+    db.set_resume_pos(CON, sid, req.pos)
+    return {"ok": True}
+
+
+def _norm(s: str) -> str:
+    """minúsculas sin acentos, para buscar 'cami' y encontrar 'camí'."""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", (s or "").lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+@app.get("/api/search")
+def search(q: str):
+    """Busca `q` en los subtítulos de toda la biblioteca del idioma activo.
+    Devuelve, por sesión, las líneas que coinciden (con índice y tiempo)."""
+    needle = _norm(q).strip()
+    if len(needle) < 2:
+        return {"results": []}
+    results = []
+    for s in db.list_sessions(CON, languages.active_code()):
+        full = db.get_session(CON, s["id"])
+        try:
+            segs = json.loads(full["transcript_json"])
+        except Exception:
+            continue
+        hits = []
+        for i, seg in enumerate(segs):
+            if needle in _norm(seg.get("text", "")):
+                hits.append({"index": i, "start": seg.get("start", 0),
+                             "text": seg.get("text", "")})
+            if len(hits) >= 6:
+                break
+        if hits:
+            results.append({"session_id": s["id"], "title": s["title"],
+                            "source_type": s["source_type"], "hits": hits})
+        if len(results) >= 40:
+            break
+    return {"results": results}
+
+
 @app.post("/api/sessions/upload")
 async def upload(file: UploadFile = File(...)):
     """Guarda el archivo y delega remux+análisis a un job con progreso

@@ -64,6 +64,17 @@ Marcado a medida que se implementa.
       de repasos propio. Diferido.
 - [ ] `sentry-sdk` opt-in (off por defecto) para reporte de errores entre amigos
 
+
+## ✅ Reanudar + búsqueda (v0.9.12)
+
+- [x] **Reanudar donde lo dejaste** — cada sesión guarda su posición (columna
+      `resume_pos`, guardado throttled + en pausa/salir/pagehide); al reabrir
+      salta ahí (si >5 s y no al final) con aviso, y las tarjetas muestran una
+      barra de progreso violeta.
+- [x] **Búsqueda en subtítulos** de toda la biblioteca — buscador en la portada,
+      acento-insensible (`cami`→`camí`), agrupado por video con tiempo y término
+      resaltado; un clic abre la sesión y salta a esa línea. i18n es/ca/en.
+
 ## Notas
 
 - **Empaquetado**: el modelo local-completo (CTranslate2 + Whisper + ~3 GB) es
