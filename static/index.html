@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>CatalàMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="/favicon.png?v=0.9.9">
+<link rel="icon" href="/favicon.png?v=0.9.10">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0c0d13">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CatalàMiner">
-<link rel="stylesheet" href="/style.css?v=0.9.9">
+<link rel="stylesheet" href="/style.css?v=0.9.10">
 </head>
 <body>
 <header>
@@ -84,12 +84,20 @@
           <div id="overlay-ca"></div>
           <div id="overlay-es" hidden></div>
         </div>
-      </div>
       <div id="controls">
-        <button class="icon" id="play-btn" title="Reproducir/Pausar (espacio)">▶</button>
-        <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">⏮</button>
-        <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">⟲</button>
-        <button class="icon" id="next-btn" title="Frase siguiente (D / →)">⏭</button>
+        <button class="icon" id="play-btn" title="Reproducir/Pausar (espacio)">
+          <svg class="ic-a" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>
+          <svg class="ic-b" viewBox="0 0 24 24" fill="currentColor"><rect x="5.5" y="4" width="4.6" height="16" rx="1.2"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.2"/></svg>
+        </button>
+        <button class="icon" id="prev-btn" title="Frase anterior (A / ←)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4"/><rect x="4" y="4" width="2.6" height="16" rx="1"/></svg>
+        </button>
+        <button class="icon" id="replay-btn" title="Repetir frase (S / ↓)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5 4.5 1.5 10.5 7.5 10.5"/><path d="M4 15a9 9 0 1 0 2.13-9.36L1.5 10.5"/></svg>
+        </button>
+        <button class="icon" id="next-btn" title="Frase siguiente (D / →)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20"/><rect x="17.4" y="4" width="2.6" height="16" rx="1"/></svg>
+        </button>
         <div id="seek-row">
           <span id="time-cur" class="tlabel">0:00</span>
           <div id="seek-wrap">
@@ -104,15 +112,25 @@
         </div>
         <button class="icon" id="speed-btn" title="Velocidad de reproducción">1×</button>
         <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)">🇪🇸</button>
-        <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">⏯</button>
-        <button class="icon toggle" id="condensed-btn" title="Reproducción condensada: salta los silencios entre frases (K)">⚡</button>
+        <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.2"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="9" x2="14" y2="15"/></svg>
+        </button>
+        <button class="icon toggle" id="condensed-btn" title="Reproducción condensada: salta los silencios entre frases (K)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </button>
         <div id="offset-ctl" title="Desfase de subtítulos — teclas [ y ]">
           <button class="icon" id="offset-minus" title="Subtítulos antes ([)">−</button>
           <span id="offset-val" class="tlabel">0.0s</span>
           <button class="icon" id="offset-plus" title="Subtítulos después (])">+</button>
         </div>
-        <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">📜</button>
-        <button class="icon" id="fs-btn" title="Pantalla completa (F)">⛶</button>
+        <button class="icon toggle" id="browser-btn" title="Navegador de subtítulos (G)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="9" y1="18" x2="21" y2="18"/><line x1="4" y1="6" x2="4.01" y2="6"/><line x1="4" y1="12" x2="4.01" y2="12"/><line x1="4" y1="18" x2="4.01" y2="18"/></svg>
+        </button>
+        <button class="icon" id="fs-btn" title="Pantalla completa (F)">
+          <svg class="ic-a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg class="ic-b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/></svg>
+        </button>
+      </div>
       </div>
       <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · K condensado · [ ] sincronía · G transcripción · F pantalla completa · ? ayuda · ⚙️ atajos</div>
 
@@ -340,7 +358,7 @@
     });
   }
 </script>
-<script src="/i18n.js?v=0.9.9"></script>
-<script src="/app.js?v=0.9.9"></script>
+<script src="/i18n.js?v=0.9.10"></script>
+<script src="/app.js?v=0.9.10"></script>
 </body>
 </html>
