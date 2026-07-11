@@ -69,6 +69,10 @@ def connect(path: Path) -> sqlite3.Connection:
     if "stream_height" not in cols:
         con.execute("ALTER TABLE sessions ADD COLUMN stream_height INTEGER "
                     "NOT NULL DEFAULT 0")
+    # migración reanudar: segundos donde se dejó el video la última vez
+    if "resume_pos" not in cols:
+        con.execute("ALTER TABLE sessions ADD COLUMN resume_pos REAL "
+                    "NOT NULL DEFAULT 0")
     card_cols = {r["name"] for r in con.execute("PRAGMA table_info(cards)")}
     if "language" not in card_cols:
         con.execute("ALTER TABLE cards ADD COLUMN language TEXT NOT NULL "
@@ -134,9 +138,17 @@ def set_stream_height(con, sid, height):
         con.commit()
 
 
+def set_resume_pos(con, sid, pos: float):
+    # no toca updated_at: reanudar no debe reordenar la biblioteca
+    with LOCK:
+        con.execute("UPDATE sessions SET resume_pos=? WHERE id=?",
+                    (max(0.0, float(pos)), sid))
+        con.commit()
+
+
 def list_sessions(con, lang: str | None = None):
     q = ("SELECT id,title,source_type,srt_source,model_size,duration_secs,"
-         "created_at,updated_at,page_url,language FROM sessions")
+         "created_at,updated_at,page_url,language,resume_pos FROM sessions")
     args: tuple = ()
     if lang:
         q += " WHERE language=?"
