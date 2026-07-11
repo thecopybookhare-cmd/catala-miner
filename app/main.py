@@ -1,6 +1,7 @@
 """CatalàMiner — FastAPI backend + static frontend."""
 import json
 import shutil
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,6 +35,33 @@ from . import (
 )
 
 
+def _gc_media():
+    """Cada preview deja cm-*.mp3/.jpg/.gif aunque se cancele la tarjeta, y
+    cada pronunciación un wav; sin esto MEDIA_DIR crece para siempre. Se
+    borran los cm-* de más de 1 día que ninguna tarjeta referencia y los wav
+    de voz de más de 30 días (cacheados por hash: se regeneran solos)."""
+    import time
+    now = time.time()
+    try:
+        used = {r[0] for r in CON.execute(
+            "SELECT audio_file FROM cards UNION SELECT image_file FROM cards")}
+    except Exception:
+        return
+    for f in config.MEDIA_DIR.glob("cm-*"):
+        try:
+            if f.name not in used and now - f.stat().st_mtime > 86400:
+                f.unlink()
+        except OSError:
+            pass
+    for pat in ("piper-*.wav", "tts-*.wav"):
+        for f in config.MEDIA_DIR.glob(pat):
+            try:
+                if now - f.stat().st_mtime > 30 * 86400:
+                    f.unlink()
+            except OSError:
+                pass
+
+
 def _warm_models():
     """Precarga en background lo ya descargado para que el primer popup no
     espere a cargar el motor de traducción / el bidix. Nunca dispara
@@ -49,11 +77,14 @@ def _warm_models():
             _dict()                                # carga el bidix en memoria
     except Exception:
         pass
+    try:
+        _gc_media()
+    except Exception:
+        pass
 
 
 @asynccontextmanager
 async def lifespan(_app):
-    import threading
     threading.Thread(target=_warm_models, daemon=True).start()
     yield
 
@@ -71,6 +102,53 @@ async def no_stale_ui(request, call_next):
     if p == "/" or p.endswith((".html", ".js", ".css")):
         resp.headers["Cache-Control"] = "no-cache"
     return resp
+
+
+# Endpoints de administración: con el modo compartir activo, los invitados de
+# la red solo estudian (ver, minar, diccionario). Importar rutas del disco,
+# tocar settings, disparar descargas o parar el compartir queda reservado al
+# equipo anfitrión.
+_ADMIN_POSTS = {
+    "/api/userdict/import", "/api/userdict/remove",
+    "/api/share/start", "/api/share/stop",
+    "/api/settings", "/api/anki/deck", "/api/anki/port",
+    "/api/setup/download", "/api/words/import",
+    "/api/sessions/upload", "/api/sessions/youtube", "/api/sessions/stream",
+}
+
+
+def _is_local_client(request) -> bool:
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1", "testclient")
+
+
+def _host_allowed(request) -> bool:
+    """Anti DNS-rebinding: el Host debe ser localhost, una IP privada/tailnet
+    o un nombre MagicDNS de Tailscale — nunca un dominio de terceros."""
+    import ipaddress
+    host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]")
+    if not host or host in ("localhost", "testserver"):
+        return True
+    if host.endswith(".ts.net"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.is_private or ip.is_loopback or ip in ipaddress.ip_network("100.64.0.0/10")
+    except ValueError:
+        return False
+
+
+@app.middleware("http")
+async def guest_gate(request, call_next):
+    if not _host_allowed(request):
+        return JSONResponse({"error": "host no permitido"}, status_code=421)
+    if request.method == "POST" and not _is_local_client(request):
+        p = request.url.path
+        if p in _ADMIN_POSTS or p.endswith("/transcribe"):
+            return JSONResponse(
+                {"error": "solo disponible desde el equipo anfitrión"},
+                status_code=403)
+    return await call_next(request)
 
 
 CON = db.connect(config.DB_PATH)
@@ -140,18 +218,33 @@ def _word_es(selection: str, lemma: str) -> str:
 
 
 def _segment_es(sid: str, idx: int) -> str:
-    """text_es cacheado del segmento (lo crea si falta)."""
+    """text_es cacheado del segmento (lo crea si falta).
+
+    La traducción (lenta) corre fuera del lock; la escritura relee el
+    transcript dentro para no pisar traducciones concurrentes ni resucitar
+    un transcript viejo si una retranscripción se cruzó por medio."""
     s = db.get_session(CON, sid)
     if not s:
         return ""
     segs = json.loads(s["transcript_json"])
     if not 0 <= idx < len(segs):
         return ""
-    if not segs[idx].get("text_es"):
-        segs[idx]["text_es"] = translate.sentence(segs[idx]["text"])
-        db.update_transcript(CON, sid, json.dumps(segs), s["model_size"],
-                             s["srt_source"], s.get("tok_version") or 0)
-    return segs[idx]["text_es"]
+    if segs[idx].get("text_es"):
+        return segs[idx]["text_es"]
+    es = translate.sentence(segs[idx]["text"])
+    with db.LOCK:
+        s2 = db.get_session(CON, sid)
+        if not s2:
+            return es
+        segs2 = json.loads(s2["transcript_json"])
+        if (not 0 <= idx < len(segs2)
+                or segs2[idx].get("text") != segs[idx]["text"]):
+            return es                      # retranscrito entre medias: no pisar
+        if not segs2[idx].get("text_es"):
+            segs2[idx]["text_es"] = es
+            db.update_transcript(CON, sid, json.dumps(segs2), s2["model_size"],
+                                 s2["srt_source"], s2.get("tok_version") or 0)
+    return es
 
 
 DEFAULT_SETTINGS = {
@@ -345,7 +438,8 @@ def _session_meta(row: dict, statuses: dict, wsv: str) -> dict:
 def sessions():
     statuses = db.word_statuses(CON, _lang())
     wsv = _ws_version()
-    return [_session_meta(r, statuses, wsv) for r in db.list_sessions(CON)]
+    return [_session_meta(r, statuses, wsv)
+            for r in db.list_sessions(CON, languages.active_code())]
 
 
 @app.get("/api/sessions/{sid}")
@@ -383,17 +477,18 @@ def media_file(sid: str):
 async def upload(file: UploadFile = File(...)):
     """Guarda el archivo y delega remux+análisis a un job con progreso
     (los .mkv grandes tardan minutos: sin job parecía colgado)."""
-    dest = config.DL_DIR / (uuid.uuid4().hex[:6] + "-" + file.filename)
+    safe_name = Path(file.filename or "video").name or "video"
+    dest = config.DL_DIR / (uuid.uuid4().hex[:6] + "-" + safe_name)
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    fname = file.filename
+    fname = safe_name
 
     def work(jid):
         jobs.set_progress(jid, 0.3, "Convirtiendo el video si hace falta…")
         playable = media.ensure_browser_playable(dest, config.DL_DIR)
         jobs.set_progress(jid, 0.8, "Analizando el video…")
         sid = db.create_session(
-            CON, title=fname, source_type="local",
+            CON, language=languages.active_code(), title=fname, source_type="local",
             media_path=str(playable), srt_source="none", model_size="-",
             duration_secs=media.duration(str(playable)),
             transcript_json="[]")
@@ -426,7 +521,8 @@ def url_session(req: UrlReq):
                 "como YouTube o 3cat, usa el botón ⬇️ Importar.")
         title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
         sid = db.create_session(
-            CON, title=title, source_type="url", media_path=url,
+            CON, language=languages.active_code(),
+            title=title, source_type="url", media_path=url,
             srt_source="none", model_size="-", duration_secs=dur,
             transcript_json="[]")
         return {"session_id": sid}
@@ -473,7 +569,8 @@ def stream_session(req: UrlReq):
                 raise ValueError("no se pudo leer ese enlace directo de video")
             title = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
             sid = db.create_session(
-                CON, title=title, source_type="url", media_path=url,
+                CON, language=languages.active_code(),
+                title=title, source_type="url", media_path=url,
                 srt_source="none", model_size="-", duration_secs=dur,
                 transcript_json="[]")
             return {"session_id": sid}
@@ -486,7 +583,7 @@ def stream_session(req: UrlReq):
         jobs.set_progress(jid, 0.7, "Cargando subtítulos…")
         transcript, srt_source = _stream_subs_transcript(r)
         sid = db.create_session(
-            CON, title=r["title"], source_type="stream",
+            CON, language=languages.active_code(), title=r["title"], source_type="stream",
             media_path=r["best_url"], srt_source=srt_source, model_size="-",
             duration_secs=r["duration"], transcript_json=transcript,
             page_url=url, stream_height=r["best_height"])
@@ -533,7 +630,7 @@ def youtube_import(req: YoutubeReq):
         playable = media.ensure_browser_playable(
             Path(info["media_path"]), config.DL_DIR)
         sid = db.create_session(
-            CON, title=info["title"], source_type="youtube",
+            CON, language=languages.active_code(), title=info["title"], source_type="youtube",
             media_path=str(playable), srt_source="none", model_size="-",
             duration_secs=info["duration"], transcript_json="[]")
         if info["subtitles"]:
@@ -629,7 +726,7 @@ def sync_statuses():
         anki.ensure_note_type()  # keeps card template in sync with app version
     except Exception:
         pass
-    pairs = db.cards_with_notes(CON)
+    pairs = db.cards_with_notes(CON, _lang())
     intervals = anki.note_intervals([p["anki_note_id"] for p in pairs])
     statuses = db.word_statuses(CON, _lang())
     n = 0
@@ -805,11 +902,22 @@ def _build_preview(s: dict, segment_index: int, selection: str,
     }
 
 
+def _bad_index(s: dict, idx: int):
+    n = len(json.loads(s["transcript_json"]))
+    if not 0 <= idx < n:
+        return JSONResponse({"error": f"segment_index fuera de rango (0-{n-1})"},
+                            status_code=400)
+    return None
+
+
 @app.post("/api/cards/preview")
 def card_preview(req: PreviewReq):
     s = db.get_session(CON, req.session_id)
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
+    bad = _bad_index(s, req.segment_index)
+    if bad:
+        return bad
     return _build_preview(s, req.segment_index, req.selection,
                           req.pad_before, req.pad_after, req.offset)
 
@@ -828,6 +936,9 @@ def card_mine(req: MineReq):
     s = db.get_session(CON, req.session_id)
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
+    bad = _bad_index(s, req.segment_index)
+    if bad:
+        return bad
     p = _build_preview(s, req.segment_index, req.selection, offset=req.offset)
     active_es = (p["senses"][p["active"]]["es"]
                  if p["senses"] and p["active"] >= 0 else "")
@@ -837,7 +948,8 @@ def card_mine(req: MineReq):
         paraula=p["paraula"], lema=p["lema"], pos=p["pos"],
         paraula_es=paraula_es, frase=p["frase"], frase_es=p["frase_es"],
         freq_rank=p["freq_rank"], audio_file=p["audio_file"],
-        image_file=p["clip_file"] or p["image_file"], font=p["font"])
+        image_file=p["clip_file"] or p["image_file"], font=p["font"],
+        language=_lang())
     if p["lema"]:
         db.mark_learning_if_new(CON, p["lema"], _lang())
     sent = _flush()
@@ -869,7 +981,8 @@ def create_card(req: CardReq):
                          lema=req.lema, pos=req.pos, paraula_es=req.paraula_es,
                          frase=req.frase, frase_es=req.frase_es,
                          freq_rank=req.freq_rank, audio_file=req.audio_file,
-                         image_file=req.image_file, font=req.font)
+                         image_file=req.image_file, font=req.font,
+                         language=_lang())
     if req.lema:
         db.mark_learning_if_new(CON, req.lema, _lang())
     sent = _flush()
@@ -878,7 +991,19 @@ def create_card(req: CardReq):
             "word_status": db.word_statuses(CON, _lang()).get(req.lema.strip().lower())}
 
 
+_FLUSH_LOCK = threading.Lock()
+
+
 def _flush() -> int:
+    if not _FLUSH_LOCK.acquire(blocking=False):
+        return 0                          # ya hay un flush en marcha
+    try:
+        return _flush_locked()
+    finally:
+        _FLUSH_LOCK.release()
+
+
+def _flush_locked() -> int:
     if not anki.is_up(_settings().get("anki_port")):
         return 0
     deck = _settings()["deck"]
@@ -1029,12 +1154,37 @@ def get_settings():
     return _settings_payload()
 
 
+# tipo esperado (y rango numérico) de cada ajuste — antes se aceptaba
+# cualquier cosa y acababa interpolada en la query de Anki o en el CSS
+_SETTING_TYPES = {
+    "deck": str, "anki_port": (int, type(None)), "language": str,
+    "sub_scale": (int, float), "dual_default": bool, "autopause_default": bool,
+    "speed_default": (int, float), "ipa_enabled": bool, "online_enabled": bool,
+    "audio_trim": bool, "ui_lang": str, "keymap": dict,
+}
+_SETTING_RANGES = {"sub_scale": (0.3, 3.0), "speed_default": (0.25, 3.0),
+                   "anki_port": (1, 65535)}
+
+
 @app.post("/api/settings")
 def post_settings(body: dict):
     unknown = set(body) - set(DEFAULT_SETTINGS)
     if unknown:
         return JSONResponse({"error": f"claves desconocidas: {sorted(unknown)}"},
                             status_code=400)
+    for k, v in body.items():
+        want = _SETTING_TYPES[k]
+        wants = want if isinstance(want, tuple) else (want,)
+        # ojo: bool es subclase de int — un true donde va un número no cuela
+        if (isinstance(v, bool) and bool not in wants) or not isinstance(v, wants):
+            return JSONResponse({"error": f"tipo inválido para {k}"},
+                                status_code=400)
+        lo_hi = _SETTING_RANGES.get(k)
+        if lo_hi and v is not None and not lo_hi[0] <= v <= lo_hi[1]:
+            return JSONResponse({"error": f"{k} fuera de rango {lo_hi}"},
+                                status_code=400)
+    if "ui_lang" in body and body["ui_lang"] not in ("es", "ca", "en", "fr"):
+        return JSONResponse({"error": "ui_lang no soportado"}, status_code=400)
     if "language" in body and body["language"] not in languages.activable():
         return JSONResponse({"error": "idioma no disponible todavía"},
                             status_code=400)

@@ -7,6 +7,12 @@ JOBS: dict[str, dict] = {}
 
 
 def start(target, *args, label="") -> str:
+    # cap: los jobs terminados más viejos se descartan para no crecer sin
+    # límite (relevante con invitados del modo compartir lanzando streams)
+    if len(JOBS) > 100:
+        done = [k for k, j in JOBS.items() if j["status"] != "running"]
+        for k in done[:len(JOBS) - 100]:
+            del JOBS[k]
     jid = uuid.uuid4().hex[:8]
     JOBS[jid] = {"status": "running", "progress": 0.0, "label": label,
                  "message": "", "result": None}

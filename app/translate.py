@@ -69,26 +69,33 @@ def download():
         snapshot_download(repo_id=repo, local_dir=str(model_dir()))
 
 
-_ENGINES: dict = {}   # motor por idioma
+_ENGINES: dict = {}       # motor por idioma
+_FAILED_AT: dict = {}     # idioma -> timestamp del último intento fallido
+_RETRY_SECS = 60.0        # un corte de red no debe matar el traductor para siempre
 
 
 def translate(text: str) -> str:
     """Translate →es. Returns '' on any failure (never raises to caller)."""
+    import time
+
     from . import languages
     code = languages.active_code()
-    if code not in _ENGINES:
+    if _ENGINES.get(code) is None:
+        last = _FAILED_AT.get(code, 0.0)
+        if code in _ENGINES and time.time() - last < _RETRY_SECS:
+            return ""                     # fallo reciente: esperar al reintento
         try:
             if not is_downloaded():
                 download()
             eos = bool(languages.profile().get("translate_eos"))
             _ENGINES[code] = _Engine(model_dir(), eos=eos)
+            _FAILED_AT.pop(code, None)
         except Exception:
             _ENGINES[code] = None
-    eng = _ENGINES[code]
-    if eng is None:
-        return ""
+            _FAILED_AT[code] = time.time()
+            return ""
     try:
-        return eng.translate(text)
+        return _ENGINES[code].translate(text)
     except Exception:
         return ""
 

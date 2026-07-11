@@ -1,7 +1,15 @@
 import sqlite3
+import threading
 import time
 import uuid
 from pathlib import Path
+
+# La conexión se comparte entre el threadpool de uvicorn, los hilos de jobs y
+# el segundo servidor del modo compartir. sqlite3 es thread-safe a nivel C,
+# pero el autocommit diferido no: un commit() de un hilo confirmaría la
+# transacción a medias de otro. Este lock serializa cada escritura completa
+# (execute+commit). RLock: los helpers pueden anidarse.
+LOCK = threading.RLock()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -61,6 +69,10 @@ def connect(path: Path) -> sqlite3.Connection:
     if "stream_height" not in cols:
         con.execute("ALTER TABLE sessions ADD COLUMN stream_height INTEGER "
                     "NOT NULL DEFAULT 0")
+    card_cols = {r["name"] for r in con.execute("PRAGMA table_info(cards)")}
+    if "language" not in card_cols:
+        con.execute("ALTER TABLE cards ADD COLUMN language TEXT NOT NULL "
+                    "DEFAULT 'ca'")
     ws_cols = {r["name"] for r in con.execute("PRAGMA table_info(word_status)")}
     if "language" not in ws_cols:
         con.executescript("""
@@ -85,27 +97,29 @@ def connect(path: Path) -> sqlite3.Connection:
 
 def create_session(con, *, title, source_type, media_path, srt_source,
                    model_size, duration_secs, transcript_json,
-                   page_url="", stream_height=0) -> str:
+                   page_url="", stream_height=0, language="ca") -> str:
     sid = uuid.uuid4().hex[:12]
-    con.execute(
-        "INSERT INTO sessions (id, title, source_type, media_path, srt_source,"
-        " language, model_size, duration_secs, transcript_json, created_at,"
-        " updated_at, page_url, stream_height) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (sid, title, source_type, media_path, srt_source, "ca",
-         model_size, duration_secs, transcript_json, _now(), _now(),
-         page_url, stream_height))
-    con.commit()
+    with LOCK:
+        con.execute(
+            "INSERT INTO sessions (id, title, source_type, media_path, srt_source,"
+            " language, model_size, duration_secs, transcript_json, created_at,"
+            " updated_at, page_url, stream_height) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (sid, title, source_type, media_path, srt_source, language,
+             model_size, duration_secs, transcript_json, _now(), _now(),
+             page_url, stream_height))
+        con.commit()
     return sid
 
 
 def update_transcript(con, sid, transcript_json, model_size, srt_source,
                       tok_version=0):
-    con.execute(
-        "UPDATE sessions SET transcript_json=?, model_size=?, srt_source=?, "
-        "tok_version=?, updated_at=? WHERE id=?",
-        (transcript_json, model_size, srt_source, tok_version, _now(), sid))
-    con.commit()
+    with LOCK:
+        con.execute(
+            "UPDATE sessions SET transcript_json=?, model_size=?, srt_source=?, "
+            "tok_version=?, updated_at=? WHERE id=?",
+            (transcript_json, model_size, srt_source, tok_version, _now(), sid))
+        con.commit()
 
 
 def get_session(con, sid):
@@ -114,41 +128,52 @@ def get_session(con, sid):
 
 
 def set_stream_height(con, sid, height):
-    con.execute("UPDATE sessions SET stream_height=?, updated_at=? WHERE id=?",
-                (height, _now(), sid))
-    con.commit()
+    with LOCK:
+        con.execute("UPDATE sessions SET stream_height=?, updated_at=? WHERE id=?",
+                    (height, _now(), sid))
+        con.commit()
 
 
-def list_sessions(con):
-    rs = con.execute(
-        "SELECT id,title,source_type,srt_source,model_size,duration_secs,"
-        "created_at,updated_at,page_url FROM sessions ORDER BY created_at DESC"
-    ).fetchall()
+def list_sessions(con, lang: str | None = None):
+    q = ("SELECT id,title,source_type,srt_source,model_size,duration_secs,"
+         "created_at,updated_at,page_url,language FROM sessions")
+    args: tuple = ()
+    if lang:
+        q += " WHERE language=?"
+        args = (lang,)
+    rs = con.execute(q + " ORDER BY created_at DESC", args).fetchall()
     return [dict(r) for r in rs]
 
 
 def create_card(con, *, session_id, segment_index, paraula, lema, pos,
                 paraula_es, frase, frase_es, freq_rank, audio_file,
-                image_file, font) -> str:
+                image_file, font, language="ca") -> str:
     cid = uuid.uuid4().hex[:12]
-    con.execute(
-        "INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,'pending',?)",
-        (cid, session_id, segment_index, paraula, lema, pos, paraula_es,
-         frase, frase_es, freq_rank, audio_file, image_file, font, _now()))
-    con.commit()
+    with LOCK:
+        con.execute(
+            "INSERT INTO cards (id, session_id, segment_index, paraula, lema,"
+            " pos, paraula_es, frase, frase_es, freq_rank, audio_file,"
+            " image_file, font, anki_note_id, status, created_at, language) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,'pending',?,?)",
+            (cid, session_id, segment_index, paraula, lema, pos, paraula_es,
+             frase, frase_es, freq_rank, audio_file, image_file, font, _now(),
+             language))
+        con.commit()
     return cid
 
 
 def mark_card_sent(con, cid, anki_note_id):
-    con.execute("UPDATE cards SET status='sent', anki_note_id=? WHERE id=?",
-                (anki_note_id, cid))
-    con.commit()
+    with LOCK:
+        con.execute("UPDATE cards SET status='sent', anki_note_id=? WHERE id=?",
+                    (anki_note_id, cid))
+        con.commit()
 
 
 def mark_card_duplicate(con, cid):
     """Anki refused it as duplicate — drop from queue, don't retry forever."""
-    con.execute("UPDATE cards SET status='duplicate' WHERE id=?", (cid,))
-    con.commit()
+    with LOCK:
+        con.execute("UPDATE cards SET status='duplicate' WHERE id=?", (cid,))
+        con.commit()
 
 
 def pending_cards(con):
@@ -165,16 +190,17 @@ def set_word_status(con, lemma: str, status: str, lang: str = "ca"):
     lemma = lemma.strip().lower()
     if not lemma:
         return
-    if status == "unknown":
-        con.execute("DELETE FROM word_status WHERE lemma=? AND language=?",
-                    (lemma, lang))
-    else:
-        con.execute(
-            "INSERT INTO word_status VALUES (?,?,?,?) "
-            "ON CONFLICT(lemma, language) DO UPDATE SET "
-            "status=excluded.status, updated_at=excluded.updated_at",
-            (lemma, lang, status, _now()))
-    con.commit()
+    with LOCK:
+        if status == "unknown":
+            con.execute("DELETE FROM word_status WHERE lemma=? AND language=?",
+                        (lemma, lang))
+        else:
+            con.execute(
+                "INSERT INTO word_status VALUES (?,?,?,?) "
+                "ON CONFLICT(lemma, language) DO UPDATE SET "
+                "status=excluded.status, updated_at=excluded.updated_at",
+                (lemma, lang, status, _now()))
+        con.commit()
 
 
 def word_statuses(con, lang: str = "ca") -> dict[str, str]:
@@ -185,11 +211,12 @@ def word_statuses(con, lang: str = "ca") -> dict[str, str]:
 
 def mark_learning_if_new(con, lemma: str, lang: str = "ca"):
     """Card created -> lemma becomes 'learning' unless already known/ignored."""
-    cur = con.execute(
-        "SELECT status FROM word_status WHERE lemma=? AND language=?",
-        (lemma.strip().lower(), lang)).fetchone()
-    if cur is None or cur["status"] == "tracking":
-        set_word_status(con, lemma, "learning", lang)
+    with LOCK:
+        cur = con.execute(
+            "SELECT status FROM word_status WHERE lemma=? AND language=?",
+            (lemma.strip().lower(), lang)).fetchone()
+        if cur is None or cur["status"] == "tracking":
+            set_word_status(con, lemma, "learning", lang)
 
 
 def backup_daily(con, app_dir: Path, keep: int = 7):
@@ -207,8 +234,11 @@ def backup_daily(con, app_dir: Path, keep: int = 7):
         p.unlink()
 
 
-def cards_with_notes(con) -> list[dict]:
-    rs = con.execute(
-        "SELECT lema, anki_note_id FROM cards WHERE anki_note_id IS NOT NULL"
-    ).fetchall()
+def cards_with_notes(con, lang: str | None = None) -> list[dict]:
+    q = "SELECT lema, anki_note_id FROM cards WHERE anki_note_id IS NOT NULL"
+    args: tuple = ()
+    if lang:
+        q += " AND language=?"
+        args = (lang,)
+    rs = con.execute(q, args).fetchall()
     return [dict(r) for r in rs]

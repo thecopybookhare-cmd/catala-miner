@@ -51,8 +51,10 @@ def animated_clip(src, start, end, out, max_dur=6.0):
     _run(clip_cmd(src, start, end, out, max_dur))
 
 
-def _run(cmd: list[str]):
-    subprocess.run(cmd, check=True, capture_output=True)
+# Sin timeout, una URL de stream caducada deja a ffmpeg colgado minutos y
+# bloquea la biblioteca (miniaturas) o el minado enteros.
+def _run(cmd: list[str], timeout: float = 90):
+    subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
 
 
 def cut_audio(src, start, end, out, pad=0.25, trim=False):
@@ -60,17 +62,17 @@ def cut_audio(src, start, end, out, pad=0.25, trim=False):
 
 
 def snapshot(src, ts, out):
-    _run(frame_cmd(src, ts, out))
+    _run(frame_cmd(src, ts, out), timeout=45)
 
 
 def duration(src: str) -> float:
-    p = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", src],
-        capture_output=True, text=True)
     try:
+        p = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", src],
+            capture_output=True, text=True, timeout=30)
         return float(p.stdout.strip())
-    except ValueError:
+    except (ValueError, subprocess.TimeoutExpired):
         return 0.0
 
 
@@ -81,11 +83,12 @@ def ensure_browser_playable(src: Path, out_dir: Path) -> Path:
     out = out_dir / (src.stem + ".mp4")
     if out.exists():
         return out
+    # remux/transcode de archivos locales grandes: legítimamente lento
     try:
         _run([FFMPEG, "-y", "-i", str(src), "-c", "copy",
-              "-movflags", "+faststart", str(out)])
+              "-movflags", "+faststart", str(out)], timeout=1800)
     except subprocess.CalledProcessError:
         _run([FFMPEG, "-y", "-i", str(src), "-c:v", "libx264", "-preset",
               "veryfast", "-crf", "23", "-c:a", "aac",
-              "-movflags", "+faststart", str(out)])
+              "-movflags", "+faststart", str(out)], timeout=3600)
     return out

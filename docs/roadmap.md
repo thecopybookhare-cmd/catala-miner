@@ -74,3 +74,31 @@ Marcado a medida que se implementa.
 - **Legal**: descargar/streamear para uso personal es zona gris; la herramienta
   se comparte con aviso de "solo uso personal/educativo". Licencias de modelos
   (AINA Apache-2.0, Softcatalà MIT, Apertium GPL, Matcha MPL-2.0) compatibles.
+
+## 🔍 Revisión Fable (jul 2026) — aplicada en v0.9.11
+
+Los 18 hallazgos de la revisión de código profunda, corregidos:
+
+- **C1** Gate de invitados: con el modo compartir, la red solo estudia — importar
+  rutas del disco, settings, descargas, transcribir y parar el compartir dan 403
+  fuera de localhost. Verificado en vivo desde la LAN.
+- **C2** XSS por título de sesión / diccionario: `esc()` en todas las
+  interpolaciones de `innerHTML` (títulos, acepciones, glosas, ejemplos, calidades).
+- **I1/I2** Concurrencia SQLite: lock global de escritura en `db.py`,
+  relectura del transcript dentro del lock en `_segment_es`, `_flush` de un solo
+  vuelo (dos hilos ya no marcan duplicada una tarjeta recién enviada).
+- **I3** Auto-pausa sin rebote (al reanudar cruza a la frase siguiente) y la
+  barra de seek ya no devuelve al segmento anterior.
+- **I4** Service worker: `ignoreSearch` (los assets llevan `?v=`) — el arranque
+  offline ya no muere tras actualizar.
+- **I5** Timeouts de ffmpeg/ffprobe (una URL caducada colgaba la biblioteca).
+- **I6** Capa de datos multi-idioma de verdad: las sesiones y tarjetas graban su
+  idioma, la biblioteca filtra por el activo y el sync de Anki ya no cruza idiomas.
+- **I7** `segment_index` validado (un índice negativo minaba el último segmento).
+- **M1-M9** pollJob no se cuelga si el server reinició; el traductor reintenta
+  tras fallo transitorio (TTL 60 s); GC de MEDIA_DIR al arrancar; poda de cachés;
+  tipos validados en settings; nombre de subida saneado; anti DNS-rebinding
+  (Host 421); help-line dinámica según keymap; sync con Anki cada 10 min + focus;
+  badge de streaming ya no dice «En vivo».
+
+Pendiente menor: roles ARIA en los badges del header (a11y).
