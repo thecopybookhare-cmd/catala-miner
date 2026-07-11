@@ -690,8 +690,37 @@ function renderPopupLookup(r) {
   $("wp-word-es").textContent = r.word_es || "";
   $("wp-say").hidden = !(r.ipa || r.tts);            // voz Piper o espeak
   $("wp-dict").hidden = !(SETTINGS?.online_enabled);
+  // conjugación: solo verbos y solo con diccionario de formas (catalán)
+  $("wp-conj-btn").hidden = !(r.pos === "VERB" && (SETTINGS?.language ?? "ca") === "ca");
   renderExamples(r);
 }
+
+async function openConj(lemma) {
+  if (!lemma) return;
+  $("conj-title").textContent = "Conjugació — " + lemma;
+  $("conj-body").innerHTML = '<p class="dim">…</p>';
+  $("conj-view").hidden = false;
+  const t = await api("/api/conjugation?lemma=" + encodeURIComponent(lemma));
+  $("conj-body").innerHTML = renderConjTable(t);
+}
+
+function renderConjTable(t) {
+  if (!t || !t.moods || !t.moods.length)
+    return '<p class="dim">— sense conjugació disponible —</p>';
+  const nf = t.nonfinite || {};
+  const nfHtml = ["Infinitiu", "Gerundi", "Participi"].filter((k) => nf[k])
+    .map((k) => `${k}: <b>${nf[k]}</b>`).join(" · ");
+  const head = `<tr><th></th>${t.pronouns.map((p) => `<th>${p}</th>`).join("")}</tr>`;
+  const body = t.moods.map((m) =>
+    `<tr class="conj-mrow"><td colspan="7">${m.mood}</td></tr>` +
+    m.tenses.map((te) => `<tr><td class="conj-t">${te.tense}</td>${te.forms.map((f) => `<td>${f || "—"}</td>`).join("")}</tr>`).join("")
+  ).join("");
+  return (nfHtml ? `<p class="conj-nf">${nfHtml}</p>` : "") +
+    `<div class="conj-scroll"><table class="conj-tbl">${head}${body}</table></div>`;
+}
+$("wp-conj-btn").onclick = () => openConj(POP?.lemma);
+$("conj-close").onclick = () => { $("conj-view").hidden = true; };
+$("conj-view").onclick = (e) => { if (e.target === $("conj-view")) $("conj-view").hidden = true; };
 
 // frases del propio contenido donde aparece el mismo lema (carga perezosa)
 async function renderExamples(r) {
@@ -845,7 +874,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.key === "Escape") {
     closePopup(); $("card-panel").hidden = true;
-    $("stats-view").hidden = true; $("settings-view").hidden = true; $("help-view").hidden = true;
+    $("stats-view").hidden = true; $("settings-view").hidden = true; $("help-view").hidden = true; $("conj-view").hidden = true;
     if ($("video-col").classList.contains("fake-fs")) { $("video-col").classList.remove("fake-fs"); $("fs-btn").textContent = "⛶"; }
     return;
   }

@@ -570,3 +570,18 @@ button.small { font-size: 12px; padding: 6px 10px; }
   background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px;
   border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--fg); }
 @media (max-width: 640px) { #help-body .help-cols { grid-template-columns: 1fr; } }
+
+/* Tabla de conjugación (modal) */
+.wp-conj-btn { display: block; width: 100%; margin: 8px 0 2px; padding: 6px;
+  font-size: 13px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 8px; cursor: pointer; }
+.wp-conj-btn:hover { border-color: var(--vio); background: var(--vio-soft); }
+.conj-nf { font-size: 14px; margin: 0 0 10px; color: var(--dim); }
+.conj-nf b { color: var(--fg); }
+.conj-scroll { overflow-x: auto; }
+.conj-tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
+.conj-tbl th { color: var(--vio); font-weight: 600; text-align: center; padding: 4px 8px; font-size: 12px; }
+.conj-tbl td { padding: 4px 8px; text-align: center; white-space: nowrap; border-top: 1px solid var(--line); }
+.conj-tbl td.conj-t { text-align: left; color: var(--dim); font-size: 12px; }
+.conj-tbl tr.conj-mrow td { text-align: left; color: var(--vio); font-weight: 600;
+  padding-top: 12px; border-top: none; }
