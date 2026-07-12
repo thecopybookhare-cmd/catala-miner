@@ -62,6 +62,30 @@ def _progressive(info: dict) -> list[dict]:
     return uniq
 
 
+def _hls_stream(info: dict) -> tuple[str, int]:
+    """(url de un manifiesto HLS reproducible, altura) o ('', 0).
+
+    Muchos sitios legítimos (y enlaces directos) sirven HLS en vez de un mp4
+    progresivo. Preferimos el máster .m3u8 (deja que el reproductor/hls.js haga
+    bitrate adaptativo); si no, la mejor variante suelta."""
+    master = ""
+    best = ("", 0)
+    for f in info.get("formats", []):
+        proto = f.get("protocol") or ""
+        if "m3u8" not in proto:
+            continue
+        mu = f.get("manifest_url") or ""
+        if mu and not master:
+            master = mu
+        if f.get("url"):
+            h = f.get("height") or 0
+            if h >= best[1]:
+                best = (f["url"], h)
+    if master:
+        return master, best[1]
+    return best
+
+
 def _subs_url(info: dict) -> tuple[str, bool]:
     """(url del .vtt en catalán, es_automático) o ('', False)."""
     for key, auto in (("subtitles", False), ("automatic_captions", True)):
@@ -92,7 +116,13 @@ def resolve(url: str) -> dict:
         info = _extract(url)
     except Exception:
         return {}
-    formats = _progressive(info)
+    formats = _progressive(info)            # ideal: mp4 progresivo (mejor para ffmpeg)
+    is_hls = False
+    if not formats:                         # si no hay, caer a HLS (m3u8)
+        hls_url, hls_h = _hls_stream(info)
+        if hls_url:
+            formats = [{"height": hls_h, "label": "HLS", "url": hls_url}]
+            is_hls = True
     if not formats:
         return {}
     subs_url, subs_auto = _subs_url(info)
@@ -101,20 +131,22 @@ def resolve(url: str) -> dict:
          "formats": formats,
          "best_url": formats[-1]["url"],
          "best_height": formats[-1]["height"],
+         "is_hls": is_hls,
          "subs_url": subs_url, "subs_auto": subs_auto}
     _CACHE[url] = (time.time(), r)          # solo éxitos; los fallos reintentan
     return r
 
 
-def stream_url(url: str, height: int = 0) -> tuple[str, list[dict]]:
-    """URL fresca para la altura pedida (o la mejor) + lista de alturas."""
+def stream_url(url: str, height: int = 0) -> tuple[str, list[dict], bool]:
+    """URL fresca para la altura pedida (o la mejor) + alturas + si es HLS."""
     r = resolve(url)
     if not r:
-        return "", []
+        return "", [], False
     fmts = r["formats"]
     chosen = r["best_url"]
     if height:
         exact = [f for f in fmts if f["height"] == height]
         if exact:
             chosen = exact[0]["url"]
-    return chosen, [{"height": f["height"], "label": f["label"]} for f in fmts]
+    heights = [{"height": f["height"], "label": f["label"]} for f in fmts]
+    return chosen, heights, bool(r.get("is_hls"))

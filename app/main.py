@@ -458,6 +458,7 @@ def session_detail(sid: str):
     s["word_statuses"] = db.word_statuses(CON, _lang())
     if s["source_type"] == "url":
         s["media_url"] = s["media_path"]
+        s["is_hls"] = ".m3u8" in s["media_path"].lower()   # enlace HLS directo
     elif s["source_type"] == "stream":
         s["media_url"] = ""            # el frontend pide /stream-url (URL fresca)
     else:
@@ -625,8 +626,9 @@ def stream_session(req: UrlReq):
         r = stream.resolve(url)
         if not r:
             raise ValueError(
-                "No pude extraer un stream reproducible de ese enlace. "
-                "Si es HD/720p+, usa ⬇️ Importar (descarga).")
+                "No pude extraer un vídeo de esa página. yt-dlp no soporta ese "
+                "sitio (o el vídeo está protegido). Prueba con YouTube/3cat, o "
+                "pega el enlace directo al archivo (.mp4) o al manifiesto (.m3u8).")
         jobs.set_progress(jid, 0.7, "Cargando subtítulos…")
         transcript, srt_source = _stream_subs_transcript(r)
         sid = db.create_session(
@@ -646,14 +648,16 @@ def session_stream_url(sid: str, height: int = 0):
     if not s or s["source_type"] != "stream":
         return JSONResponse({"error": "no es una sesión de streaming"},
                             status_code=400)
-    url, heights = stream.stream_url(s["page_url"], height or s["stream_height"])
+    url, heights, is_hls = stream.stream_url(s["page_url"],
+                                             height or s["stream_height"])
     if not url:
         return JSONResponse(
             {"error": "el enlace ya no está disponible o cambió"},
             status_code=502)
     if height and height != s["stream_height"]:
         db.set_stream_height(CON, sid, height)
-    return {"url": url, "height": height or s["stream_height"], "heights": heights}
+    return {"url": url, "height": height or s["stream_height"],
+            "heights": heights, "is_hls": is_hls}
 
 
 def _find_sidecar_subs(path: Path) -> Path | None:
@@ -900,7 +904,7 @@ def _build_preview(s: dict, segment_index: int, selection: str,
     # los streams tienen URL caducable: re-resolver una fresca para ffmpeg
     src = s["media_path"]
     if s.get("source_type") == "stream" and s.get("page_url"):
-        fresh, _ = stream.stream_url(s["page_url"], s.get("stream_height") or 0)
+        fresh, _, _ = stream.stream_url(s["page_url"], s.get("stream_height") or 0)
         if fresh:
             src = fresh
 

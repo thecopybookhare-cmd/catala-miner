@@ -75,6 +75,21 @@ Marcado a medida que se implementa.
       acento-insensible (`cami`→`camí`), agrupado por video con tiempo y término
       resaltado; un clic abre la sesión y salta a esa línea. i18n es/ca/en.
 
+
+## ✅ Streaming HLS multiplataforma (v0.9.13)
+
+- [x] **Soporte HLS (.m3u8)** — antes la app rechazaba todo lo que no fuera un
+      mp4 progresivo (solo YouTube 360p / 3cat 576p). Ahora, si no hay
+      progresivo, cae al manifiesto HLS: reproducible en cualquier plataforma
+      (Safari/WKWebView nativo; Chrome/Firefox/Android con **hls.js** vendido en
+      `/vendor`, cargado solo si hace falta y bajo la CSP de la PWA). Enlaces
+      directos `.m3u8` funcionan pegándolos en «Ver online». El corte de audio
+      de las tarjetas (ffmpeg) también lee HLS.
+- [x] Mejor mensaje de error cuando yt-dlp no soporta un sitio.
+- Nota: sitios que cargan el stream con un reproductor propio ofuscado (muchos
+  agregadores) siguen sin funcionar — no hay stream que extraer y no se
+  construyen scrapers a medida para ellos.
+
 ## Notas
 
 - **Empaquetado**: el modelo local-completo (CTranslate2 + Whisper + ~3 GB) es

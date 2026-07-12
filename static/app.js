@@ -311,7 +311,7 @@ async function openSession(sid, opts = {}) {
     await loadStreamUrl(sid, 0);        // URL fresca (las de yt-dlp caducan)
   } else {
     $("quality-btn").hidden = true;
-    $("video").src = s.media_url;
+    await setVideoSrc(s.media_url, s.is_hls);   // enlace directo (mp4 o HLS)
   }
   // preferencias por defecto de la configuración
   setDual(SETTINGS?.dual_default ?? DUAL);
@@ -344,15 +344,46 @@ function renderSeekMarks() {
 // ---------- streaming (URL fresca + calidad + auto-bajada) ----------
 let STREAM_HEIGHTS = [], STREAM_H = 0, STALLS = [];
 
+// Reproducir HLS (.m3u8) en cualquier plataforma: Safari/WKWebView lo hace
+// nativo; Chrome/Firefox/Android necesitan hls.js (se carga solo si hace falta,
+// vendido en /vendor para funcionar offline y bajo la CSP de la PWA).
+let HLS = null, _hlsLib = null;
+function ensureHls() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (!_hlsLib) _hlsLib = new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "/vendor/hls.min.js";
+    sc.onload = () => res(window.Hls); sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+  return _hlsLib;
+}
+async function setVideoSrc(url, isHls) {
+  if (HLS) { HLS.destroy(); HLS = null; }
+  const wantHls = isHls || /\.m3u8(\?|$)/i.test(url || "");
+  if (wantHls && !V.canPlayType("application/vnd.apple.mpegurl")) {
+    const Hls = await ensureHls().catch(() => null);
+    if (Hls && Hls.isSupported()) {
+      HLS = new Hls({ enableWorker: true, backBufferLength: 30 });
+      HLS.on(Hls.Events.ERROR, (_e, d) => {
+        if (d.fatal) showProgress(1, "⚠️ error de reproducción HLS", true);
+      });
+      HLS.loadSource(url); HLS.attachMedia(V);
+      return;
+    }
+  }
+  V.src = url;                            // nativo (Safari/WKWebView) o fallback
+}
+
 async function loadStreamUrl(sid, height) {
   showProgress(0.5, "Cargando el video…");
   const r = await api(`/api/sessions/${sid}/stream-url?height=${height || 0}`);
   hideProgress();
   if (r.error) { showProgress(1, "⚠️ " + r.error, true); return; }
   const t = V.currentTime || 0, playing = !V.paused;
-  STREAM_HEIGHTS = r.heights || [];
+  STREAM_HEIGHTS = r.is_hls ? [] : (r.heights || []);   // HLS: ABR automático
   STREAM_H = r.height || 0;
-  $("video").src = r.url;
+  await setVideoSrc(r.url, r.is_hls);
   if (height) {   // cambio de calidad: preservar el punto
     V.addEventListener("loadedmetadata", () => {
       V.currentTime = t; if (playing) V.play();
@@ -363,7 +394,7 @@ async function loadStreamUrl(sid, height) {
 
 function renderQualityMenu() {
   const btn = $("quality-btn");
-  if (!STREAM_HEIGHTS.length) { btn.hidden = true; return; }
+  if (STREAM_HEIGHTS.length < 2) { btn.hidden = true; return; }
   btn.hidden = false;
   btn.textContent = STREAM_H ? STREAM_H + "p" : "Auto";
   $("quality-menu").innerHTML = STREAM_HEIGHTS
