@@ -389,6 +389,83 @@ def test_guest_gate_helpers():
     assert not main._host_allowed(mk("8.8.8.8"))
 
 
+# ---------- borrado de sesiones ----------
+
+def _mk_local_session(media_path="/x.mp4"):
+    return main.db.create_session(
+        main.CON, title="V", source_type="local", media_path=media_path,
+        srt_source="none", model_size="-", duration_secs=1,
+        transcript_json="[]")
+
+
+def test_delete_session_removes_session_and_cards(tmp_path):
+    c = client(tmp_path)
+    sid = _mk_local_session()
+    main.db.create_card(
+        main.CON, session_id=sid, segment_index=0, paraula="gos", lema="gos",
+        pos="NOUN", paraula_es="perro", frase="El gos", frase_es="El perro",
+        freq_rank="common", audio_file="a.mp3", image_file="i.jpg",
+        font="V @ 0:01")
+    assert c.delete("/api/sessions/" + sid).json()["ok"]
+    assert main.db.get_session(main.CON, sid) is None
+    assert main.CON.execute("SELECT COUNT(*) FROM cards WHERE session_id=?",
+                            (sid,)).fetchone()[0] == 0
+    # segunda vez: ya no existe
+    assert c.delete("/api/sessions/" + sid).status_code == 404
+
+
+def test_delete_session_guest_forbidden(tmp_path):
+    main.CON = main.db.connect(tmp_path / "t.db")
+    sid = _mk_local_session()
+    guest = TestClient(main.app, client=("192.168.1.77", 5000))
+    assert guest.delete("/api/sessions/" + sid).status_code == 403
+    assert main.db.get_session(main.CON, sid) is not None   # no se borró
+
+
+def test_delete_session_cleans_media(tmp_path, monkeypatch):
+    c = client(tmp_path)
+    dl, md = tmp_path / "dl", tmp_path / "media"
+    dl.mkdir()
+    md.mkdir()
+    monkeypatch.setattr(main.config, "DL_DIR", dl)
+    monkeypatch.setattr(main.config, "MEDIA_DIR", md)
+    vid = dl / "clip.mp4"
+    vid.write_bytes(b"x")
+    sid = _mk_local_session(str(vid))
+    thumb = md / f"thumb-{sid}.jpg"
+    thumb.write_bytes(b"x")
+    failed = md / f"thumb-{sid}.failed"
+    failed.write_bytes(b"")
+    assert c.delete("/api/sessions/" + sid).json()["ok"]
+    assert not vid.exists()          # descargado en DL_DIR -> se borra
+    assert not thumb.exists()
+    assert not failed.exists()
+
+
+def test_delete_session_keeps_external_media(tmp_path, monkeypatch):
+    c = client(tmp_path)
+    dl = tmp_path / "dl"
+    dl.mkdir()
+    monkeypatch.setattr(main.config, "DL_DIR", dl)
+    ext = tmp_path / "outside.mp4"
+    ext.write_bytes(b"x")
+    sid = _mk_local_session(str(ext))
+    assert c.delete("/api/sessions/" + sid).json()["ok"]
+    assert ext.exists()              # fuera de DL_DIR: no se toca
+
+
+def test_delete_session_keeps_url_media(tmp_path, monkeypatch):
+    c = client(tmp_path)
+    dl = tmp_path / "dl"
+    dl.mkdir()
+    monkeypatch.setattr(main.config, "DL_DIR", dl)
+    sid = main.db.create_session(
+        main.CON, title="U", source_type="url",
+        media_path="https://cdn.example.com/v.mp4", srt_source="none",
+        model_size="-", duration_secs=1, transcript_json="[]")
+    assert c.delete("/api/sessions/" + sid).json()["ok"]   # URL: nada que borrar
+
+
 def test_mine_rejects_bad_segment_index(tmp_path):
     c = client(tmp_path)
     sid = main.db.create_session(

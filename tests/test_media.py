@@ -64,3 +64,11 @@ def test_real_cut(tmp_path):
     out = tmp_path / "cut.mp3"
     media.cut_audio(str(src), 1.0, 2.0, str(out))
     assert out.exists() and out.stat().st_size > 1000
+
+
+def test_exe_prefers_path(monkeypatch):
+    media._EXES.clear()
+    monkeypatch.setattr(media.shutil, "which",
+                        lambda n: "/usr/bin/" + n if n == "ffmpeg" else None)
+    assert media._exe("ffmpeg") == "/usr/bin/ffmpeg"
+    media._EXES.clear()

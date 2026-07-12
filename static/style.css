@@ -532,6 +532,18 @@ button.small { font-size: 12px; padding: 6px 10px; }
 .src-badge.src-tv { background: #2a6df0aa; }
 .src-badge.src-st { background: #8b5cf6aa; }
 .src-badge.src-loc { background: #000000a0; color: #c8cbe0; }
+/* Botón de borrar: aparece al pasar el ratón por la tarjeta (siempre visible
+   en pantallas táctiles, que no tienen hover). */
+.scard-del {
+  position: absolute; right: 8px; top: 8px; z-index: 2;
+  width: 28px; height: 28px; border: none; border-radius: 8px; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 0;
+  background: #000000a6; color: #fff; backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity .15s ease, background .15s ease;
+}
+.scard:hover .scard-del { opacity: 1; }
+.scard-del:hover { background: #e0455fcc; }
+@media (hover: none) { .scard-del { opacity: .85; } }
 
 /* ---------- marcadores de subtítulo en la barra de progreso ---------- */
 #seek-row { flex: 1 1 100%; order: 9; display: flex; align-items: center; gap: 10px; padding: 2px 4px 4px; }

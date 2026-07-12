@@ -7,7 +7,11 @@ on:
 
 jobs:
   lint-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +23,11 @@ jobs:
 
       - name: Create venv and install deps
         run: |
-          uv venv --python 3.12 .venv
-          uv pip install -p .venv/bin/python -e . --group dev
+          uv venv --python 3.12
+          uv pip install -e . --group dev
 
       - name: Lint (ruff)
-        run: .venv/bin/ruff check app/ tests/
+        run: uv run ruff check app/ tests/
 
       - name: Tests (pytest)
-        run: .venv/bin/python -m pytest tests/ -q
+        run: uv run pytest tests/ -q

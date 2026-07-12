@@ -131,6 +131,17 @@ def get_session(con, sid):
     return dict(r) if r else None
 
 
+def delete_session(con, sid):
+    """Borra la sesión y sus tarjetas. No toca word_status: el progreso de
+    vocabulario es global, no por sesión (borrar un vídeo no debe olvidar
+    palabras). La FK de cards no tiene ON DELETE CASCADE (SQLite no fuerza
+    FKs por defecto), así que borramos las tarjetas explícitamente."""
+    with LOCK:
+        con.execute("DELETE FROM cards WHERE session_id=?", (sid,))
+        con.execute("DELETE FROM sessions WHERE id=?", (sid,))
+        con.commit()
+
+
 def set_stream_height(con, sid, height):
     with LOCK:
         con.execute("UPDATE sessions SET stream_height=?, updated_at=? WHERE id=?",

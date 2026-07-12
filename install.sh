@@ -1,29 +1,49 @@
 #!/bin/bash
+# CatalàMiner — instalación en macOS y Linux. No requiere Homebrew ni ffmpeg
+# a mano: uv se instala solo y ffmpeg lo aporta static-ffmpeg si falta.
 set -euo pipefail
 cd "$(dirname "$0")"
 echo "== CatalàMiner install =="
-command -v brew >/dev/null || { echo "Necessites Homebrew: https://brew.sh"; exit 1; }
-brew list uv >/dev/null 2>&1 || brew install uv
-command -v ffmpeg >/dev/null 2>&1 || brew install ffmpeg
-# espeak-ng habilita la pronunciación IPA del popup (opcional)
-brew list espeak-ng >/dev/null 2>&1 || brew install espeak-ng || true
+
+# 1) uv (gestor de Python; se instala solo si falta, sin sudo)
+if ! command -v uv >/dev/null 2>&1; then
+  echo "-- Instalando uv --"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+fi
+command -v uv >/dev/null 2>&1 || { echo "No pude instalar uv. Ver https://docs.astral.sh/uv/"; exit 1; }
+
+# 2) espeak-ng (opcional: la voz principal es Piper; esto solo añade IPA)
+if ! command -v espeak-ng >/dev/null 2>&1; then
+  if command -v brew >/dev/null 2>&1; then brew install espeak-ng || true
+  elif command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y espeak-ng || true; fi
+fi
+
+# 3) entorno y dependencias
 [ -d .venv ] || uv venv --python 3.12 .venv
-uv pip install -p .venv/bin/python -e . --group dev
-echo "-- spaCy català --"
-.venv/bin/python -m spacy download ca_core_news_sm || echo "AVÍS: spaCy ca no instal·lat (fallback regex)"
-echo "-- Traductor Softcatalà + diccionari (descàrrega única) --"
+uv pip install -p .venv/bin/python -e .
+
+# 4) modelos ligeros de primer uso (spaCy + traductor + diccionarios)
+echo "-- Modelo spaCy (catalán) --"
+.venv/bin/python -m spacy download ca_core_news_sm || echo "AVISO: spaCy ca no instalado (fallback regex)"
+echo "-- Traductor Softcatalà + diccionarios (descarga única) --"
 .venv/bin/python - <<'PY'
 from app import translate, dictionary, forms
 if not translate.is_downloaded():
     translate.download()
 print("traductor:", "ok" if translate.is_downloaded() else "ERROR")
-d = dictionary.load()
-print("diccionari:", "ok" if d.lookup("gos") else "ERROR")
-print("formes:", "ok" if forms.lookup("ets") else "ERROR")  # baixa diccionari-lt
+print("diccionario:", "ok" if dictionary.load().lookup("gos") else "ERROR")
+print("formas:", "ok" if forms.lookup("ets") else "ERROR")
 PY
-echo "-- App d'escriptori --"
-./make-app.sh || echo "AVÍS: no s'ha pogut crear CatalàMiner.app"
-echo
-echo "Fet! Arrenca amb ./run.sh (navegador) o obre CatalàMiner.app (finestra nativa)."
-echo "Recorda: instal·la Anki (https://apps.ankiweb.net) + add-on AnkiConnect (codi 2055492159)."
-echo "El model Whisper català (≈3 GB) es descarrega automàticament al primer ús."
+
+# 5) lanzador
+if [ "$(uname)" = "Darwin" ]; then
+  ./make-app.sh || echo "AVISO: no se pudo crear CatalàMiner.app"
+  echo
+  echo "¡Listo! Abre CatalàMiner.app (Launchpad/Spotlight) o ejecuta ./run.sh"
+else
+  echo
+  echo "¡Listo! Arranca con:  ./run.sh    (abre la app en tu navegador)"
+fi
+echo "Opcional: instala Anki (https://apps.ankiweb.net) + add-on AnkiConnect (2055492159)."
+echo "El modelo Whisper catalán (≈3 GB) se descarga solo al transcribir por primera vez."

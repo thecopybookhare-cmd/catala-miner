@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 PORT = 8977
@@ -6,7 +7,24 @@ PORT = 8977
 # service can squat it — we probe candidates and remember the winner.
 ANKI_PORTS = (8765, 8766, 8767)
 
-APP_DIR = Path.home() / "Library" / "Application Support" / "CatalaMiner"
+
+def default_app_dir(platform: str | None = None) -> Path:
+    """Directorio de datos según el SO (multiplataforma). El de macOS se
+    mantiene idéntico al histórico para no perder datos de instalaciones
+    previas. CATALAMINER_DIR lo sobreescribe (tests / instalaciones portables)."""
+    plat = platform or sys.platform
+    if plat == "darwin":
+        return Path.home() / "Library" / "Application Support" / "CatalaMiner"
+    if plat.startswith("win"):
+        base = Path(os.environ.get("APPDATA")
+                    or Path.home() / "AppData" / "Roaming")
+        return base / "CatalaMiner"
+    base = Path(os.environ.get("XDG_DATA_HOME")
+                or Path.home() / ".local" / "share")
+    return base / "CatalaMiner"
+
+
+APP_DIR = Path(os.environ.get("CATALAMINER_DIR") or default_app_dir())
 MEDIA_DIR = APP_DIR / "media"
 DL_DIR = APP_DIR / "downloads"
 MODELS_DIR = APP_DIR / "models"
