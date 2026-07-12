@@ -1,7 +1,10 @@
-"""CatalàMiner como app de escritorio: uvicorn en un hilo + WKWebView."""
+"""CatalàMiner como app de escritorio: uvicorn en un hilo + ventana webview.
+Multiplataforma: WKWebView en macOS, WebView2 en Windows, GTK/QT en Linux;
+si no hay motor webview disponible, cae al navegador por defecto."""
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -9,12 +12,13 @@ from . import config
 
 LOG_PATH = config.APP_DIR / "desktop.log"
 
-# Lanzada por LaunchServices (doble clic), la app NO hereda el PATH de la
-# terminal: ffmpeg/ffprobe/espeak-ng de Homebrew quedan invisibles y todo
+# macOS: lanzada por LaunchServices (doble clic), la app NO hereda el PATH de
+# la terminal: ffmpeg/ffprobe/espeak-ng de Homebrew quedan invisibles y todo
 # subprocess.run(["ffprobe", ...]) revienta con FileNotFoundError.
-for _hb in ("/opt/homebrew/bin", "/usr/local/bin"):
-    if _hb not in os.environ.get("PATH", "").split(os.pathsep):
-        os.environ["PATH"] = _hb + os.pathsep + os.environ.get("PATH", "")
+if sys.platform == "darwin":
+    for _hb in ("/opt/homebrew/bin", "/usr/local/bin"):
+        if _hb not in os.environ.get("PATH", "").split(os.pathsep):
+            os.environ["PATH"] = _hb + os.pathsep + os.environ.get("PATH", "")
 
 
 def _setup_logging():
@@ -52,16 +56,35 @@ def main():
     _setup_logging()
     log = logging.getLogger("desktop")
     log.info("arrancando CatalàMiner desktop, log en %s", LOG_PATH)
+    url = f"http://127.0.0.1:{config.PORT}"
     try:
         import webview
-        threading.Thread(target=_serve, daemon=True).start()
-        _wait_port(config.PORT)
-        webview.create_window("CatalàMiner", f"http://127.0.0.1:{config.PORT}",
-                              width=1280, height=860, min_size=(980, 640))
-        webview.start()
     except Exception:
-        log.exception("fallo no capturado en main()")
-        raise
+        webview = None
+    serving = False                       # ¿el hilo del server ya está en marcha?
+    if webview is not None:
+        try:
+            threading.Thread(target=_serve, daemon=True).start()
+            serving = _wait_port(config.PORT)
+            webview.create_window("CatalàMiner", url,
+                                  width=1280, height=860, min_size=(980, 640))
+            webview.start()
+            log.info("cerrado normalmente")
+            return
+        except Exception:
+            # sin motor webview utilizable (Linux sin GTK/QT, Windows sin
+            # WebView2…): seguimos sirviendo y abrimos el navegador
+            log.exception("webview no disponible; caigo al navegador")
+    import webbrowser
+    log.info("modo navegador: %s", url)
+    threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+    try:
+        if serving:
+            threading.Event().wait()      # el server ya corre en su hilo
+        else:
+            _serve()                      # bloquea (Ctrl+C para salir)
+    except KeyboardInterrupt:
+        pass
     log.info("cerrado normalmente")
 
 

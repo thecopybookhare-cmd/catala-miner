@@ -142,9 +142,14 @@ def _host_allowed(request) -> bool:
 async def guest_gate(request, call_next):
     if not _host_allowed(request):
         return JSONResponse({"error": "host no permitido"}, status_code=421)
-    if request.method == "POST" and not _is_local_client(request):
+    if not _is_local_client(request):
         p = request.url.path
-        if p in _ADMIN_POSTS or p.endswith("/transcribe"):
+        # borrar sesiones es una acción de administración: el único DELETE de
+        # la API. Los invitados de la red solo estudian, no tocan la biblioteca.
+        gated = ((request.method == "POST"
+                  and (p in _ADMIN_POSTS or p.endswith("/transcribe")))
+                 or request.method == "DELETE")
+        if gated:
             return JSONResponse(
                 {"error": "solo disponible desde el equipo anfitrión"},
                 status_code=403)
@@ -300,7 +305,7 @@ def _setup_checks() -> dict:
     prof = languages.profile()
     dl = config.MODELS_DIR
     return {
-        "ffmpeg": bool(shutil.which("ffmpeg")),
+        "ffmpeg": media.ffmpeg_available(),   # PATH o binario estático descargable
         "espeak": bool(shutil.which("espeak-ng") or shutil.which("espeak")),
         "spacy": importlib.util.find_spec(prof["spacy"]) is not None,
         "translator": translate.is_downloaded(),
@@ -464,6 +469,34 @@ def session_detail(sid: str):
     else:
         s["media_url"] = "/media-file/" + sid
     return s
+
+
+@app.delete("/api/sessions/{sid}")
+def delete_session(sid: str):
+    """Borra una sesión de la biblioteca: fila + tarjetas + media asociada
+    (miniatura y, en local/youtube, el archivo descargado). Acción de
+    administración (ver guest_gate): los invitados no pueden borrar."""
+    s = db.get_session(CON, sid)
+    if not s:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    db.delete_session(CON, sid)
+    # miniatura + su marca de "no reintentar"
+    for name in (f"thumb-{sid}.jpg", f"thumb-{sid}.failed"):
+        try:
+            (config.MEDIA_DIR / name).unlink(missing_ok=True)
+        except OSError:
+            pass
+    # el archivo descargado solo se borra si vive dentro de DL_DIR: nunca
+    # tocamos rutas externas (url/stream son URLs; un local podría, en teoría,
+    # apuntar fuera). Comparamos rutas resueltas para evitar sorpresas.
+    if s["source_type"] in ("local", "youtube"):
+        try:
+            mp = Path(s["media_path"]).resolve()
+            if config.DL_DIR.resolve() in mp.parents and mp.is_file():
+                mp.unlink()
+        except OSError:
+            pass
+    return {"ok": True}
 
 
 @app.get("/media-file/{sid}")

@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.3-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.15-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -26,12 +26,26 @@ que compártela solo con gente de confianza en tu red privada.
 
 ## Instalación
 
+Cada persona instala **su propia copia** — no hace falta que nadie la hospede. No
+necesitas instalar Python ni ffmpeg a mano: el script instala `uv` (que aporta
+Python) y `ffmpeg` lo trae `static-ffmpeg` solo si falta.
+
+**macOS / Linux**
 ```bash
-./install.sh
+./install.sh        # instala todo y, en Mac, crea CatalàMiner.app
+./run.sh            # o abre CatalàMiner.app (Mac)
 ```
 
-Requiere [Homebrew](https://brew.sh). El script instala `uv`, `ffmpeg`, crea el venv
-(Python 3.12), descarga el traductor de Softcatalà, el diccionario y el modelo de spaCy.
+**Windows** (PowerShell, en la carpeta del proyecto)
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+.\run.bat
+```
+
+El instalador crea el venv (Python 3.12), descarga el traductor de Softcatalà, el
+diccionario y el modelo de spaCy. El modelo Whisper catalán (~3 GB) se baja solo la
+primera vez que transcribes. Datos de la app en la carpeta estándar de tu SO
+(`Application Support` en Mac, `AppData\Roaming` en Windows, `~/.local/share` en Linux).
 
 **Para las tarjetas necesitas Anki:**
 1. Instala [Anki](https://apps.ankiweb.net)
@@ -46,11 +60,14 @@ Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
 ./run.sh          # modo navegador: abre http://localhost:8977
 ```
 
-**App de escritorio (macOS):** `./make-app.sh` crea `~/Applications/CatalàMiner.app`
-— doble clic la abre en una ventana nativa (WKWebView) con icono en el Dock, sin
-navegador ni terminal. `./install.sh` ya la genera al final. El modo `./run.sh` sigue
-disponible como alternativa. `espeak-ng` (se instala con `install.sh`) habilita la
-pronunciación IPA en el popup.
+**Ventana de escritorio:** en macOS, `./make-app.sh` crea `~/Applications/CatalàMiner.app`
+(ventana nativa WKWebView, icono en el Dock). En Windows/Linux, `python -m app.desktop`
+abre una ventana propia si hay motor webview (WebView2 / GTK); si no, cae al navegador
+automáticamente. El modo `./run.sh` / `.\run.bat` siempre funciona.
+
+**Compartir sin que cada uno instale:** si prefieres que un amigo la use sin instalar
+nada, activa ⚙️ → *Compartir* y comparte el enlace (misma red o Tailscale) — pero para
+que **cada uno tenga su copia independiente**, que instale con los pasos de arriba.
 
 1. Abre un archivo local (mp4/mkv/mp3…), o pega una URL de **YouTube / 3cat / enlace
    directo** y pulsa **«🔗 Ver online»**: se reproduce en streaming al instante (yt-dlp
@@ -116,7 +133,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 83 tests
+.venv/bin/python -m pytest tests/    # 113 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.

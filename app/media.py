@@ -1,9 +1,42 @@
 """ffmpeg helpers: card audio cut, video frame, browser-safe remux."""
+import shutil
 import subprocess
 from pathlib import Path
 
 FFMPEG = "ffmpeg"
 BROWSER_OK = {".mp4", ".m4v", ".mov", ".webm", ".mp3", ".m4a", ".wav", ".aac", ".ogg"}
+
+# Resolución multiplataforma de ffmpeg/ffprobe: primero el PATH (brew/apt/
+# winget); si no está, static-ffmpeg descarga binarios estáticos una única vez
+# (clave en Windows, donde instalar ffmpeg a mano era la mayor fricción).
+_EXES: dict[str, str] = {}
+
+
+def _exe(name: str) -> str:
+    if name in _EXES:
+        return _EXES[name]
+    path = shutil.which(name)
+    if not path:
+        try:
+            from static_ffmpeg import run as _sf
+            ff, fp = _sf.get_or_fetch_platform_executables_else_raise()
+            path = ff if name == "ffmpeg" else fp
+        except Exception:
+            path = name                   # que el error hable de "ffmpeg"
+    _EXES[name] = path
+    return path
+
+
+def ffmpeg_available() -> bool:
+    """Hay ffmpeg utilizable (del sistema o binario estático descargable)."""
+    if shutil.which("ffmpeg"):
+        return True
+    try:
+        from static_ffmpeg import run as _sf
+        _sf.get_or_fetch_platform_executables_else_raise()
+        return True
+    except Exception:
+        return False
 
 
 # Recorta silencio de cabeza y cola dejando ~0.1 s de aire (VAD por umbral de
@@ -21,14 +54,14 @@ def audio_cmd(src: str, start: float, end: float, out: str,
               pad: float = 0.25, trim: bool = False) -> list[str]:
     s = max(0.0, start - pad)
     dur = round(end + pad - s, 3)
-    cmd = [FFMPEG, "-y", "-ss", str(round(s, 3)), "-i", src, "-t", str(dur)]
+    cmd = [_exe("ffmpeg"), "-y", "-ss", str(round(s, 3)), "-i", src, "-t", str(dur)]
     if trim:
         cmd += ["-af", _SILENCEREMOVE]
     return cmd + ["-vn", "-c:a", "libmp3lame", "-q:a", "4", out]
 
 
 def frame_cmd(src: str, ts: float, out: str) -> list[str]:
-    return [FFMPEG, "-y", "-ss", str(round(ts, 3)), "-i", src,
+    return [_exe("ffmpeg"), "-y", "-ss", str(round(ts, 3)), "-i", src,
             "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "3", out]
 
 
@@ -42,7 +75,7 @@ def clip_cmd(src: str, start: float, end: float, out: str,
     vf = ("fps=8,scale=420:-2:flags=lanczos,split[s0][s1];"
           "[s0]palettegen=max_colors=128[p];"
           "[s1][p]paletteuse=dither=bayer:bayer_scale=4")
-    return [FFMPEG, "-y", "-ss", str(round(start, 3)), "-i", src,
+    return [_exe("ffmpeg"), "-y", "-ss", str(round(start, 3)), "-i", src,
             "-t", str(dur), "-an", "-filter_complex", vf,
             "-loop", "0", out]
 
@@ -68,7 +101,7 @@ def snapshot(src, ts, out):
 def duration(src: str) -> float:
     try:
         p = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+            [_exe("ffprobe"), "-v", "error", "-show_entries", "format=duration",
              "-of", "default=noprint_wrappers=1:nokey=1", src],
             capture_output=True, text=True, timeout=30)
         return float(p.stdout.strip())
@@ -85,10 +118,10 @@ def ensure_browser_playable(src: Path, out_dir: Path) -> Path:
         return out
     # remux/transcode de archivos locales grandes: legítimamente lento
     try:
-        _run([FFMPEG, "-y", "-i", str(src), "-c", "copy",
+        _run([_exe("ffmpeg"), "-y", "-i", str(src), "-c", "copy",
               "-movflags", "+faststart", str(out)], timeout=1800)
     except subprocess.CalledProcessError:
-        _run([FFMPEG, "-y", "-i", str(src), "-c:v", "libx264", "-preset",
+        _run([_exe("ffmpeg"), "-y", "-i", str(src), "-c:v", "libx264", "-preset",
               "veryfast", "-crf", "23", "-c:a", "aac",
               "-movflags", "+faststart", str(out)], timeout=3600)
     return out

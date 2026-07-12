@@ -104,6 +104,7 @@ async function loadSessions() {
       <div class="thumb" style="${s.thumb ? `background-image:url('${s.thumb}')` : ""}">
         ${s.thumb ? "" : "🎬"}
         <span class="src-badge src-${sourceBadge(s).c}">${sourceBadge(s).t}</span>
+        <button class="scard-del" title="${esc(t("lib.delete"))}" aria-label="${esc(t("lib.delete"))}">🗑</button>
         ${s.duration_secs ? `<span class="dur">${fmtTime(s.duration_secs)}</span>` : ""}
         ${s.resume_pos && s.duration_secs ? `<span class="resume-bar" style="width:${Math.min(100, s.resume_pos / s.duration_secs * 100).toFixed(1)}%"></span>` : ""}
       </div>
@@ -116,11 +117,24 @@ async function loadSessions() {
         </div>
       </div>
     </article>`).join("");
-  for (const card of $("session-list").children)
+  for (const card of $("session-list").children) {
     card.onclick = () => openSession(card.dataset.id);
+    const del = card.querySelector(".scard-del");
+    del.onclick = (e) => {
+      e.stopPropagation();                 // no abrir la sesión al borrar
+      deleteSession(card.dataset.id, card.querySelector(".scard-title").textContent);
+    };
+  }
   $("library-empty").hidden = list.length > 0;
   $("lib-search-sec").hidden = list.length === 0;
   refreshOnboarding();
+}
+
+async function deleteSession(sid, title) {
+  if (!confirm(t("lib.delete_confirm", title))) return;
+  const r = await api("/api/sessions/" + sid, { method: "DELETE" }).catch(() => null);
+  if (r && r.ok) { toast(t("lib.deleted")); loadSessions(); }
+  else toast(t("lib.delete_err"), "err");
 }
 
 // ---------- búsqueda en subtítulos ----------
