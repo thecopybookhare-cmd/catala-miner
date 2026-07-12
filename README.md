@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.15-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.16-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -27,8 +27,23 @@ que compártela solo con gente de confianza en tu red privada.
 ## Instalación
 
 Cada persona instala **su propia copia** — no hace falta que nadie la hospede. No
-necesitas instalar Python ni ffmpeg a mano: el script instala `uv` (que aporta
-Python) y `ffmpeg` lo trae `static-ffmpeg` solo si falta.
+necesitas instalar Python ni ffmpeg a mano: el instalador trae `uv` (que aporta
+Python) y `ffmpeg` lo aporta `static-ffmpeg` solo si falta.
+
+### Un solo comando (clona + instala)
+
+**macOS / Linux** (en una terminal):
+```bash
+curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.sh | bash
+```
+**Windows** (en PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.ps1 | iex
+```
+Clona el repo en `~/CatalaMiner` y lo instala todo. *(Requiere que el repo sea
+**público**; mientras sea privado, usa los pasos manuales de abajo.)*
+
+### Manual (si ya tienes la carpeta del proyecto)
 
 **macOS / Linux**
 ```bash
