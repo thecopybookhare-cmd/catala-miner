@@ -33,6 +33,38 @@ def test_is_direct():
     assert not stream.is_direct("https://youtube.com/watch?v=abc")
 
 
+def test_hls_prefers_master_manifest():
+    info = {"formats": [
+        {"protocol": "m3u8_native", "height": 720, "url": "https://c/720.m3u8",
+         "manifest_url": "https://c/master.m3u8"},
+        {"protocol": "m3u8_native", "height": 480, "url": "https://c/480.m3u8",
+         "manifest_url": "https://c/master.m3u8"},
+    ]}
+    url, h = stream._hls_stream(info)
+    assert url == "https://c/master.m3u8" and h == 720
+
+
+def test_hls_falls_back_to_best_variant():
+    info = {"formats": [
+        {"protocol": "m3u8_native", "height": 360, "url": "https://c/360.m3u8"},
+        {"protocol": "m3u8_native", "height": 720, "url": "https://c/720.m3u8"},
+    ]}
+    url, h = stream._hls_stream(info)
+    assert url == "https://c/720.m3u8" and h == 720
+
+
+def test_resolve_uses_hls_when_no_progressive(monkeypatch):
+    stream._CACHE.clear()
+    info = {"title": "Peli", "duration": 90, "formats": [
+        {"protocol": "m3u8_native", "height": 1080, "url": "https://c/v.m3u8",
+         "manifest_url": "https://c/master.m3u8"}]}
+    monkeypatch.setattr(stream, "_extract", lambda u: info)
+    r = stream.resolve("https://site/peli")
+    assert r["is_hls"] is True
+    assert r["best_url"] == "https://c/master.m3u8"
+    stream._CACHE.clear()
+
+
 _FAKE_INFO = {"title": "T", "duration": 10, "formats": [
     {"height": 360, "vcodec": "avc1", "acodec": "mp4a",
      "protocol": "https", "format_note": "360p", "url": "u360"}]}
@@ -103,10 +135,11 @@ def test_stream_session_creates_and_reresolves(mock_resolve, tmp_path):
     # URL fresca + cambio de altura
     with patch("app.main.stream.stream_url",
                return_value=("fresh576", [{"height": 360, "label": "360p"},
-                                          {"height": 576, "label": "576p"}])):
+                                          {"height": 576, "label": "576p"}], False)):
         u = c.get(f"/api/sessions/{sid}/stream-url").json()
         assert u["url"] == "fresh576"
         assert {h["height"] for h in u["heights"]} == {360, 576}
+        assert u["is_hls"] is False
 
 
 @patch("app.main.stream.resolve", return_value={})
