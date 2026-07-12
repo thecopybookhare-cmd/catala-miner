@@ -24,6 +24,18 @@ def _clean(html: str) -> str:
     return _WS.sub(" ", _TAG.sub(" ", html or "")).strip()
 
 
+def _close(p: Path):
+    """Cierra y descarta la conexión cacheada. Imprescindible antes de borrar
+    el archivo: en Windows no se puede unlink() un sqlite con la conexión
+    abierta (WinError 32); en Unix daría igual, pero así es portable."""
+    con = _CONS.pop(str(p), None)
+    if con is not None:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-") or "dic"
 
@@ -39,7 +51,7 @@ def import_file(path: str) -> dict:
     name = g.getInfo("name") or g.getInfo("title") or Path(path).stem
     slug = _slug(name)
     dbp = _dir() / f"{slug}.sqlite"
-    _CONS.pop(str(dbp), None)
+    _close(dbp)
     if dbp.exists():
         dbp.unlink()
     con = sqlite3.connect(str(dbp))
@@ -80,7 +92,7 @@ def list_dicts() -> list[dict]:
 
 def remove(slug: str) -> bool:
     p = _dir() / f"{_slug(slug)}.sqlite"
-    _CONS.pop(str(p), None)
+    _close(p)                             # cerrar antes de borrar (Windows)
     if p.exists():
         p.unlink()
         return True
