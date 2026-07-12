@@ -149,4 +149,4 @@ def test_stream_session_error_when_unresolvable(_m, tmp_path):
                json={"url": "https://site.com/pagina"}).json()
     j = _wait(r["job_id"])
     assert j["status"] == "error"
-    assert "Importar" in j["message"]
+    assert "no soporta" in j["message"]
