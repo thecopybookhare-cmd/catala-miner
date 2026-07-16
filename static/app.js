@@ -928,12 +928,22 @@ function positionPopup(anchorEl) {
   // borde INFERIOR (crece hacia arriba al llegar el contenido async); si no,
   // va debajo anclado por arriba. Así el popup jamás se expande sobre la palabra.
   const roomAbove = rect.top, roomBelow = window.innerHeight - rect.bottom;
-  if (roomAbove >= roomBelow) {
+  const above = roomAbove >= roomBelow;
+  if (above) {
     pop.style.top = "auto";
     pop.style.bottom = Math.max(8, window.innerHeight - rect.top + gap) + "px";
   } else {
     pop.style.bottom = "auto";
     pop.style.top = Math.max(8, rect.bottom + gap) + "px";
+  }
+  // flecha estilo Migaku apuntando a la palabra: horizontal en el centro de la
+  // palabra (recortada al ancho del popup), arriba o abajo según el lado.
+  const arrow = $("wp-arrow");
+  if (arrow) {
+    const cx = rect.left + rect.width / 2 - x;      // centro de la palabra rel. al popup
+    arrow.style.left = Math.min(Math.max(16, cx), w - 16) + "px";
+    arrow.classList.toggle("down", above);          // popup arriba → flecha abajo
+    arrow.classList.toggle("up", !above);
   }
 }
 

@@ -644,3 +644,9 @@ button.small { font-size: 12px; padding: 6px 10px; }
   font-weight: 600; color: var(--vio); font-variant-numeric: tabular-nums; }
 .search-tx { color: var(--fg); font-size: 14px; line-height: 1.4; }
 .search-tx mark { background: #8b7cf855; color: #fff; border-radius: 3px; padding: 0 1px; }
+
+/* Flecha del popup apuntando a la palabra (estilo Migaku) */
+#wp-arrow { position: absolute; width: 0; height: 0; transform: translateX(-50%);
+  border-left: 8px solid transparent; border-right: 8px solid transparent; }
+#wp-arrow.down { bottom: -8px; border-top: 8px solid var(--panel2); }
+#wp-arrow.up   { top: -8px;   border-bottom: 8px solid var(--panel2); }
