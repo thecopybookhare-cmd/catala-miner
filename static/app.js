@@ -804,7 +804,7 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   }
   if (!V.paused) { V.pause(); RESUME = !pin; }
   PINNED = !!pin;
-  POP = { segIndex, selection,
+  POP = { segIndex, selection, anchor: anchorEl,
           lemma: (anchorEl.dataset?.l || selection).toLowerCase() };
   $("wp-word").textContent = selection;
   $("wp-ipa").textContent = "";
@@ -836,6 +836,7 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   POP.lemma = r.lemma;
   markStatusButtons(stOf(r.lemma));
   renderPopupLookup(r);
+  if (POP.anchor) positionPopup(POP.anchor);   // recolocar con la altura final
 }
 
 const LEVEL_LABEL = { 5: "muy frecuente", 4: "frecuente", 3: "media", 2: "poco común", 1: "rara" };
@@ -870,6 +871,10 @@ function renderPopupLookup(r) {
 
 async function openConj(lemma) {
   if (!lemma) return;
+  // estudiar la conjugación: el vídeo se queda quieto y el popup no se
+  // auto-cierra por detrás (si no, al salir el ratón se reanudaba el vídeo).
+  V.pause(); RESUME = false;
+  PINNED = true; clearTimeout(CLOSE_TIMER);
   $("conj-title").textContent = "Conjugació — " + lemma;
   $("conj-body").innerHTML = '<p class="dim">…</p>';
   $("conj-view").hidden = false;
@@ -892,8 +897,9 @@ function renderConjTable(t) {
     `<div class="conj-scroll"><table class="conj-tbl">${head}${body}</table></div>`;
 }
 $("wp-conj-btn").onclick = () => openConj(POP?.lemma);
-$("conj-close").onclick = () => { $("conj-view").hidden = true; };
-$("conj-view").onclick = (e) => { if (e.target === $("conj-view")) $("conj-view").hidden = true; };
+function closeConj() { $("conj-view").hidden = true; closePopup(); }
+$("conj-close").onclick = closeConj;
+$("conj-view").onclick = (e) => { if (e.target === $("conj-view")) closeConj(); };
 
 // frases del propio contenido donde aparece el mismo lema (carga perezosa)
 async function renderExamples(r) {
@@ -914,12 +920,21 @@ function positionPopup(anchorEl) {
   const pop = $("word-pop");
   const rect = anchorEl.getBoundingClientRect();
   pop.hidden = false;
-  const w = 304, h = pop.offsetHeight || 250;
-  let x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 8);
-  let y = rect.top - h - 10;
-  if (y < 8) y = Math.min(rect.bottom + 10, window.innerHeight - h - 8);
+  const w = pop.offsetWidth || 324, gap = 12;
+  const x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2),
+                     window.innerWidth - w - 8);
   pop.style.left = x + "px";
-  pop.style.top = y + "px";
+  // estilo Migaku: nunca tapa la palabra. Con sitio arriba, se ancla por el
+  // borde INFERIOR (crece hacia arriba al llegar el contenido async); si no,
+  // va debajo anclado por arriba. Así el popup jamás se expande sobre la palabra.
+  const roomAbove = rect.top, roomBelow = window.innerHeight - rect.bottom;
+  if (roomAbove >= roomBelow) {
+    pop.style.top = "auto";
+    pop.style.bottom = Math.max(8, window.innerHeight - rect.top + gap) + "px";
+  } else {
+    pop.style.bottom = "auto";
+    pop.style.top = Math.max(8, rect.bottom + gap) + "px";
+  }
 }
 
 function closePopup() {

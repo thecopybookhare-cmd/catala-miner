@@ -45,6 +45,40 @@ PROFILES = {
                         "kaikki.org-dictionary-Franc%C3%A9s.jsonl"),
         "piper_voice": "fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
     },
+    "en": {
+        "name": "English",
+        "wordfreq": "en",
+        "espeak": "en",
+        "spacy": "en_core_web_sm",
+        "whisper_models": {"large-v3": "large-v3", "small": "small"},
+        "default_whisper": "large-v3",
+        "translate_repo": "michaelfeil/ct2fast-opus-mt-en-es",   # OPUS-MT en→es CT2
+        "translate_eos": True,
+        "translate_dir": "translate-eng-spa",
+        "bidix_url": None,                        # sentidos vía Wikcionario
+        "bidix_file": "apertium-eng-spa.dix",
+        "forms_url": None,                        # spaCy en_core_web_sm lematiza
+        "wikdict_url": ("https://kaikki.org/eswiktionary/Ingl%C3%A9s/"
+                        "kaikki.org-dictionary-Ingl%C3%A9s.jsonl"),
+        "piper_voice": "en/en_US/amy/low/en_US-amy-low.onnx",
+    },
+    "de": {
+        "name": "Deutsch",
+        "wordfreq": "de",
+        "espeak": "de",
+        "spacy": "de_core_news_sm",
+        "whisper_models": {"large-v3": "large-v3", "small": "small"},
+        "default_whisper": "large-v3",
+        "translate_repo": "gaudi/opus-mt-de-es-ctranslate2",     # OPUS-MT de→es CT2
+        "translate_eos": True,
+        "translate_dir": "translate-deu-spa",
+        "bidix_url": None,
+        "bidix_file": "apertium-deu-spa.dix",
+        "forms_url": None,                        # spaCy de_core_news_sm lematiza
+        "wikdict_url": ("https://kaikki.org/eswiktionary/Alem%C3%A1n/"
+                        "kaikki.org-dictionary-Alem%C3%A1n.jsonl"),
+        "piper_voice": "de/de_DE/thorsten/low/de_DE-thorsten-low.onnx",
+    },
 }
 
 

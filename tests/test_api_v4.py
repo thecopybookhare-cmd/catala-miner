@@ -299,8 +299,8 @@ def test_language_fr_selectable(tmp_path):
     assert c.post("/api/settings", json={"language": "fr"}).status_code == 200
     assert c.get("/api/settings").json()["language"] == "fr"
     assert c.post("/api/settings", json={"language": "ca"}).status_code == 200
-    # un idioma inexistente sigue rechazándose
-    assert c.post("/api/settings", json={"language": "de"}).status_code == 400
+    # un idioma sin perfil configurado sigue rechazándose
+    assert c.post("/api/settings", json={"language": "zz"}).status_code == 400
 
 
 # ---------- asistente de primer arranque ----------
@@ -531,3 +531,14 @@ def test_subtitle_search(tmp_path):
     assert r2 and r2[0]["hits"][0]["index"] == 1
     # consulta corta -> vacío
     assert c.get("/api/search?q=a").json()["results"] == []
+
+
+def test_languages_available_en_de(tmp_path):
+    c = client(tmp_path)
+    langs = {lang["code"]: lang["available"] for lang in
+             c.get("/api/settings").json()["languages"]}
+    for code in ("ca", "fr", "en", "de"):
+        assert langs.get(code) is True, code
+    # cambiar a inglés y a alemán es válido
+    assert c.post("/api/settings", json={"language": "en"}).status_code == 200
+    assert c.post("/api/settings", json={"language": "de"}).status_code == 200

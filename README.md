@@ -13,10 +13,10 @@ subtítulos palabra a palabra, y de un clic crea tarjetas de Anki con:
 
 Todo corre **100% local** — sin cuentas, sin APIs de pago.
 
-🇫🇷 **También francés → español.** Cámbialo en ⚙️ *Ajustes → Idioma*. Al elegir francés
-la app usa el traductor OPUS-MT fr→es, spaCy `fr_core_news_sm`, el bidix Apertium fra-spa
-y las glosas del Wikcionario en español; se descargan solos la primera vez (o desde el
-asistente de primer arranque).
+🌍 **Multi-idioma → español:** además del catalán, **francés, inglés y alemán**. Cámbialo en
+⚙️ *Ajustes → Idioma*. Cada idioma usa su traductor neural OPUS-MT (CTranslate2, offline), su
+modelo spaCy, las glosas del Wikcionario en español y una voz Piper; se descargan solos la
+primera vez (o desde el asistente de primer arranque).
 
 📡 **Compartir con amigos.** En ⚙️ *Ajustes → Compartir* enciendes un servidor bajo demanda
 en tu red local o [Tailscale](https://tailscale.com), con enlace + código QR para que un
