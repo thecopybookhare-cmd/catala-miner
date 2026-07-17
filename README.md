@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.18-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.19-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -148,7 +148,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 115 tests
+.venv/bin/python -m pytest tests/    # 116 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.

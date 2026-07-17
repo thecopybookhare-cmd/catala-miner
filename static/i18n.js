@@ -24,6 +24,7 @@ const I18N = {
     "conj.btn": "📖 Conjugació",
     "st.unknown": "Nueva", "st.learning": "Aprendiendo", "st.known": "Conocida",
     "st.ignored": "Ignorar",
+    "wp.trans_ph": "traducción de la tarjeta…",
     "set.title": "⚙️ Configuración",
     "set.ui_lang": "Idioma de la interfaz", "set.study_lang": "Idioma de estudio",
     "set.sec_lang": "Idioma", "set.sec_share": "📡 Compartir con amigos",
@@ -66,6 +67,7 @@ const I18N = {
     "conj.btn": "📖 Conjugació",
     "st.unknown": "Nova", "st.learning": "Aprenent", "st.known": "Coneguda",
     "st.ignored": "Ignora",
+    "wp.trans_ph": "traducció de la targeta…",
     "set.title": "⚙️ Configuració",
     "set.ui_lang": "Idioma de la interfície", "set.study_lang": "Idioma d'estudi",
     "set.sec_lang": "Idioma", "set.sec_share": "📡 Comparteix amb amics",
@@ -108,6 +110,7 @@ const I18N = {
     "conj.btn": "📖 Conjugation",
     "st.unknown": "New", "st.learning": "Learning", "st.known": "Known",
     "st.ignored": "Ignore",
+    "wp.trans_ph": "card translation…",
     "set.title": "⚙️ Settings",
     "set.ui_lang": "Interface language", "set.study_lang": "Study language",
     "set.sec_lang": "Language", "set.sec_share": "📡 Share with friends",
@@ -140,6 +143,8 @@ function applyI18n(root = document) {
   root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
   root.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+  // placeholder de contenteditable (CSS :empty::before con attr(data-ph))
+  root.querySelectorAll("[data-i18n-dph]").forEach((el) => { el.dataset.ph = t(el.dataset.i18nDph); });
 }
 function setUILang(lang) {
   UILANG = I18N[lang] ? lang : "es";

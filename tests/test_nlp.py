@@ -16,6 +16,20 @@ def test_naive_tokenize_keeps_catalan_clitics():
     assert any(t["t"] == "," and not t["is_word"] for t in toks)
 
 
+def test_naive_tokenize_ws_reconstructs_text():
+    # «ws» permite al frontend reconstruir el espaciado original exacto
+    text = "Aquesta campanya, oi? No."
+    toks = nlp.naive_tokenize(text)
+    assert all("ws" in t for t in toks)
+    rebuilt = "".join(t["t"] + t["ws"] for t in toks).strip()
+    assert rebuilt == text
+    # sin espacio antes de la coma; con espacio después
+    coma = next(t for t in toks if t["t"] == ",")
+    assert coma["ws"] == " "
+    campanya = next(t for t in toks if t["t"] == "campanya")
+    assert campanya["ws"] == ""
+
+
 def test_correct_lemma_overrides_spacy(monkeypatch):
     from app import forms
     monkeypatch.setattr(forms, "lookup",

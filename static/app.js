@@ -563,12 +563,35 @@ document.addEventListener("fullscreenchange", () => {
 });
 
 // ---------- render ----------
+// transcripciones antiguas sin «ws»: reconstruirlo localizando cada token en
+// el texto original (así «dels» no se muestra partido en «d els»)
+function reconstructWs(seg) {
+  if (seg._ws !== undefined) return seg._ws;
+  const txt = seg.text || "";
+  let cur = 0;
+  for (const t of seg.tokens) {
+    const idx = txt.indexOf(t.t, cur);
+    if (idx < 0) return (seg._ws = false);        // no mapea → join legado
+    cur = idx + t.t.length;
+    t.ws = /\s/.test(txt[cur] || "") ? " " : "";
+  }
+  return (seg._ws = true);
+}
+
 function tokenHtml(seg) {
-  if (!(seg.tokens && seg.tokens.length)) return seg.text;
+  if (!(seg.tokens && seg.tokens.length)) return esc(seg.text);
+  const hasWs = seg.tokens[0].ws !== undefined || reconstructWs(seg);
+  let prevJoined = false;                    // el token anterior va pegado a este
   return seg.tokens.map((t, k) => {
+    // nsr/nsl: sin padding en la juntura, para que «d»+«els» se lea «dels»
+    const joined = hasWs && t.ws === "" && k < seg.tokens.length - 1;
+    const cls = (joined ? " nsr" : "") + (prevJoined ? " nsl" : "");
     const html = t.is_word
-      ? `<span class="t st-${stOf(t.lemma)}" data-l="${t.lemma}">${t.t}</span>`
-      : `<span>${t.t}</span>`;
+      ? `<span class="t st-${stOf(t.lemma)}${cls}" data-l="${esc(t.lemma)}">${esc(t.t)}</span>`
+      : `<span>${esc(t.t)}</span>`;
+    prevJoined = joined;
+    // «ws» = espaciado original; sin él, espacio antes de cada palabra (legado)
+    if (hasWs) return html + (t.ws ? " " : "");
     return (k > 0 && t.is_word ? " " : "") + html;
   }).join("");
 }
@@ -662,7 +685,13 @@ V.addEventListener("pause", () => { $("play-btn").classList.remove("alt"); });
 // controles auto-ocultables (estilo reproductor): visibles con el ratón o en
 // pausa; se desvanecen tras 2.6 s reproduciendo, y al salir del video.
 let CTL_TIMER = null;
+// altura real de la barra (cambia con flex-wrap) → var CSS para que el
+// subtítulo suba por encima de los controles cuando están visibles
+function syncCtlH() {
+  $("video-wrap").style.setProperty("--ctl-h", ($("controls").offsetHeight + 10) + "px");
+}
 function wakeControls() {
+  syncCtlH();
   $("video-wrap").classList.remove("hide-ctl");
   clearTimeout(CTL_TIMER);
   if (!V.paused)
@@ -670,6 +699,7 @@ function wakeControls() {
 }
 $("video-wrap").addEventListener("mousemove", wakeControls);
 $("video-wrap").addEventListener("touchstart", wakeControls, { passive: true });
+window.addEventListener("resize", syncCtlH);
 $("video-wrap").addEventListener("mouseleave", () => {
   if (!V.paused) { clearTimeout(CTL_TIMER); $("video-wrap").classList.add("hide-ctl"); }
 });
@@ -819,6 +849,7 @@ async function openPopup(segIndex, selection, anchorEl, pin) {
   $("wp-sentence-ca").textContent = SEGS[segIndex].text;
   markStatusButtons(stOf(POP.lemma));
   positionPopup(anchorEl);
+  $("word-pop").classList.add("loading");   // oculta el pie hasta tener datos
   $("word-pop").hidden = false;
 
   const key = segIndex + ":" + selection;
@@ -843,6 +874,7 @@ const LEVEL_LABEL = { 5: "muy frecuente", 4: "frecuente", 3: "media", 2: "poco c
 function zipfLevel(z) { return z >= 5.5 ? 5 : z >= 5 ? 4 : z >= 4.3 ? 3 : z >= 3.3 ? 2 : 1; }
 
 function renderPopupLookup(r) {
+  $("word-pop").classList.remove("loading");
   $("wp-ipa").textContent = (SETTINGS?.ipa_enabled ?? true) ? (r.ipa || "") : "";
   const lvl = zipfLevel(r.zipf);
   $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
