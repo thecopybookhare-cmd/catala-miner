@@ -148,7 +148,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 114 tests
+.venv/bin/python -m pytest tests/    # 115 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.
