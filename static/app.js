@@ -1315,6 +1315,12 @@ function applySettings() {
   $("set-lang-section").hidden = langs.length <= 1;
   $("set-language").innerHTML = langs.map((l) =>
     `<option value="${l.code}"${l.code === SETTINGS.language ? " selected" : ""}>${l.name}</option>`).join("");
+  // el hero refleja el idioma de estudio activo («Mina inglés desde tus videos…»)
+  const lc = SETTINGS.language || "ca";
+  let ln = t("lang." + lc);
+  if (ln === "lang." + lc)                       // sin clave i18n → nombre del perfil
+    ln = (SETTINGS.languages || []).find((l) => l.code === lc)?.name || lc;
+  $("hero-sub").textContent = t("hero.sub", ln);
 }
 
 async function loadSettings() {

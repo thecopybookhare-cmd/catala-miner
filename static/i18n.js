@@ -5,7 +5,8 @@ const I18N = {
   es: {
     "hdr.stats": "Estadísticas", "hdr.settings": "Configuración",
     "hero.title": "Tu biblioteca",
-    "hero.sub": "Mina catalán desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.",
+    "hero.sub": "Mina {0} desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.",
+    "lang.ca": "catalán", "lang.fr": "francés", "lang.en": "inglés", "lang.de": "alemán",
     "hero.open": "📁 Abrir archivo",
     "hero.url_ph": "URL de YouTube o enlace directo (.mp4, .m3u8)…",
     "hero.import": "⬇️ Importar", "hero.online": "🔗 Ver online",
@@ -48,7 +49,8 @@ const I18N = {
   ca: {
     "hdr.stats": "Estadístiques", "hdr.settings": "Configuració",
     "hero.title": "La teva biblioteca",
-    "hero.sub": "Mina català dels teus vídeos — targetes amb àudio, imatge i traducció directes a l'Anki.",
+    "hero.sub": "Mina {0} dels teus vídeos — targetes amb àudio, imatge i traducció directes a l'Anki.",
+    "lang.ca": "català", "lang.fr": "francès", "lang.en": "anglès", "lang.de": "alemany",
     "hero.open": "📁 Obre un fitxer",
     "hero.url_ph": "URL de YouTube o enllaç directe (.mp4, .m3u8)…",
     "hero.import": "⬇️ Importa", "hero.online": "🔗 Mira en línia",
@@ -91,7 +93,8 @@ const I18N = {
   en: {
     "hdr.stats": "Statistics", "hdr.settings": "Settings",
     "hero.title": "Your library",
-    "hero.sub": "Mine Catalan from your videos — Anki cards with audio, image and translation in one click.",
+    "hero.sub": "Mine {0} from your videos — Anki cards with audio, image and translation in one click.",
+    "lang.ca": "Catalan", "lang.fr": "French", "lang.en": "English", "lang.de": "German",
     "hero.open": "📁 Open file",
     "hero.url_ph": "YouTube URL or direct link (.mp4, .m3u8)…",
     "hero.import": "⬇️ Import", "hero.online": "🔗 Watch online",

@@ -26,3 +26,15 @@ def test_index_cache_bust_matches_version():
         f"cache-bust {versions} no coincide con la versión "
         f"{_project_version()} de pyproject.toml"
     )
+
+
+def test_sw_cache_name_matches_version():
+    # el nombre de la caché del service worker invalida el shell PWA viejo;
+    # si no sube con la versión, los usuarios PWA arrancan con UI vieja
+    sw = (ROOT / "static" / "sw.js").read_text(encoding="utf-8")
+    m = re.search(r'const CACHE = "catalaminer-([0-9.]+)"', sw)
+    assert m, "sw.js debería definir const CACHE = \"catalaminer-<versión>\""
+    assert m.group(1) == _project_version(), (
+        f"CACHE del sw.js ({m.group(1)}) no coincide con la versión "
+        f"{_project_version()} de pyproject.toml"
+    )
