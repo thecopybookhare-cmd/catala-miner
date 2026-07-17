@@ -186,6 +186,11 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
   pointer-events: none; padding: 0 24px; max-height: 72%;
   display: flex; flex-direction: column; justify-content: flex-end;
   align-items: center; overflow: hidden;
+  transition: bottom .25s ease;
+}
+/* estilo YouTube: con los controles visibles el subtítulo sube y no queda tapado */
+#video-wrap:not(.hide-ctl) #overlay-sub {
+  bottom: max(12%, calc(var(--ctl-h, 92px) + 18px));
 }
 #overlay-ca, #overlay-es {
   pointer-events: auto; display: inline-block;
@@ -201,6 +206,9 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
 #overlay-es.longtext { font-size: calc(13px * var(--sub-scale, 1)); }
 #overlay-ca .t { cursor: pointer; border-radius: 5px; padding: 0 2px; }
 #overlay-ca .t:hover { background: #ffffff2e; }
+/* contracciones partidas por el tokenizador («d»+«els»): sin hueco visual */
+#overlay-ca .t.nsr { padding-right: 0; }
+#overlay-ca .t.nsl { padding-left: 0; }
 
 /* Migaku word learning statuses (default/absent = unknown) */
 .t.st-unknown { border-bottom: 2px solid var(--red); }
@@ -261,6 +269,10 @@ video { width: 100%; max-height: 56vh; background: #000; display: block; }
   left: 14px; right: 14px; bottom: 12px;
 }
 #video-col:fullscreen #overlay-sub, #video-col.fake-fs #overlay-sub { bottom: 11%; }
+#video-col:fullscreen #video-wrap:not(.hide-ctl) #overlay-sub,
+#video-col.fake-fs #video-wrap:not(.hide-ctl) #overlay-sub {
+  bottom: max(11%, calc(var(--ctl-h, 92px) + 18px));
+}
 
 /* subtitle browser rows */
 .seg {
@@ -445,6 +457,14 @@ button.small { font-size: 12px; padding: 6px 10px; }
   cursor: text; min-width: 40px; display: inline-block;
 }
 #wp-word-es[contenteditable]:focus { border-bottom-color: var(--vio); }
+/* placeholder si el lookup no trajo traducción (editable a mano) */
+#wp-word-es:empty:not(:focus)::before {
+  content: attr(data-ph); color: var(--dim); font-style: italic; font-weight: 400;
+}
+/* mientras carga el lookup: sin pie suelto «→» y meta con pulso */
+#word-pop.loading #wp-foot { visibility: hidden; }
+#word-pop.loading #wp-meta { animation: wp-pulse 1.1s ease-in-out infinite; }
+@keyframes wp-pulse { 50% { opacity: .35; } }
 
 /* ---------- i+1 recomendadas ---------- */
 .seg.rec { border-left: 3px solid var(--amber); }

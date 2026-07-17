@@ -66,22 +66,30 @@ def zipf(word: str) -> float:
 
 
 def naive_tokenize(text: str) -> list[dict]:
+    # "ws": espacio original tras el token — el frontend reconstruye el texto
+    # exacto (contracciones como «dels» no se parten en «d els»)
     toks, i = [], 0
     for m in _WORD.finditer(text):
         if m.start() > i:
             gap = text[i:m.start()]
             if gap.strip():
+                if toks:
+                    toks[-1]["ws"] = " " if gap[:1].isspace() else ""
                 toks.append({"t": gap.strip(), "lemma": "", "pos": "",
-                             "is_word": False, "zipf": 0.0})
+                             "is_word": False, "zipf": 0.0,
+                             "ws": " " if gap[-1:].isspace() else ""})
         w = m.group(0)
         lemma, pos = _correct(w, w.lower(), "")
         toks.append({"t": w, "lemma": lemma, "pos": pos,
-                     "is_word": True, "zipf": zipf(w)})
+                     "is_word": True, "zipf": zipf(w),
+                     "ws": " " if text[m.end():m.end() + 1].isspace() else ""})
         i = m.end()
     tail = text[i:].strip()
     if tail:
+        if toks:
+            toks[-1]["ws"] = " " if text[i:i + 1].isspace() else ""
         toks.append({"t": tail, "lemma": "", "pos": "", "is_word": False,
-                     "zipf": 0.0})
+                     "zipf": 0.0, "ws": ""})
     return toks
 
 
@@ -99,7 +107,8 @@ def tokenize(text: str) -> list[dict]:
             lemma, pos = _correct(tok.text, tok.lemma_.lower(), tok.pos_)
         toks.append({"t": tok.text, "lemma": lemma, "pos": pos,
                      "is_word": is_word,
-                     "zipf": zipf(tok.text) if is_word else 0.0})
+                     "zipf": zipf(tok.text) if is_word else 0.0,
+                     "ws": tok.whitespace_})
     return toks
 
 
