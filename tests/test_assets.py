@@ -13,12 +13,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _project_version() -> str:
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     return data["project"]["version"]
 
 
 def test_index_cache_bust_matches_version():
-    html = (ROOT / "static" / "index.html").read_text()
+    # utf-8 explícito: en Windows read_text() usa cp1252 y el HTML trae à/emojis
+    html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
     versions = set(re.findall(r"\?v=([0-9]+\.[0-9]+\.[0-9]+)", html))
     assert versions, "index.html debería usar cache-bust ?v=… en sus assets"
     assert versions == {_project_version()}, (
