@@ -1,6 +1,6 @@
 # 🐈 CatalàMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.16-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.18-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
 Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
@@ -40,8 +40,8 @@ curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/ma
 ```powershell
 irm https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.ps1 | iex
 ```
-Clona el repo en `~/CatalaMiner` y lo instala todo. *(Requiere que el repo sea
-**público**; mientras sea privado, usa los pasos manuales de abajo.)*
+Clona el repo en `~/CatalaMiner` y lo instala todo. *(Si prefieres clonar tú
+mismo, usa los pasos manuales de abajo.)*
 
 ### Manual (si ya tienes la carpeta del proyecto)
 
@@ -148,7 +148,7 @@ Datos en `~/Library/Application Support/CatalaMiner/`.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 113 tests
+.venv/bin/python -m pytest tests/    # 114 tests
 ```
 
 Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.
