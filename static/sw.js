@@ -1,7 +1,7 @@
 // Service worker de CatalàMiner. Convierte la web en PWA instalable y da un
 // arranque offline del "shell". Nunca cachea /api/ ni /media/ (dinámicos y
-// pesados). Sube CACHE al publicar para invalidar el shell viejo.
-const CACHE = "catalaminer-0.9.15";
+// pesados). CACHE va atado a la versión de pyproject (lo garantiza test_assets).
+const CACHE = "catalaminer-0.9.19";
 const SHELL = [
   "/",
   "/index.html",
@@ -38,7 +38,7 @@ self.addEventListener("fetch", (e) => {
   // Navegaciones: red primero, index.html cacheado como fallback offline.
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-cache" })
         .then((res) => {
           caches.open(CACHE).then((c) => c.put("/index.html", res.clone()));
           return res;
@@ -48,21 +48,21 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Recursos estáticos: stale-while-revalidate (rápido y se actualiza solo).
-  // ignoreSearch: el shell se precachea SIN query pero la página pide
-  // /app.js?v=x.y.z — sin esto, el arranque offline moría tras actualizar.
+  // Recursos estáticos: RED primero (el servidor es local → sin latencia real)
+  // con no-cache para saltar la caché HTTP del navegador; la caché del SW es
+  // solo fallback offline. Antes era stale-while-revalidate y el primer
+  // arranque tras actualizar servía el shell viejo — el ?v= no bastaba.
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cached) => {
-      const net = fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(url.pathname, copy));
-          }
-          return res;
-        })
-        .catch(() => cached || Response.error());
-      return cached || net;
-    })
+    fetch(req, { cache: "no-cache" })
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(url.pathname, copy));
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(req, { ignoreSearch: true })
+          .then((r) => r || Response.error()))
   );
 });
