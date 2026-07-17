@@ -563,6 +563,14 @@ document.addEventListener("fullscreenchange", () => {
 });
 
 // ---------- render ----------
+// etiqueta amigable de un lema para mostrar: contracciones Apertium
+// («de+el» → «del») y homógrafos numerados del diccionario («nit1» → «nit»)
+const CONTR_LABEL = { "de+el": "del", "de+els": "dels", "a+el": "al",
+                      "a+els": "als", "per+el": "pel", "per+els": "pels" };
+function lemmaLabel(l) {
+  return CONTR_LABEL[l] || String(l || "").replace(/(\D)\d+$/, "$1");
+}
+
 // transcripciones antiguas sin «ws»: reconstruirlo localizando cada token en
 // el texto original (así «dels» no se muestra partido en «d els»)
 function reconstructWs(seg) {
@@ -878,7 +886,7 @@ function renderPopupLookup(r) {
   $("wp-ipa").textContent = (SETTINGS?.ipa_enabled ?? true) ? (r.ipa || "") : "";
   const lvl = zipfLevel(r.zipf);
   $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
-  $("wp-meta").textContent = `${r.lemma}${r.pos ? " · " + r.pos : ""}`;
+  $("wp-meta").textContent = `${lemmaLabel(r.lemma)}${r.pos ? " · " + r.pos : ""}`;
   $("wp-sentence-es").textContent = r.sentence_es || "";
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
     .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${esc(s.es)}">${esc(s.es)} <small>${esc(s.pos)}</small></span>`).join("")
@@ -1559,7 +1567,7 @@ async function renderWords() {
   $("words-list").innerHTML = groups.map((g, b) => g.length ? `
     <div class="wband"><div class="wband-h">${label(b)} · ${g.length}</div>
       <div class="wband-words">${g.map((l) =>
-        `<span class="w st-${stOf(l)}" data-l="${l}">${l}</span>`).join("")}</div></div>` : "").join("");
+        `<span class="w st-${stOf(l)}" data-l="${esc(l)}">${esc(lemmaLabel(l))}</span>`).join("")}</div></div>` : "").join("");
   for (const w of $("words-list").querySelectorAll(".w")) {
     w.onclick = (ev) => {
       ev.stopPropagation();
