@@ -163,7 +163,7 @@ except Exception:
     pass
 STATIC = Path(__file__).resolve().parent.parent / "static"
 _DICTS: dict = {}   # bidix por idioma
-SETTINGS_PATH = config.APP_DIR / "settings.json"
+
 
 
 def _dict():
@@ -266,8 +266,8 @@ DEFAULT_SETTINGS = {
 def _settings() -> dict:
     s = {k: (dict(v) if isinstance(v, dict) else v)
          for k, v in DEFAULT_SETTINGS.items()}
-    if SETTINGS_PATH.exists():
-        saved = json.loads(SETTINGS_PATH.read_text())
+    if config.SETTINGS_PATH.exists():
+        saved = json.loads(config.SETTINGS_PATH.read_text())
         for k, v in saved.items():
             if k == "keymap" and isinstance(v, dict):
                 s["keymap"].update(v)
@@ -277,7 +277,7 @@ def _settings() -> dict:
 
 
 def _save_settings(s: dict):
-    SETTINGS_PATH.write_text(json.dumps(s))
+    config.SETTINGS_PATH.write_text(json.dumps(s))
 
 
 def _lang() -> str:
@@ -741,6 +741,10 @@ def do_transcribe(sid: str, req: TranscribeReq):
     s = db.get_session(CON, sid)
     if not s:
         return JSONResponse({"error": "not found"}, status_code=404)
+    if not req.use_sidecar and req.model not in languages.profile()["whisper_models"]:
+        return JSONResponse(
+            {"error": f"modelo «{req.model}» no disponible para este idioma"},
+            status_code=400)
 
     def work(jid):
         from . import transcribe as T
@@ -1230,6 +1234,11 @@ def _settings_payload() -> dict:
     s["languages"] = [{"code": c, "name": p["name"],
                        "available": languages.available(c)}
                       for c, p in languages.PROFILES.items()]
+    # modelos Whisper del idioma activo, para que el selector de la UI no
+    # ofrezca opciones de otro idioma (p. ej. el modelo catalán AINA en alemán)
+    prof = languages.profile()
+    s["whisper_models"] = list(prof["whisper_models"].keys())
+    s["default_whisper"] = prof["default_whisper"]
     return s
 
 
@@ -1282,7 +1291,7 @@ def post_settings(body: dict):
             return JSONResponse(
                 {"error": "atajos inválidos (letras a-z, sin repetir)"},
                 status_code=400)
-    saved = json.loads(SETTINGS_PATH.read_text()) if SETTINGS_PATH.exists() else {}
+    saved = json.loads(config.SETTINGS_PATH.read_text()) if config.SETTINGS_PATH.exists() else {}
     for k, v in body.items():
         if k == "keymap":
             saved["keymap"] = {**saved.get("keymap", {}), **v}

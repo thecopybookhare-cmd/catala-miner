@@ -35,6 +35,7 @@ APP_DIR = Path(os.environ.get("LINGUAMINER_DIR")
                or os.environ.get("CATALAMINER_DIR")    # compat instalaciones previas
                or default_app_dir())
 MEDIA_DIR = APP_DIR / "media"
+SETTINGS_PATH = APP_DIR / "settings.json"    # única fuente: main y languages la comparten
 DL_DIR = APP_DIR / "downloads"
 MODELS_DIR = APP_DIR / "models"
 DB_PATH = APP_DIR / "app.db"

@@ -18,8 +18,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>CFBundleName</key><string>LinguaMiner</string>
   <key>CFBundleDisplayName</key><string>LinguaMiner</string>
-  <key>CFBundleIdentifier</key><string>cat.linguaminer.app</string>
-  <key>CFBundleVersion</key><string>0.6.0</string>
+  <key>CFBundleIdentifier</key><string>app.linguaminer.desktop</string>
+  <key>CFBundleVersion</key><string>1.0.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>launcher</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>

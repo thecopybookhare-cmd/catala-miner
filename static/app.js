@@ -1323,6 +1323,18 @@ function applySettings() {
   $("set-lang-section").hidden = langs.length <= 1;
   $("set-language").innerHTML = langs.map((l) =>
     `<option value="${l.code}"${l.code === SETTINGS.language ? " selected" : ""}>${l.name}</option>`).join("");
+  // selector de Whisper según el idioma activo (el modelo catalán AINA no
+  // debe ofrecerse para transcribir alemán, etc.)
+  const wm = SETTINGS.whisper_models || [];
+  if (wm.length) {
+    const WLBL = {
+      "catala-large": "Whisper large-v3 catalán (AINA) — máxima calidad",
+      "large-v3": "Whisper large-v3 multilingüe — máxima calidad",
+      "small": "Whisper small — rápido",
+    };
+    $("model-select").innerHTML = wm.map((k) =>
+      `<option value="${esc(k)}"${k === SETTINGS.default_whisper ? " selected" : ""}>${esc(WLBL[k] || k)}</option>`).join("");
+  }
   // el hero refleja el idioma de estudio activo («Mina inglés desde tus videos…»)
   const lc = SETTINGS.language || "ca";
   let ln = t("lang." + lc);

@@ -93,7 +93,7 @@ def activable() -> list[str]:
 
 def active_code() -> str:
     try:
-        s = json.loads((config.APP_DIR / "settings.json").read_text())
+        s = json.loads(config.SETTINGS_PATH.read_text())
         code = s.get("language", "ca")
     except Exception:
         code = "ca"

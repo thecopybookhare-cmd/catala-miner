@@ -20,10 +20,11 @@ def _model(key: str):
 def transcribe(jid: str, media_path: str, model_key: str,
                duration: float) -> list[dict]:
     """Return segments: {start,end,text,logprob,words:[{w,start,end}],tokens:[...]}"""
-    jobs.set_progress(jid, 0.01, "Carregant model… (la primera vegada es descarrega)")
+    from . import languages
+    jobs.set_progress(jid, 0.01, "Cargando modelo… (la primera vez se descarga)")
     model = _model(model_key)
     segments, _info = model.transcribe(
-        media_path, language="ca", beam_size=5,
+        media_path, language=languages.active_code(), beam_size=5,
         word_timestamps=True, vad_filter=True)
     out = []
     for seg in segments:
@@ -36,7 +37,7 @@ def transcribe(jid: str, media_path: str, model_key: str,
                     "tokens": nlp.tokenize(seg.text.strip())})
         if duration:
             jobs.set_progress(jid, min(0.99, seg.end / duration),
-                              "Transcrivint…")
+                              "Transcribiendo…")
     return out
 
 

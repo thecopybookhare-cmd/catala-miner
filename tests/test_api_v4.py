@@ -71,6 +71,32 @@ def test_settings_defaults_and_merge(tmp_path):
     assert c.get("/api/settings").json()["sub_scale"] == 1.3
 
 
+def test_settings_expose_whisper_models_of_active_language(tmp_path):
+    c = client(tmp_path)
+    s = c.get("/api/settings").json()
+    # catalán activo por defecto: su perfil incluye el modelo AINA
+    assert "catala-large" in s["whisper_models"]
+    assert s["default_whisper"] == "catala-large"
+    # con alemán activo el modelo catalán ya no se ofrece
+    c.post("/api/settings", json={"language": "de"})
+    s = c.get("/api/settings").json()
+    assert "catala-large" not in s["whisper_models"]
+    assert s["default_whisper"] == "large-v3"
+    c.post("/api/settings", json={"language": "ca"})
+
+
+def test_transcribe_rejects_model_of_other_language(tmp_path, monkeypatch):
+    c = client(tmp_path)
+    sid = main.db.create_session(main.CON, title="x", source_type="upload",
+                                 media_path="/nope.mp4", srt_source="none",
+                                 model_size="-", duration_secs=0,
+                                 transcript_json="[]")
+    c.post("/api/settings", json={"language": "de"})
+    r = c.post(f"/api/sessions/{sid}/transcribe", json={"model": "catala-large"})
+    assert r.status_code == 400
+    c.post("/api/settings", json={"language": "ca"})
+
+
 def test_settings_rejects_bad_keymap_and_unknown(tmp_path):
     c = client(tmp_path)
     # tecla duplicada con otra acción
