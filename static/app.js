@@ -77,7 +77,7 @@ setInterval(syncStatuses, 600000);
 window.addEventListener("focus", () => syncStatuses());
 
 // ---------- biblioteca ----------
-const SRC_LABEL = { whisper: "Whisper", srt: "SRT", youtube_subs: "Subs YouTube", youtube_auto: "Subs auto YouTube", none: "sin transcribir", "-": "—" };
+const SRC_LABEL = () => ({ whisper: "Whisper", srt: "SRT", youtube_subs: t("src.yt"), youtube_auto: t("src.yt_auto"), none: t("src.none"), "-": "—" });
 
 // badge de origen (arriba a la izquierda de la miniatura)
 function sourceBadge(s) {
@@ -111,9 +111,9 @@ async function loadSessions() {
       <div class="scard-body">
         <div class="scard-title" title="${esc(s.title)}">${esc(s.title)}</div>
         <div class="pills">
-          ${s.comp_pct !== null && s.comp_pct !== undefined ? `<span class="pill comp">📊 ${s.comp_pct}% conocido</span>` : ""}
-          ${s.new_words ? `<span class="pill new">${s.new_words} nuevas</span>` : ""}
-          <span class="pill">${SRC_LABEL[s.srt_source] ?? s.srt_source}</span>
+          ${s.comp_pct !== null && s.comp_pct !== undefined ? `<span class="pill comp">📊 ${t("pill.known", s.comp_pct)}</span>` : ""}
+          ${s.new_words ? `<span class="pill new">${t("pill.new", s.new_words)}</span>` : ""}
+          <span class="pill">${SRC_LABEL()[s.srt_source] ?? s.srt_source}</span>
         </div>
       </div>
     </article>`).join("");
@@ -500,7 +500,7 @@ function updateComp() {
       }
   if (!total) { chip.hidden = true; return; }
   const pct = Math.round((known / total) * 100);
-  chip.textContent = `📊 ${pct}% conocido · ${newLemmas.size} palabras nuevas`;
+  chip.textContent = "📊 " + t("chip.comp", pct, newLemmas.size);
   chip.hidden = false;
   chip.className = "badge " + (pct >= 90 ? "up" : pct >= 60 ? "pending" : "");
   updateRecs();
@@ -634,7 +634,7 @@ function scheduleClose() {
 
 function renderSegs() {
   const el = $("subs");
-  if (!SEGS.length) { el.innerHTML = '<p class="dim">Sin transcripción — 🎙️ Transcribe o 📎 adjunta un .srt.</p>'; return; }
+  if (!SEGS.length) { el.innerHTML = `<p class="dim">${esc(t("pl.no_transcript"))}</p>`; return; }
   el.innerHTML = SEGS.map((seg, i) => {
     const low = seg.logprob < -1.0 ? " lowconf" : "";
     return `<div class="seg${low}${i === CUR ? " active" : ""}" id="seg-${i}" data-i="${i}">
@@ -1294,12 +1294,9 @@ function renderHelpLine() {
   // la línea de ayuda refleja el keymap real (tras remapear en ⚙️ no miente)
   const km = SETTINGS?.keymap || DEFAULT_KEYMAP;
   const U = (a) => (km[a] || "?").toUpperCase();
-  $("help-line").textContent =
-    `${U("prev")}/${U("next")} frase · ${U("replay")} repetir · ${U("mine")} tarjeta` +
-    ` · ⇧${U("mine")} editar · ${U("recommended")} recomendada ⭐ · 1-4 estado` +
-    ` · ${U("subs")} subs · ${U("dual")} dual · K condensado · [ ] sincronía` +
-    ` · ${U("browser")} transcripción · ${U("fullscreen")} pantalla completa` +
-    " · ? ayuda · ⚙️ atajos";
+  $("help-line").textContent = t("help.line",
+    U("prev"), U("next"), U("replay"), U("mine"), U("recommended"),
+    U("subs"), U("dual"), U("browser"), U("fullscreen"));
 }
 
 function applySettings() {
@@ -1594,7 +1591,7 @@ async function renderWords() {
       }
   });
   const lemmas = Object.keys(first);
-  if (!lemmas.length) { $("words-list").innerHTML = '<p class="dim">Sin transcripción.</p>'; return; }
+  if (!lemmas.length) { $("words-list").innerHTML = `<p class="dim">${esc(t("words.empty"))}</p>`; return; }
   const bandOf = (l) => {
     const r = RANKS[l];
     if (!r) return BANDS.length;
@@ -1606,7 +1603,7 @@ async function renderWords() {
   for (const g of groups)
     g.sort((a, b) => (RANKS[a] || 1e9) - (RANKS[b] || 1e9) || (zmax[b] - zmax[a]));
   const label = (b) => b < BANDS.length
-    ? `Rank ${BANDS[b][0]} – ${BANDS[b][1]}` : "Resto (raras / sin rango)";
+    ? `Rank ${BANDS[b][0]} – ${BANDS[b][1]}` : t("words.rest");
   $("words-list").innerHTML = groups.map((g, b) => g.length ? `
     <div class="wband"><div class="wband-h">${label(b)} · ${g.length}</div>
       <div class="wband-words">${g.map((l) =>
