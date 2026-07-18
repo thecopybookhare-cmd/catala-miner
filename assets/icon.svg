@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- LinguaMiner: gema (brand-dot rotado) sobre dos líneas de subtítulo -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#232044"/>
+      <stop offset="55%" stop-color="#12131f"/>
+      <stop offset="100%" stop-color="#0c0d13"/>
+    </radialGradient>
+    <linearGradient id="gem" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a99cff"/>
+      <stop offset="45%" stop-color="#8b7cf8"/>
+      <stop offset="100%" stop-color="#5f4fd8"/>
+    </linearGradient>
+    <linearGradient id="gemhi" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="46"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="0" fill="url(#glow)"/>
+
+  <!-- halo de la gema -->
+  <rect x="352" y="192" width="320" height="320" rx="88" fill="#8b7cf8"
+        opacity=".55" filter="url(#soft)" transform="rotate(45 512 352)"/>
+  <!-- gema -->
+  <rect x="366" y="206" width="292" height="292" rx="72" fill="url(#gem)"
+        transform="rotate(45 512 352)"/>
+  <rect x="366" y="206" width="292" height="292" rx="72" fill="url(#gemhi)"
+        transform="rotate(45 512 352)"/>
+
+  <!-- líneas de subtítulo -->
+  <rect x="222" y="668" width="580" height="74" rx="37" fill="#e9e9f2"/>
+  <rect x="322" y="790" width="380" height="74" rx="37" fill="#8f93a8"/>
+</svg>
