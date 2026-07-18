@@ -1,14 +1,14 @@
 #!/bin/bash
-# CatalàMiner — instalación de UN comando (macOS / Linux). Clona el repo y lo
+# LinguaMiner — instalación de UN comando (macOS / Linux). Clona el repo y lo
 # instala todo. Uso:
-#   curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.sh | bash
+#   curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/lingua-miner/main/bootstrap.sh | bash
 # (requiere que el repo sea público; si es privado, clónalo tú y ejecuta ./install.sh)
 set -euo pipefail
 
-REPO="${CATALAMINER_REPO:-https://github.com/thecopybookhare-cmd/catala-miner.git}"
-DEST="${CATALAMINER_HOME:-$HOME/CatalaMiner}"
+REPO="${LINGUAMINER_REPO:-https://github.com/thecopybookhare-cmd/lingua-miner.git}"
+DEST="${LINGUAMINER_HOME:-$HOME/LinguaMiner}"
 
-echo "== CatalàMiner — instalación de un comando =="
+echo "== LinguaMiner — instalación de un comando =="
 if ! command -v git >/dev/null 2>&1; then
   echo "Necesitas 'git'. macOS: se instala con 'xcode-select --install'. Linux: 'sudo apt install git'." >&2
   exit 1

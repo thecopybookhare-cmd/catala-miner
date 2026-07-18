@@ -1,7 +1,7 @@
 {
-  "name": "CatalàMiner",
-  "short_name": "CatalàMiner",
-  "description": "Minero local de flashcards estilo Migaku para aprender catalán y francés desde español.",
+  "name": "LinguaMiner",
+  "short_name": "LinguaMiner",
+  "description": "Local Migaku-style flashcard miner — learn languages from your videos, cards straight to Anki.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",

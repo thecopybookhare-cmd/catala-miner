@@ -1,4 +1,4 @@
-# CatalàMiner — Roadmap
+# LinguaMiner — Roadmap
 
 Checklist vivo de la investigación (auditoría del repo + ecosistema de *sentence
 mining*: asbplayer, Lute, VocabSieve, GameSentenceMiner, awesome-immersion).

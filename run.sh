@@ -1,5 +1,5 @@
 #!/bin/bash
-# Arranca CatalàMiner y abre la app en el navegador (macOS y Linux).
+# Arranca LinguaMiner y abre la app en el navegador (macOS y Linux).
 cd "$(dirname "$0")"
 URL="http://localhost:8977"
 if command -v open >/dev/null 2>&1; then OPEN=open        # macOS

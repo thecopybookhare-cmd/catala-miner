@@ -1,10 +1,10 @@
-# CatalàMiner — instalación en Windows (PowerShell).
+# LinguaMiner — instalación en Windows (PowerShell).
 # No requiere instalar Python ni ffmpeg a mano: uv aporta Python y
 # static-ffmpeg descarga ffmpeg solo. Ejecuta con:
 #   powershell -ExecutionPolicy Bypass -File install.ps1
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-Write-Host "== CatalàMiner install (Windows) =="
+Write-Host "== LinguaMiner install (Windows) =="
 
 # 1) uv (gestor de Python; se instala solo si falta)
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {

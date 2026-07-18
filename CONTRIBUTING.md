@@ -1,4 +1,4 @@
-# Contribuir a CatalàMiner
+# Contribuir a LinguaMiner
 
 ¡Gracias por tu interés! Este es un proyecto personal de código abierto (MIT).
 
@@ -6,7 +6,7 @@
 
 ```bash
 git clone <repo>
-cd catala-miner
+cd lingua-miner
 ./install.sh          # crea el venv, instala deps y modelos (macOS + Homebrew)
 ```
 

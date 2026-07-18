@@ -1,9 +1,9 @@
 #!/bin/bash
-# CatalàMiner — instalación en macOS y Linux. No requiere Homebrew ni ffmpeg
+# LinguaMiner — instalación en macOS y Linux. No requiere Homebrew ni ffmpeg
 # a mano: uv se instala solo y ffmpeg lo aporta static-ffmpeg si falta.
 set -euo pipefail
 cd "$(dirname "$0")"
-echo "== CatalàMiner install =="
+echo "== LinguaMiner install =="
 
 # 1) uv (gestor de Python; se instala solo si falta, sin sudo)
 if ! command -v uv >/dev/null 2>&1; then
@@ -38,9 +38,9 @@ PY
 
 # 5) lanzador
 if [ "$(uname)" = "Darwin" ]; then
-  ./make-app.sh || echo "AVISO: no se pudo crear CatalàMiner.app"
+  ./make-app.sh || echo "AVISO: no se pudo crear LinguaMiner.app"
   echo
-  echo "¡Listo! Abre CatalàMiner.app (Launchpad/Spotlight) o ejecuta ./run.sh"
+  echo "¡Listo! Abre LinguaMiner.app (Launchpad/Spotlight) o ejecuta ./run.sh"
 else
   echo
   echo "¡Listo! Arranca con:  ./run.sh    (abre la app en tu navegador)"

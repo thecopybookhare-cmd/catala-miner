@@ -60,7 +60,7 @@ def test_url_session_rejects_non_http(tmp_path):
 def test_settings_defaults_and_merge(tmp_path):
     c = client(tmp_path)
     s = c.get("/api/settings").json()
-    assert s["deck"] == "Català::Mining"
+    assert s["deck"] == "LinguaMiner::Mining"
     assert s["keymap"]["next"] == "d"
     # POST parcial: cambia una clave y una tecla, el resto persiste
     r = c.post("/api/settings",

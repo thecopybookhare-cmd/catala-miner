@@ -1,9 +1,9 @@
 #!/bin/bash
-# Genera ~/Applications/CatalàMiner.app apuntando a este checkout.
+# Genera ~/Applications/LinguaMiner.app apuntando a este checkout.
 set -e
 cd "$(dirname "$0")"
 REPO="$(pwd)"
-APP="$HOME/Applications/CatalàMiner.app"
+APP="$HOME/Applications/LinguaMiner.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 # icono del Dock/Finder
@@ -16,9 +16,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleName</key><string>CatalàMiner</string>
-  <key>CFBundleDisplayName</key><string>CatalàMiner</string>
-  <key>CFBundleIdentifier</key><string>cat.catalaminer.app</string>
+  <key>CFBundleName</key><string>LinguaMiner</string>
+  <key>CFBundleDisplayName</key><string>LinguaMiner</string>
+  <key>CFBundleIdentifier</key><string>cat.linguaminer.app</string>
   <key>CFBundleVersion</key><string>0.6.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>launcher</string>

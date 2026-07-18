@@ -80,7 +80,7 @@ def test_default_app_dir_per_platform(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", r"C:\Users\x\AppData\Roaming")
     monkeypatch.setenv("XDG_DATA_HOME", "/home/x/.local/share")
     assert config.default_app_dir("darwin").as_posix().endswith(
-        "Library/Application Support/CatalaMiner")
-    assert "CatalaMiner" in config.default_app_dir("win32").as_posix()
+        "Library/Application Support/LinguaMiner")
+    assert "LinguaMiner" in config.default_app_dir("win32").as_posix()
     assert config.default_app_dir("linux").as_posix() == \
-        "/home/x/.local/share/CatalaMiner"
+        "/home/x/.local/share/LinguaMiner"

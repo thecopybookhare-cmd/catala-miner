@@ -9,22 +9,31 @@ ANKI_PORTS = (8765, 8766, 8767)
 
 
 def default_app_dir(platform: str | None = None) -> Path:
-    """Directorio de datos según el SO (multiplataforma). El de macOS se
-    mantiene idéntico al histórico para no perder datos de instalaciones
-    previas. CATALAMINER_DIR lo sobreescribe (tests / instalaciones portables)."""
+    """Directorio de datos según el SO (multiplataforma). Las instalaciones
+    previas (cuando la app se llamaba CatalaMiner) se migran renombrando la
+    carpeta; si no se puede (otro proceso la usa), se sigue usando la vieja.
+    LINGUAMINER_DIR lo sobreescribe (tests / instalaciones portables)."""
     plat = platform or sys.platform
     if plat == "darwin":
-        return Path.home() / "Library" / "Application Support" / "CatalaMiner"
-    if plat.startswith("win"):
+        base = Path.home() / "Library" / "Application Support"
+    elif plat.startswith("win"):
         base = Path(os.environ.get("APPDATA")
                     or Path.home() / "AppData" / "Roaming")
-        return base / "CatalaMiner"
-    base = Path(os.environ.get("XDG_DATA_HOME")
-                or Path.home() / ".local" / "share")
-    return base / "CatalaMiner"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME")
+                    or Path.home() / ".local" / "share")
+    new, old = base / "LinguaMiner", base / "CatalaMiner"
+    if not new.exists() and old.exists():
+        try:
+            old.rename(new)
+        except OSError:
+            return old
+    return new
 
 
-APP_DIR = Path(os.environ.get("CATALAMINER_DIR") or default_app_dir())
+APP_DIR = Path(os.environ.get("LINGUAMINER_DIR")
+               or os.environ.get("CATALAMINER_DIR")    # compat instalaciones previas
+               or default_app_dir())
 MEDIA_DIR = APP_DIR / "media"
 DL_DIR = APP_DIR / "downloads"
 MODELS_DIR = APP_DIR / "models"
@@ -53,6 +62,7 @@ BIDIX_URL = ("https://raw.githubusercontent.com/apertium/apertium-spa-cat/"
 FORMS_URL = ("https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/"
              "master/resultats/lt/diccionari.txt")
 
-NOTE_TYPE = "CatalaMiner"
+NOTE_TYPE = "LinguaMiner"
+NOTE_TYPE_LEGACY = "CatalaMiner"      # instalaciones previas: no partir la colección
 NOTE_FIELDS = ["Paraula", "ParaulaES", "Frase", "FraseES",
                "Audio", "Imatge", "Font", "Freq"]

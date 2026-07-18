@@ -94,7 +94,7 @@ def test_sync_statuses_from_anki(_up, intervals, tmp_path):
 @patch("app.anki.invoke")
 def test_ensure_note_type_updates_existing_model(invoke):
     invoke.side_effect = lambda action, **kw: (
-        ["CatalaMiner"] if action == "modelNames" else None)
+        ["LinguaMiner"] if action == "modelNames" else None)
     anki.ensure_note_type()
     actions = [c.args[0] for c in invoke.call_args_list]
     assert "updateModelTemplates" in actions

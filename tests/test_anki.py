@@ -30,7 +30,7 @@ def test_note_payload():
             "image_file": "i.jpg", "font": "V @ 0:01", "freq_rank": "common"}
     note = anki.build_note(card, deck="Català")
     assert note["deckName"] == "Català"
-    assert note["modelName"] == "CatalaMiner"
+    assert note["modelName"] == "LinguaMiner"
     assert note["fields"]["Audio"] == "[sound:a.mp3]"
     assert note["fields"]["Imatge"] == '<img src="i.jpg">'
     assert note["options"]["allowDuplicate"] is False

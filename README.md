@@ -1,162 +1,149 @@
-# 🐈 CatalàMiner
+# ⛏️ LinguaMiner
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-0.9.19-8b7cf8) ![python](https://img.shields.io/badge/python-3.12-3776ab)
+[![CI](https://github.com/thecopybookhare-cmd/lingua-miner/actions/workflows/ci.yml/badge.svg)](https://github.com/thecopybookhare-cmd/lingua-miner/actions)
+![license](https://img.shields.io/badge/license-MIT-blue)
+![version](https://img.shields.io/badge/version-1.0.0-8b7cf8)
+![python](https://img.shields.io/badge/python-3.12-3776ab)
 
-Minero local de flashcards estilo **Migaku** para aprender catalán desde español.
-Transcribe video/audio en catalán (Whisper large-v3 afinado para catalán), muestra los
-subtítulos palabra a palabra, y de un clic crea tarjetas de Anki con:
+**Local, Migaku-style flashcard miner — learn languages from the videos you love.**
 
-- 🔊 audio del segmento (recortado con ffmpeg)
-- 🖼️ fotograma del video
-- 📝 frase en catalán + traducción neural al español (Softcatalà, offline)
-- 📖 palabra objetivo con lema, POS, acepciones del diccionario Apertium y frecuencia
+Watch anything with word-by-word interactive subtitles, click a word, and get an
+Anki card with the audio of the sentence, a video frame, the sentence + neural
+translation, and the word's lemma, part of speech, dictionary senses and
+frequency. Everything runs **100% locally** — no accounts, no paid APIs.
 
-Todo corre **100% local** — sin cuentas, sin APIs de pago.
+![LinguaMiner player with dictionary popup](docs/screenshots/player-popup.png)
 
-🌍 **Multi-idioma → español:** además del catalán, **francés, inglés y alemán**. Cámbialo en
-⚙️ *Ajustes → Idioma*. Cada idioma usa su traductor neural OPUS-MT (CTranslate2, offline), su
-modelo spaCy, las glosas del Wikcionario en español y una voz Piper; se descargan solos la
-primera vez (o desde el asistente de primer arranque).
+## Features
 
-📡 **Compartir con amigos.** En ⚙️ *Ajustes → Compartir* enciendes un servidor bajo demanda
-en tu red local o [Tailscale](https://tailscale.com), con enlace + código QR para que un
-amigo (o tu móvil) la use en el navegador. Es una **PWA instalable** (icono en pantalla,
-arranque offline del shell). Nada se expone hasta que lo activas; el acceso es completo, así
-que compártela solo con gente de confianza en tu red privada.
+- 🎙️ **Transcription** with Whisper (fine-tuned Catalan model, or generic
+  large-v3 / small) — or use the video's own `.srt` / YouTube subtitles.
+- 🖱️ **One-click mining**: click any subtitle word (or drag to select an
+  expression) → editable Anki card with segment audio (ffmpeg-trimmed), video
+  frame, sentence + translation.
+- 🌍 **Multi-language**: Catalan, French, English and German (glosses and
+  neural OPUS-MT translation into Spanish, offline). Each language downloads
+  its own translator, spaCy model, Wiktionary glosses and Piper voice on
+  first use. Architecture ready for more.
+- 🎨 **Migaku-style word states**: red = new · orange = learning ·
+  no mark = known · grey = ignored — synced back from your Anki review
+  intervals. A header chip shows the % of the video you already know.
+- ⭐ **i+1 sentence finder**: jump between sentences with exactly one unknown
+  word — the optimal ones to mine.
+- 📺 **Watch online**: paste a YouTube / direct / HLS link and it streams
+  instantly (yt-dlp resolves the best format); cards cut audio + image
+  straight from the stream. Quality selector included.
+- 📋 **Words panel**: every lemma in the video grouped by frequency band;
+  bulk-mark the N most frequent words of the language as known.
+- 🔊 Neural TTS pronunciation (Piper), IPA, conjugation tables, custom
+  StarDict/Yomitan dictionaries, remappable shortcuts, daily DB backups.
+- 📱 **Installable PWA + share mode**: serve the app on your LAN or
+  [Tailscale](https://tailscale.com) so a friend or your phone can use it in
+  a browser (off by default, full access — share only with people you trust).
 
-## Instalación
+| Your library | Words panel |
+|---|---|
+| ![Library](docs/screenshots/library.png) | ![Words panel](docs/screenshots/words-panel.png) |
 
-Cada persona instala **su propia copia** — no hace falta que nadie la hospede. No
-necesitas instalar Python ni ffmpeg a mano: el instalador trae `uv` (que aporta
-Python) y `ffmpeg` lo aporta `static-ffmpeg` solo si falta.
+## Install
 
-### Un solo comando (clona + instala)
+Everyone installs **their own copy** — nothing to host. You don't need Python
+or ffmpeg beforehand: the installer brings `uv` (which provides Python) and
+`static-ffmpeg` covers ffmpeg if it's missing.
 
-**macOS / Linux** (en una terminal):
+### One command (clones + installs)
+
+**macOS / Linux**:
 ```bash
-curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.sh | bash
+curl -LsSf https://raw.githubusercontent.com/thecopybookhare-cmd/lingua-miner/main/bootstrap.sh | bash
 ```
-**Windows** (en PowerShell):
+**Windows** (PowerShell):
 ```powershell
-irm https://raw.githubusercontent.com/thecopybookhare-cmd/catala-miner/main/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/thecopybookhare-cmd/lingua-miner/main/bootstrap.ps1 | iex
 ```
-Clona el repo en `~/CatalaMiner` y lo instala todo. *(Si prefieres clonar tú
-mismo, usa los pasos manuales de abajo.)*
+Clones the repo into `~/LinguaMiner` and installs everything. *(Prefer to
+clone yourself? Use the manual steps below.)*
 
-### Manual (si ya tienes la carpeta del proyecto)
+### Manual (from the project folder)
 
 **macOS / Linux**
 ```bash
-./install.sh        # instala todo y, en Mac, crea CatalàMiner.app
-./run.sh            # o abre CatalàMiner.app (Mac)
+./install.sh        # installs everything; on macOS also creates LinguaMiner.app
+./run.sh            # or open LinguaMiner.app (Mac)
 ```
 
-**Windows** (PowerShell, en la carpeta del proyecto)
+**Windows** (PowerShell, inside the project folder)
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 .\run.bat
 ```
 
-El instalador crea el venv (Python 3.12), descarga el traductor de Softcatalà, el
-diccionario y el modelo de spaCy. El modelo Whisper catalán (~3 GB) se baja solo la
-primera vez que transcribes. Datos de la app en la carpeta estándar de tu SO
-(`Application Support` en Mac, `AppData\Roaming` en Windows, `~/.local/share` en Linux).
+The installer creates the venv (Python 3.12) and downloads the translator,
+dictionary and spaCy model. The Whisper model (~3 GB) downloads itself the
+first time you transcribe. App data lives in your OS's standard folder
+(`Application Support` on Mac, `AppData\Roaming` on Windows,
+`~/.local/share` on Linux).
 
-**Para las tarjetas necesitas Anki:**
-1. Instala [Anki](https://apps.ankiweb.net)
-2. En Anki: Herramientas → Complementos → Obtener complementos → código `2055492159` (AnkiConnect)
-3. Reinicia Anki y déjalo abierto mientras minas
+### Anki (for the cards)
 
-Si Anki está cerrado las tarjetas quedan en cola y se envían solas al abrirlo.
+1. Install [Anki](https://apps.ankiweb.net)
+2. In Anki: Tools → Add-ons → Get Add-ons → code `2055492159` (AnkiConnect)
+3. Restart Anki and keep it open while you mine
 
-## Uso
+If Anki is closed, cards queue up and send themselves when it opens.
 
-```bash
-./run.sh          # modo navegador: abre http://localhost:8977
-```
+## Usage
 
-**Ventana de escritorio:** en macOS, `./make-app.sh` crea `~/Applications/CatalàMiner.app`
-(ventana nativa WKWebView, icono en el Dock). En Windows/Linux, `python -m app.desktop`
-abre una ventana propia si hay motor webview (WebView2 / GTK); si no, cae al navegador
-automáticamente. El modo `./run.sh` / `.\run.bat` siempre funciona.
+1. Open a local file (mp4/mkv/mp3…), or paste a **YouTube / direct / HLS**
+   URL and hit **🔗 Watch online**. For offline HD, **⬇️ Import** downloads
+   with a real progress bar.
+2. Hit **🎙️ Transcribe** (use `small` for a quick test) — or use the video's
+   own subtitles if available.
+3. Click any word in the subtitle (or drag-select an expression).
+4. Review/edit the card in the popup and press **⏎**.
 
-**Compartir sin que cada uno instale:** si prefieres que un amigo la use sin instalar
-nada, activa ⚙️ → *Compartir* y comparte el enlace (misma red o Tailscale) — pero para
-que **cada uno tenga su copia independiente**, que instale con los pasos de arriba.
+**Shortcuts (Migaku map):** `A`/`←` previous sentence · `D`/`→` next ·
+`S`/`↓` replay · `Q` mine word under cursor · `⇧Q` open card editor ·
+`1-4` word status · `W` hide subs · `E` dual subtitles · `K` condensed
+playback · `G` subtitle browser · `P` auto-pause · `F` fullscreen ·
+`space` play/pause · `⏎` send card · `Esc` close. All remappable in ⚙️.
 
-1. Abre un archivo local (mp4/mkv/mp3…), o pega una URL de **YouTube / 3cat / enlace
-   directo** y pulsa **«🔗 Ver online»**: se reproduce en streaming al instante (yt-dlp
-   resuelve el mejor formato progresivo; 3cat hasta 576p, YouTube 360p) y las tarjetas
-   cortan audio+imagen desde la URL, sin descargar. Selector de calidad + auto-bajada si
-   se atasca. Para HD offline, **⬇️ Importar** descarga (con barra de progreso real).
-2. Pulsa **🎙️ Transcriure** (el modelo catalán ≈3 GB se descarga la primera vez;
-   usa `small` si quieres probar rápido). Si el video trae `.srt`/subtítulos de
-   YouTube en catalán, puedes usarlos directamente.
-3. Clica cualquier palabra del subtítulo (o selecciona una expresión arrastrando).
-4. Revisa/edita la tarjeta en el panel y pulsa **⏎**.
+## Troubleshooting
 
-**Atajos (mapa Migaku):** `A`/`←` frase anterior · `D`/`→` siguiente · `S`/`↓` repetir ·
-`Q` crear tarjeta en segundo plano (palabra bajo el cursor o popup abierto) · `⇧Q` abrir el
-editor de tarjeta · `1-4` estado de palabra
-(1 nueva · 2 aprendiendo · 3 conocida · 4 ignorar) · `W` ocultar subtítulos ·
-`Shift+W` ocultar línea ES · `E` dual · `G` navegador de subtítulos · `C` copiar frase ·
-`P` auto-pausa · `F` pantalla completa · `espacio` play/pausa · `⏎` enviar tarjeta · `Esc` cerrar.
-
-**📋 Panel «Palabras» (G → pestaña Palabras):** todos los lemas del video por bandas de
-frecuencia (Rank 1–100, 101–300…). Clic = diccionario; clic derecho = conocida ↔ nueva.
-**«Establecer nivel de vocabulario»** marca de un golpe las N palabras más frecuentes del
-catalán como conocidas (sin pisar lo que ya marcaste). Los subtítulos de YouTube usan los
-oficiales o los **automáticos** (etiqueta «Subs auto YouTube») antes de recurrir a Whisper.
-El popup añade **glosas del Wikcionario** (offline, ~4 MB, descarga única). La DB se
-respalda a diario en `backups/` (7 copias). Arquitectura preparada para más idiomas.
-
-**⚙️ Configuración:** mazo de Anki, tamaño de subtítulos en vivo, dual/auto-pausa/velocidad
-por defecto, IPA, funciones online (Viccionari, off por defecto), **atajos remapeables** y
-export/import de palabras conocidas. **⭐ i+1:** el chip cuenta las frases con exactamente
-una palabra nueva (las óptimas para minar); `R` salta entre ellas.
-
-**Estados de palabra (colores Migaku):** rojo = desconocida · naranja = aprendiendo
-(se marca sola al crear tarjeta) · sin marca = conocida · gris = ignorada · morado = seguimiento.
-Los estados se sincronizan con Anki: intervalo ≥ 21 días → conocida. El chip 📊 de la
-cabecera muestra el % del contenido que ya conoces.
-
-## Solución de problemas
-
-| Problema | Solución |
+| Problem | Fix |
 |---|---|
-| "Anki tancat" en el badge | Abre Anki con AnkiConnect instalado; la cola se envía sola |
-| El video no se reproduce | Los .mkv se remuxan a mp4 automáticamente al importar |
-| Traducciones vacías | Ejecuta `./install.sh` de nuevo (descarga el traductor) |
-| Transcripción lenta | Elige el modelo `small` en el selector |
+| "Anki closed" badge | Open Anki with AnkiConnect installed; the queue sends itself |
+| Video won't play | `.mkv` files are remuxed to mp4 automatically on import |
+| Empty translations | Run `./install.sh` again (downloads the translator) |
+| Slow transcription | Pick the `small` model in the selector |
 
-## Arquitectura
+## Architecture
 
-FastAPI + SQLite + vanilla JS. Piezas: [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-con [projecte-aina/faster-whisper-large-v3-ca-3catparla](https://huggingface.co/projecte-aina/faster-whisper-large-v3-ca-3catparla),
-[softcatala/translate-cat-spa](https://huggingface.co/softcatala/translate-cat-spa) (CTranslate2),
-bidix de [apertium/apertium-spa-cat](https://github.com/apertium/apertium-spa-cat),
-spaCy `ca_core_news_sm`, wordfreq, yt-dlp, AnkiConnect.
+FastAPI + SQLite + vanilla JS (no build step). Pieces:
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) with
+[projecte-aina/faster-whisper-large-v3-ca-3catparla](https://huggingface.co/projecte-aina/faster-whisper-large-v3-ca-3catparla),
+[softcatala/translate-cat-spa](https://huggingface.co/softcatala/translate-cat-spa)
+and OPUS-MT CTranslate2 models per language, Apertium bilingual dictionaries,
+spaCy, wordfreq, yt-dlp, Piper TTS, AnkiConnect.
 
-Multi-idioma: los perfiles viven en [`app/languages.py`](app/languages.py). El francés añade
-[gaudi/opus-mt-fr-es-ctranslate2](https://huggingface.co/gaudi/opus-mt-fr-es-ctranslate2),
-`fr_core_news_sm` y el bidix [apertium/apertium-fr-es](https://github.com/apertium/apertium-fr-es).
+Language profiles live in [`app/languages.py`](app/languages.py) — adding a
+language is mostly adding one entry there.
 
-Datos en `~/Library/Application Support/CatalaMiner/`.
-
-## Desarrollo
+## Development
 
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 116 tests
+.venv/bin/python -m pytest tests/    # 117 tests
 ```
 
-Ver [CONTRIBUTING.md](CONTRIBUTING.md). El CI (GitHub Actions) corre lint + tests en cada push.
+See [CONTRIBUTING.md](CONTRIBUTING.md). CI runs lint + tests on
+Linux/macOS/Windows on every push.
 
-## Licencia y uso
+## License & fair use
 
-Código bajo licencia [MIT](LICENSE) © 2026 Tomás Plaza.
+Code under the [MIT](LICENSE) license © 2026 thecopybookhare.
 
-⚠️ **Solo para uso personal y educativo.** La herramienta reproduce contenido de
-YouTube/3cat para estudio de idiomas; respeta los derechos de autor y los términos
-de cada plataforma. No redistribuyas el contenido descargado.
+⚠️ **Personal and educational use only.** The tool plays third-party content
+for language study; respect copyright and each platform's terms. Don't
+redistribute downloaded content.

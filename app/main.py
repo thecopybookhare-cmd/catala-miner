@@ -1,4 +1,4 @@
-"""CatalàMiner — FastAPI backend + static frontend."""
+"""LinguaMiner — FastAPI backend + static frontend."""
 import json
 import shutil
 import threading
@@ -89,7 +89,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="CatalaMiner", lifespan=lifespan)
+app = FastAPI(title="LinguaMiner", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -253,7 +253,7 @@ def _segment_es(sid: str, idx: int) -> str:
 
 
 DEFAULT_SETTINGS = {
-    "deck": "Català::Mining", "anki_port": None, "language": "ca",
+    "deck": "LinguaMiner::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
     "audio_trim": False, "ui_lang": "es",
@@ -1155,7 +1155,7 @@ def words_export():
          "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
          "statuses": db.word_statuses(CON, _lang())},
         headers={"Content-Disposition":
-                 "attachment; filename=catalaminer-paraules.json"})
+                 "attachment; filename=linguaminer-paraules.json"})
 
 
 class ImportReq(BaseModel):
@@ -1208,7 +1208,7 @@ def define(word: str):
             params={"action": "query", "prop": "extracts",
                     "explaintext": 1, "redirects": 1, "format": "json",
                     "titles": word},
-            timeout=6, headers={"User-Agent": "CatalaMiner/0.7"})
+            timeout=6, headers={"User-Agent": "LinguaMiner/0.7"})
         pages = r.json()["query"]["pages"]
         extract = next(iter(pages.values())).get("extract", "")
         # quedarnos con la sección catalana si existe

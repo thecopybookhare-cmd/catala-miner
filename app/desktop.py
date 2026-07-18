@@ -1,4 +1,4 @@
-"""CatalàMiner como app de escritorio: uvicorn en un hilo + ventana webview.
+"""LinguaMiner como app de escritorio: uvicorn en un hilo + ventana webview.
 Multiplataforma: WKWebView en macOS, WebView2 en Windows, GTK/QT en Linux;
 si no hay motor webview disponible, cae al navegador por defecto."""
 import logging
@@ -55,7 +55,7 @@ def _wait_port(port: int, secs: float = 20.0) -> bool:
 def main():
     _setup_logging()
     log = logging.getLogger("desktop")
-    log.info("arrancando CatalàMiner desktop, log en %s", LOG_PATH)
+    log.info("arrancando LinguaMiner desktop, log en %s", LOG_PATH)
     url = f"http://127.0.0.1:{config.PORT}"
     try:
         import webview
@@ -66,7 +66,7 @@ def main():
         try:
             threading.Thread(target=_serve, daemon=True).start()
             serving = _wait_port(config.PORT)
-            webview.create_window("CatalàMiner", url,
+            webview.create_window("LinguaMiner", url,
                                   width=1280, height=860, min_size=(980, 640))
             webview.start()
             log.info("cerrado normalmente")

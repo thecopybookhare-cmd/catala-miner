@@ -1,7 +1,7 @@
-// Service worker de CatalàMiner. Convierte la web en PWA instalable y da un
+// Service worker de LinguaMiner. Convierte la web en PWA instalable y da un
 // arranque offline del "shell". Nunca cachea /api/ ni /media/ (dinámicos y
 // pesados). CACHE va atado a la versión de pyproject (lo garantiza test_assets).
-const CACHE = "catalaminer-0.9.19";
+const CACHE = "linguaminer-1.0.0";
 const SHELL = [
   "/",
   "/index.html",

@@ -88,19 +88,32 @@ BACK = """{{FrontSide}}<hr id=answer>
 <div class="font">{{Font}} · {{Freq}}</div>"""
 
 
-def ensure_note_type():
+def model_in_use() -> str:
+    """Nombre del modelo en el Anki del usuario. Las instalaciones previas
+    crearon «CatalaMiner»; si existe (y no el nuevo) se sigue usando para
+    no partir la colección en dos tipos de nota."""
+    names = invoke("modelNames") or []
+    if config.NOTE_TYPE not in names and config.NOTE_TYPE_LEGACY in names:
+        return config.NOTE_TYPE_LEGACY
+    return config.NOTE_TYPE
+
+
+def ensure_note_type() -> str:
     """Create the note type, or sync its templates/styling if it exists
-    (so template improvements reach decks created by older versions)."""
-    if config.NOTE_TYPE not in invoke("modelNames"):
-        invoke("createModel", modelName=config.NOTE_TYPE,
+    (so template improvements reach decks created by older versions).
+    Returns the model name in use."""
+    model = model_in_use()
+    if model not in (invoke("modelNames") or []):
+        invoke("createModel", modelName=model,
                inOrderFields=config.NOTE_FIELDS, css=CARD_CSS,
                cardTemplates=[{"Name": "Card 1", "Front": FRONT, "Back": BACK}])
-        return
+        return model
     invoke("updateModelTemplates",
-           model={"name": config.NOTE_TYPE,
+           model={"name": model,
                   "templates": {"Card 1": {"Front": FRONT, "Back": BACK}}})
     invoke("updateModelStyling",
-           model={"name": config.NOTE_TYPE, "css": CARD_CSS})
+           model={"name": model, "css": CARD_CSS})
+    return model
 
 
 def find_cards(query: str) -> list[int]:
@@ -118,7 +131,7 @@ def note_intervals(note_ids: list[int]) -> dict[int, int]:
     if not note_ids:
         return {}
     card_ids = invoke("findCards",
-                      query=f'"note:{config.NOTE_TYPE}"')
+                      query=f'"note:{model_in_use()}"')
     infos = invoke("cardsInfo", cards=card_ids) or []
     out: dict[int, int] = {}
     wanted = set(note_ids)
@@ -129,10 +142,10 @@ def note_intervals(note_ids: list[int]) -> dict[int, int]:
     return out
 
 
-def build_note(card: dict, deck: str) -> dict:
+def build_note(card: dict, deck: str, model: str | None = None) -> dict:
     return {
         "deckName": deck,
-        "modelName": config.NOTE_TYPE,
+        "modelName": model or config.NOTE_TYPE,
         "fields": {
             "Paraula": card["paraula"] or "",
             "ParaulaES": card["paraula_es"] or "",
@@ -144,13 +157,13 @@ def build_note(card: dict, deck: str) -> dict:
             "Freq": card.get("freq_rank") or "",
         },
         "options": {"allowDuplicate": False},
-        "tags": ["catala-miner"],
+        "tags": ["lingua-miner"],
     }
 
 
 def send_card(card: dict, deck: str) -> int:
     """Upload media + note. Raises AnkiError/requests errors if Anki is down."""
-    ensure_note_type()
+    model = ensure_note_type()
     if deck not in invoke("deckNames"):
         invoke("createDeck", deck=deck)
     for key in ("audio_file", "image_file"):
@@ -160,4 +173,4 @@ def send_card(card: dict, deck: str) -> int:
             if path.exists():
                 invoke("storeMediaFile", filename=name,
                        data=base64.b64encode(path.read_bytes()).decode())
-    return invoke("addNote", note=build_note(card, deck))
+    return invoke("addNote", note=build_note(card, deck, model))
