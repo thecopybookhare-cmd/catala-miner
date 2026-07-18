@@ -16,6 +16,18 @@ def test_naive_tokenize_keeps_catalan_clitics():
     assert any(t["t"] == "," and not t["is_word"] for t in toks)
 
 
+def test_wordlike_excludes_numbers_and_sub_artifacts():
+    # engendros reales de subs automáticos de YouTube que salían en el panel
+    for junk in ("què?-no", "tant.-i", "no?-m'", "3", "18", "gai?-home"):
+        assert not nlp.is_wordlike(junk), junk
+    # palabras legítimas con apóstrofo/guion/punt volat/elisión
+    for ok in ("n'hi", "anem-hi", "l·l", "peut-être", "l'", "'s", "casa"):
+        assert nlp.is_wordlike(ok), ok
+    toks = nlp.naive_tokenize("Té 18 anys, oi?")
+    by_text = {t["t"]: t["is_word"] for t in toks}
+    assert by_text["18"] is False and by_text["anys"] is True
+
+
 def test_naive_tokenize_ws_reconstructs_text():
     # «ws» permite al frontend reconstruir el espaciado original exacto
     text = "Aquesta campanya, oi? No."

@@ -7,10 +7,22 @@ import re
 
 _WORD = re.compile(r"[\w·]+(?:['’][\w·]+)*", re.UNICODE)
 
+# Qué cuenta como palabra de vocabulario: letras con apóstrofos/guiones/punt
+# volat interiores («n'hi», «anem-hi», «l·l», «peut-être») y elisiones al
+# borde («l'», «'s»). Números y engendros de subs automáticos («què?-no»,
+# «tant.-i») quedan fuera del panel de palabras y del % conocido.
+_WORDLIKE = re.compile(r"['’]?[^\W\d_]+(?:[·'’-][^\W\d_]+)*['’]?", re.UNICODE)
+
+
+def is_wordlike(text: str) -> bool:
+    return bool(_WORDLIKE.fullmatch(text))
+
+
 _NLPS: dict = {}   # modelo spaCy por idioma
 
 # Bump para re-tokenizar transcripciones guardadas con lemas antiguos.
-TOK_VERSION = 1
+# v2: is_word estricto (fuera números y tokens con puntuación interna) + ws.
+TOK_VERSION = 2
 
 _POS_EQ = {("VERB", "AUX"), ("AUX", "VERB")}
 
@@ -79,9 +91,10 @@ def naive_tokenize(text: str) -> list[dict]:
                              "is_word": False, "zipf": 0.0,
                              "ws": " " if gap[-1:].isspace() else ""})
         w = m.group(0)
-        lemma, pos = _correct(w, w.lower(), "")
+        word = is_wordlike(w)
+        lemma, pos = _correct(w, w.lower(), "") if word else ("", "")
         toks.append({"t": w, "lemma": lemma, "pos": pos,
-                     "is_word": True, "zipf": zipf(w),
+                     "is_word": word, "zipf": zipf(w) if word else 0.0,
                      "ws": " " if text[m.end():m.end() + 1].isspace() else ""})
         i = m.end()
     tail = text[i:].strip()
@@ -101,7 +114,7 @@ def tokenize(text: str) -> list[dict]:
     for tok in nlp_model(text):
         if tok.is_space:
             continue
-        is_word = not tok.is_punct
+        is_word = not tok.is_punct and is_wordlike(tok.text)
         lemma, pos = ("", "")
         if is_word:
             lemma, pos = _correct(tok.text, tok.lemma_.lower(), tok.pos_)
