@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>LinguaMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="/favicon.png?v=1.1.0">
+<link rel="icon" href="/favicon.png?v=1.2.0">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0c0d13">
@@ -12,16 +12,42 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LinguaMiner">
-<link rel="stylesheet" href="/style.css?v=1.1.0">
+<link rel="stylesheet" href="/style.css?v=1.2.0">
 </head>
 <body>
+<!-- sprite de iconos (estilo Lucide: 24×24, trazo 2, sin relleno) -->
+<svg hidden xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+  <symbol id="i-speech" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></symbol>
+  <symbol id="i-captions" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 12h2M13 12h4M7 15.5h4M15 15.5h2"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 12h2l2-7 3 14 3-10 2 6 2-3h6"/></symbol>
+</svg>
 <header>
   <h1 id="brand"><span class="brand-dot"></span>LinguaMiner</h1>
   <div class="header-right">
     <div id="rec-chip" class="badge" hidden title="Frases con exactamente 1 palabra nueva (i+1) — clic o tecla R para saltar entre ellas"></div>
     <div id="comp-chip" class="badge" hidden title="Porcentaje de palabras de este contenido que ya conoces"></div>
-    <div id="stats-btn" class="badge" title="Estadísticas" data-i18n-title="hdr.stats">📊</div>
-    <div id="settings-btn" class="badge" title="Configuración" data-i18n-title="hdr.settings">⚙️</div>
+    <div id="stats-btn" class="badge icon-badge" role="button" tabindex="0" title="Estadísticas" data-i18n-title="hdr.stats" aria-label="Estadísticas"><svg class="ic"><use href="#i-chart"/></svg></div>
+    <div id="settings-btn" class="badge icon-badge" role="button" tabindex="0" title="Configuración" data-i18n-title="hdr.settings" aria-label="Configuración"><svg class="ic"><use href="#i-gear"/></svg></div>
     <div id="anki-badge" class="badge" title="Haz clic para configurar el puerto de AnkiConnect">Anki…</div>
   </div>
 </header>
@@ -31,38 +57,41 @@
     <h2 data-i18n="hero.title">Tu biblioteca</h2>
     <p class="hero-sub" id="hero-sub">Mina idiomas desde tus videos — tarjetas con audio, imagen y traducción directas a Anki.</p>
     <div class="new-session">
-      <label class="filebtn primary"><span data-i18n="hero.open">📁 Abrir archivo</span>
+      <label class="filebtn primary"><svg class="ic"><use href="#i-folder"/></svg><span data-i18n="hero.open">Abrir archivo</span>
         <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.srt,.vtt">
       </label>
       <div class="yt">
         <input type="url" id="yt-url" placeholder="URL de YouTube o enlace directo (.mp4, .m3u8)…" data-i18n-ph="hero.url_ph">
-        <button id="yt-btn" title="Descargar con yt-dlp (YouTube)" data-i18n="hero.import">⬇️ Importar</button>
-        <button id="url-btn" title="Streaming sin descargar: YouTube, 3cat o enlace directo" data-i18n="hero.online">🔗 Ver online</button>
+        <button id="yt-btn" title="Descargar con yt-dlp (YouTube)"><svg class="ic"><use href="#i-download"/></svg><span data-i18n="hero.import">Importar</span></button>
+        <button id="url-btn" title="Streaming sin descargar: YouTube, 3cat o enlace directo"><svg class="ic"><use href="#i-link"/></svg><span data-i18n="hero.online">Ver online</span></button>
       </div>
     </div>
   </section>
   <section id="onboarding" hidden>
     <div class="onb-card">
       <div class="onb-head">
-        <h3 data-i18n="onb.title">👋 Primeros pasos</h3>
-        <button id="onb-dismiss" class="small" title="Ocultar">✕</button>
+        <h3 data-i18n="onb.title">Primeros pasos</h3>
+        <button id="onb-dismiss" class="small close-btn" title="Ocultar" aria-label="Ocultar"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <ul id="onb-checks"></ul>
       <div class="onb-actions">
-        <button id="onb-download" class="primary" hidden data-i18n="onb.download">⬇️ Descargar traductor y diccionarios</button>
-        <button id="onb-recheck" class="small" data-i18n="onb.recheck">↻ Volver a comprobar</button>
+        <button id="onb-download" class="primary" hidden><svg class="ic"><use href="#i-download"/></svg><span data-i18n="onb.download">Descargar traductor y diccionarios</span></button>
+        <button id="onb-recheck" class="small"><svg class="ic"><use href="#i-refresh"/></svg><span data-i18n="onb.recheck">Volver a comprobar</span></button>
       </div>
     </div>
   </section>
   <section id="lib-search-sec" hidden>
-    <input type="search" id="lib-search" autocomplete="off"
-           placeholder="🔍 Buscar en los subtítulos de tu biblioteca…"
-           data-i18n-ph="lib.search_ph">
+    <div class="search-wrap">
+      <svg class="ic search-ic"><use href="#i-search"/></svg>
+      <input type="search" id="lib-search" autocomplete="off"
+             placeholder="Buscar en los subtítulos de tu biblioteca…"
+             data-i18n-ph="lib.search_ph">
+    </div>
     <div id="search-results" hidden></div>
   </section>
   <section>
     <div id="session-list" class="scard-grid"></div>
-    <p id="library-empty" class="dim" hidden data-i18n="lib.empty">Tu biblioteca está vacía. Abre un archivo, o pega un enlace de <b>YouTube / 3cat</b> y pulsa <b>🔗 Ver online</b> para empezar.</p>
+    <p id="library-empty" class="dim" hidden data-i18n="lib.empty">Tu biblioteca está vacía. Abre un archivo, o pega un enlace de <b>YouTube / 3cat</b> y pulsa <b>Ver online</b> para empezar.</p>
   </section>
 </main>
 
@@ -75,8 +104,8 @@
         <option value="large-v3">Whisper large-v3 genérico</option>
         <option value="small">Whisper small — rápido</option>
       </select>
-      <button id="transcribe-btn" data-i18n="pl.transcribe">🎙️ Transcribir</button>
-      <label class="filebtn small">📎 .srt
+      <button id="transcribe-btn"><svg class="ic"><use href="#i-mic"/></svg><span data-i18n="pl.transcribe">Transcribir</span></button>
+      <label class="filebtn small"><svg class="ic"><use href="#i-paperclip"/></svg>.srt
         <input type="file" id="subs-input" accept=".srt,.vtt">
       </label>
     </div>
@@ -117,7 +146,7 @@
           <div id="quality-menu" hidden></div>
         </div>
         <button class="icon" id="speed-btn" title="Velocidad de reproducción">1×</button>
-        <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)">🇪🇸</button>
+        <button class="icon toggle" id="dual-btn" title="Subtítulo dual en español (E)"><svg class="ic"><use href="#i-captions"/></svg></button>
         <button class="icon toggle" id="autopause-btn" title="Auto-pausa al final de cada frase (P)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.2"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="9" x2="14" y2="15"/></svg>
         </button>
@@ -138,7 +167,7 @@
         </button>
       </div>
       </div>
-      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada ⭐ · 1-4 estado · W subs · E dual · K condensado · [ ] sincronía · G transcripción · F pantalla completa · ? ayuda · ⚙️ atajos</div>
+      <div id="help-line">A/D frase · S repetir · Q tarjeta · ⇧Q editar · R recomendada · 1-4 estado · W subs · E dual · K condensado · [ ] sincronía · G transcripción · F pantalla completa · ? ayuda · atajos</div>
 
       <aside id="card-panel" hidden>
         <h3 data-i18n="card.new">Nueva tarjeta</h3>
@@ -156,7 +185,7 @@
         <img id="c-image" alt="">
         <div class="row actions">
           <button id="c-cancel" data-i18n="card.cancel">Cancelar</button>
-          <button id="c-send" class="primary" data-i18n="card.add">➕ Añadir a Anki (⏎)</button>
+          <button id="c-send" class="primary" data-i18n="card.add">Añadir a Anki (⏎)</button>
         </div>
       </aside>
 
@@ -164,18 +193,18 @@
         <span id="wp-arrow"></span>
         <div class="wp-head">
           <span id="wp-word"></span><span id="wp-ipa"></span>
-          <button id="wp-close">✕</button>
+          <button id="wp-close" class="close-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
         </div>
         <div class="wp-chips">
           <span id="wp-level" class="wp-chip"></span>
           <span id="wp-meta"></span>
         </div>
         <div class="wp-icons">
-          <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)">🔊</button>
-          <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)">➕</button>
-          <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)">✏️</button>
-          <button id="wp-say" class="wp-ic" title="Pronunciar palabra" hidden>🗣</button>
-          <button id="wp-dict" class="wp-ic" title="Definición del Viccionari (online)" hidden>🌐</button>
+          <button id="wp-replay" class="wp-ic" title="Repetir segmento (S)" aria-label="Repetir segmento"><svg class="ic"><use href="#i-volume"/></svg></button>
+          <button id="wp-card" class="wp-ic wp-primary" title="Crear tarjeta (Q)" aria-label="Crear tarjeta"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <button id="wp-edit" class="wp-ic" title="Editar y crear (⇧Q)" aria-label="Editar y crear"><svg class="ic"><use href="#i-pencil"/></svg></button>
+          <button id="wp-say" class="wp-ic" title="Pronunciar palabra" aria-label="Pronunciar palabra" hidden><svg class="ic"><use href="#i-speech"/></svg></button>
+          <button id="wp-dict" class="wp-ic" title="Definición del Viccionari (online)" aria-label="Definición online" hidden><svg class="ic"><use href="#i-globe"/></svg></button>
         </div>
         <div id="wp-ctx">
           <div id="wp-sentence-es"></div>
@@ -184,7 +213,7 @@
         <div id="wp-senses"></div>
         <div id="wp-gloss" hidden></div>
         <div id="wp-userdefs" hidden></div>
-        <button id="wp-conj-btn" class="wp-conj-btn" hidden data-i18n="conj.btn">📖 Conjugació</button>
+        <button id="wp-conj-btn" class="wp-conj-btn" hidden><svg class="ic"><use href="#i-book"/></svg><span data-i18n="conj.btn">Conjugació</span></button>
         <div id="wp-examples"></div>
         <div id="wp-def" class="dim" hidden></div>
         <div id="wp-foot"><span class="dim">→</span>
@@ -218,7 +247,7 @@
 
 <div id="settings-view" class="modal-view" hidden>
   <div id="settings-box" class="modal-box">
-    <div class="stats-head"><h2 data-i18n="set.title">⚙️ Configuración</h2><button id="settings-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="set.title">Configuración</h2><button id="settings-close" class="close-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button></div>
     <section>
       <h3 data-i18n="set.sec_lang">Idioma</h3>
       <div class="set-row"><label data-i18n="set.ui_lang">Idioma de la interfaz</label>
@@ -233,17 +262,17 @@
         <select id="set-language"></select></div>
     </section>
     <section id="update-section" hidden>
-      <h3 data-i18n="set.sec_update">⬆️ Actualizaciones</h3>
+      <h3 data-i18n="set.sec_update">Actualizaciones</h3>
       <div class="set-row">
         <span id="update-status" class="dim" data-i18n="set.upd_idle">Comprueba si hay una versión nueva.</span>
         <span>
-          <button id="update-check" class="small" data-i18n="set.upd_check">↻ Buscar actualizaciones</button>
-          <button id="update-apply" class="small primary" hidden data-i18n="set.upd_apply">⬆️ Actualizar ahora</button>
+          <button id="update-check" class="small" data-i18n="set.upd_check">Buscar actualizaciones</button>
+          <button id="update-apply" class="small primary" hidden data-i18n="set.upd_apply">Actualizar ahora</button>
         </span>
       </div>
     </section>
     <section id="share-section">
-      <h3 data-i18n="set.sec_share">📡 Compartir con amigos</h3>
+      <h3 data-i18n="set.sec_share">Compartir con amigos</h3>
       <p class="dim" data-i18n="set.share_desc">Sirve la app a tu red local o a tu <b>Tailscale</b> para que un amigo (o tu móvil) la use en el navegador. Solo mientras esté activo — nada se expone hasta que lo enciendes.</p>
       <div class="set-row"><label data-i18n="set.share_row">Modo compartir</label>
         <input id="set-share" type="checkbox"></div>
@@ -304,8 +333,8 @@
     <section>
       <h3 data-i18n="set.sec_data">Datos</h3>
       <div class="set-row">
-        <a id="set-export" href="/api/words/export" download data-i18n="set.export">⬇️ Exportar palabras conocidas</a>
-        <label class="filebtn small"><span data-i18n="set.import">⬆️ Importar</span>
+        <a id="set-export" href="/api/words/export" download data-i18n="set.export">Exportar palabras conocidas</a>
+        <label class="filebtn small"><span data-i18n="set.import">Importar</span>
           <input type="file" id="set-import" accept=".json">
         </label>
       </div>
@@ -315,21 +344,21 @@
 
 <div id="stats-view" hidden>
   <div id="stats-box">
-    <div class="stats-head"><h2 data-i18n="stats.title">📊 Estadísticas</h2><button id="stats-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="stats.title">Estadísticas</h2><button id="stats-close" class="close-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button></div>
     <div id="stats-body"></div>
   </div>
 </div>
 
 <div id="help-view" class="modal-view" hidden>
   <div class="modal-box">
-    <div class="stats-head"><h2 data-i18n="help.title">⌨️ Atajos de teclado</h2><button id="help-close">✕</button></div>
+    <div class="stats-head"><h2 data-i18n="help.title">Atajos de teclado</h2><button id="help-close" class="close-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button></div>
     <div id="help-body"></div>
   </div>
 </div>
 
 <div id="conj-view" class="modal-view" hidden>
   <div class="modal-box">
-    <div class="stats-head"><h2 id="conj-title">Conjugació</h2><button id="conj-close">✕</button></div>
+    <div class="stats-head"><h2 id="conj-title">Conjugació</h2><button id="conj-close" class="close-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button></div>
     <div id="conj-body"></div>
   </div>
 </div>
@@ -337,7 +366,7 @@
 <div id="progress-pill" hidden>
   <progress id="gp-bar" max="1" value="0"></progress>
   <span id="gp-msg"></span>
-  <button id="gp-close" hidden title="Cerrar">✕</button>
+  <button id="gp-close" class="close-btn" hidden title="Cerrar" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
 </div>
 
 <dialog id="level-dlg">
@@ -376,7 +405,7 @@
     });
   }
 </script>
-<script src="/i18n.js?v=1.1.0"></script>
-<script src="/app.js?v=1.1.0"></script>
+<script src="/i18n.js?v=1.2.0"></script>
+<script src="/app.js?v=1.2.0"></script>
 </body>
 </html>

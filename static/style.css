@@ -678,3 +678,112 @@ button.small { font-size: 12px; padding: 6px 10px; }
   border-left: 8px solid transparent; border-right: 8px solid transparent; }
 #wp-arrow.down { bottom: -8px; border-top: 8px solid var(--panel2); }
 #wp-arrow.up   { top: -8px;   border-bottom: 8px solid var(--panel2); }
+
+/* ============ v1.2 pase premium: iconos SVG, foco, feedback ============ */
+
+/* iconos del sprite: trazo consistente, alineados al texto */
+.ic {
+  width: 17px; height: 17px; flex-shrink: 0;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ic-xs { width: 13px; height: 13px; stroke-width: 2.2; }
+
+button, .filebtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.pill, .badge { display: inline-flex; align-items: center; gap: 5px; }
+
+/* botones de icono del header: área táctil cómoda */
+.icon-badge { padding: 8px 10px; }
+.icon-badge:hover { color: var(--fg); border-color: var(--vio); background: var(--vio-soft); }
+
+/* botones de cerrar */
+.close-btn { padding: 7px; border-radius: 10px; line-height: 0; }
+.close-btn .ic { width: 15px; height: 15px; }
+
+/* buscador con icono integrado */
+.search-wrap { position: relative; }
+.search-wrap .search-ic {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--dim); pointer-events: none;
+}
+.search-wrap input { width: 100%; padding-left: 40px; }
+
+/* dots de estado del onboarding */
+.onb-dot {
+  width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+  margin-right: 9px; flex-shrink: 0; background: var(--dim);
+}
+.onb-dot.ok { background: var(--green); box-shadow: 0 0 8px #4fc38366; }
+.onb-dot.warn { background: var(--amber); box-shadow: 0 0 8px #e5a04c66; }
+.onb-dot.opt { background: #3a4059; }
+
+/* placeholder de miniatura sin video */
+.thumb-ph { width: 30px; height: 30px; color: #3a4059; stroke-width: 1.6; }
+
+/* foco visible para teclado (accesibilidad) sin ensuciar el clic */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--vio); outline-offset: 2px;
+  border-radius: 6px;
+}
+input:focus-visible, select:focus-visible { outline-offset: 0; }
+
+/* feedback de pulsación inmediato (sin mover el layout vecino) */
+button:active, .filebtn:active, .badge:active { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) {
+  button:active, .filebtn:active, .badge:active { transform: none; }
+}
+
+/* scrollbars finas y del tema */
+#side-panel, .modal-box, #wp-senses, #search-results {
+  scrollbar-width: thin; scrollbar-color: #2c3150 transparent;
+}
+#side-panel::-webkit-scrollbar, .modal-box::-webkit-scrollbar,
+#search-results::-webkit-scrollbar { width: 8px; }
+#side-panel::-webkit-scrollbar-thumb, .modal-box::-webkit-scrollbar-thumb,
+#search-results::-webkit-scrollbar-thumb {
+  background: #2c3150; border-radius: 99px; border: 2px solid transparent;
+  background-clip: content-box;
+}
+#side-panel::-webkit-scrollbar-thumb:hover { background: #3a4059; background-clip: content-box; }
+
+/* selección de texto del tema */
+::selection { background: #8b7cf855; }
+
+/* elevación refinada de paneles y tarjetas */
+.onb-card, #side-panel { box-shadow: 0 8px 28px #00000040; }
+.modal-box { box-shadow: 0 24px 70px #000000a0, 0 0 0 1px #ffffff0a; }
+
+/* cursor correcto en todo lo clicable */
+button, .filebtn, .badge, .pill, .scard, .w, .sense, label[for] { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+
+/* tap highlight móvil fuera (el feedback lo damos nosotros) */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* lo oculto se queda oculto: el display de autor no debe pisar [hidden] */
+[hidden] { display: none !important; }
+/* el id #lib-search gana especificidad al padding del wrap */
+#lib-search { padding-left: 40px; }
+
+/* popup nunca desborda el viewport: scroll interno si el contenido es alto */
+#word-pop { max-height: calc(100vh - 20px); overflow-y: auto; overscroll-behavior: contain; }
+/* icono de glosa alineado con respiro */
+.wp-gl .ic { vertical-align: -2.5px; margin-right: 6px; width: 13px; height: 13px; }
+.wp-conj-btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* controles de formulario del tema (los nativos blancos rompían el modo oscuro) */
+.modal-box select, .modal-box input[type="number"], .modal-box input[type="text"],
+.modal-box input[type="url"] {
+  background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 11px; font: inherit; font-size: 13.5px;
+  transition: border-color .15s ease;
+}
+.modal-box select:hover, .modal-box input:hover { border-color: #3a4059; }
+.modal-box select:focus, .modal-box input:focus { border-color: var(--vio); }
+.modal-box input[type="checkbox"] {
+  accent-color: var(--vio); width: 17px; height: 17px; cursor: pointer;
+}
+.modal-box input[type="range"] { accent-color: var(--vio); }
