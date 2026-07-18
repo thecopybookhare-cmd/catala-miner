@@ -1370,8 +1370,18 @@ def stats():
         "SELECT substr(created_at,1,10) d, COUNT(*) n FROM cards "
         "GROUP BY d ORDER BY d DESC LIMIT 30").fetchall()
     mined_by_day = [{"date": r["d"], "n": r["n"]} for r in reversed(mday)]
+    # racha: días seguidos minando (hoy cuenta; si hoy aún no, desde ayer)
+    from datetime import date, timedelta
+    days = {r["created_at"][:10] for r in rows}
+    d = date.today()
+    if d.isoformat() not in days:
+        d -= timedelta(days=1)
+    streak = 0
+    while d.isoformat() in days:
+        streak += 1
+        d -= timedelta(days=1)
     out = {"total_cards": len(rows), "by_month": by_month,
-           "status_counts": status_counts,
+           "status_counts": status_counts, "streak_days": streak,
            "known_over_time": known_over_time, "mined_by_day": mined_by_day,
            "sessions": len(db.list_sessions(CON)), "anki": None}
     if anki.is_up(_settings().get("anki_port")):

@@ -1243,10 +1243,11 @@ async function openStats() {
   const sc = s.status_counts || {};
   const growth = s.known_over_time || [];
   const kpis = `<div class="kpi-row">
-    ${kpiTile(sc.known || 0, "conocidas", "#4fc383")}
-    ${kpiTile(sc.learning || 0, "aprendiendo", "#e5a04c")}
-    ${kpiTile(s.total_cards, "minadas", "#8b7cf8")}
-    ${kpiTile(s.anki && s.anki.retention !== null ? s.anki.retention + "%" : "—", "retención", "#6fb3ff")}
+    ${kpiTile(sc.known || 0, t("stats.known"), "#4fc383")}
+    ${kpiTile(sc.learning || 0, t("stats.learning"), "#e5a04c")}
+    ${kpiTile(s.total_cards, t("stats.mined"), "#8b7cf8")}
+    ${kpiTile((s.streak_days || 0) + " 🔥", t("stats.streak"), "#e0564d")}
+    ${kpiTile(s.anki && s.anki.retention !== null ? s.anki.retention + "%" : "—", t("stats.retention"), "#6fb3ff")}
   </div>`;
   let html = kpis + `
     <section><h3>Palabras conocidas · progreso</h3>

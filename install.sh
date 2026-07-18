@@ -42,8 +42,23 @@ if [ "$(uname)" = "Darwin" ]; then
   echo
   echo "¡Listo! Abre LinguaMiner.app (Launchpad/Spotlight) o ejecuta ./run.sh"
 else
+  # lanzador de escritorio en Linux (menú de aplicaciones)
+  APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+  mkdir -p "$APPS_DIR"
+  cat > "$APPS_DIR/linguaminer.desktop" <<DESK
+[Desktop Entry]
+Type=Application
+Name=LinguaMiner
+Comment=Mine languages from video — Anki cards in one click
+Exec=$(pwd)/run.sh
+Path=$(pwd)
+Icon=$(pwd)/static/icons/icon-512.png
+Terminal=false
+Categories=Education;Languages;
+DESK
+  chmod +x "$APPS_DIR/linguaminer.desktop" 2>/dev/null || true
   echo
-  echo "¡Listo! Arranca con:  ./run.sh    (abre la app en tu navegador)"
+  echo "¡Listo! Arranca con:  ./run.sh    o desde el menú de aplicaciones (LinguaMiner)"
 fi
 echo "Opcional: instala Anki (https://apps.ankiweb.net) + add-on AnkiConnect (2055492159)."
 echo "El modelo Whisper catalán (≈3 GB) se descarga solo al transcribir por primera vez."
