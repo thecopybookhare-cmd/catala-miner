@@ -114,6 +114,7 @@ _ADMIN_POSTS = {
     "/api/settings", "/api/anki/deck", "/api/anki/port",
     "/api/setup/download", "/api/words/import",
     "/api/sessions/upload", "/api/sessions/youtube", "/api/sessions/stream",
+    "/api/update/apply",
 }
 
 
@@ -1225,6 +1226,23 @@ def define(word: str):
         return {"text": extract.strip()[:800]}
     except Exception:
         return {"text": ""}
+
+
+# ---------- actualización ----------
+
+@app.get("/api/update/check")
+def update_check():
+    from . import update
+    return update.check()
+
+
+@app.post("/api/update/apply")
+def update_apply():
+    from . import update
+    r = update.apply()
+    if "error" not in r:
+        r["installer"] = update.installer_hint()
+    return r
 
 
 # ---------- configuración ----------

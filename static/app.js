@@ -1484,6 +1484,37 @@ $("set-share").onchange = async () => {
 };
 $("settings-btn").onclick = openSettings;
 $("settings-close").onclick = () => { $("settings-view").hidden = true; };
+
+// ---------- actualizaciones (solo el equipo anfitrión; invitados: 403) ----------
+if (["localhost", "127.0.0.1"].includes(location.hostname))
+  $("update-section").hidden = false;
+$("update-check").onclick = async () => {
+  $("update-status").textContent = t("set.upd_checking");
+  $("update-apply").hidden = true;
+  try {
+    const r = await api("/api/update/check");
+    if (r.error) { $("update-status").textContent = `${t("set.upd_err")}: ${r.error}`; return; }
+    if (!r.git) { $("update-status").textContent = t("set.upd_nogit"); return; }
+    if (r.behind > 0) {
+      $("update-status").textContent = t("set.upd_avail", r.behind, r.latest);
+      $("update-apply").hidden = false;
+    } else {
+      $("update-status").textContent = t("set.upd_ok", r.current);
+    }
+  } catch { $("update-status").textContent = t("set.upd_err"); }
+};
+$("update-apply").onclick = async () => {
+  $("update-apply").disabled = true;
+  $("update-status").textContent = t("set.upd_updating");
+  try {
+    const r = await api("/api/update/apply", { method: "POST" });
+    if (r.error) { $("update-status").textContent = `${t("set.upd_err")}: ${r.error}`; return; }
+    $("update-apply").hidden = true;
+    $("update-status").textContent = r.deps_changed
+      ? t("set.upd_done_deps", r.installer) : t("set.upd_done");
+  } catch { $("update-status").textContent = t("set.upd_err"); }
+  finally { $("update-apply").disabled = false; }
+};
 $("settings-view").onclick = (e) => { if (e.target === $("settings-view")) $("settings-view").hidden = true; };
 
 $("set-deck").onchange = async () => {
