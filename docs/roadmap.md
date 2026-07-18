@@ -128,3 +128,22 @@ Los 18 hallazgos de la revisión de código profunda, corregidos:
   badge de streaming ya no dice «En vivo».
 
 Pendiente menor: roles ARIA en los badges del header (a11y).
+
+## 🧭 Próximos grandes (v1.x)
+
+- [ ] **Idioma base configurable (hoy solo español).** Todas las traducciones y
+      glosas son X→es. Para un usuario que no hable español: perfiles de
+      traducción por par (OPUS-MT tiene X→en para ca/fr/de), glosas del
+      Wiktionary del idioma base (kaikki.org publica extractos por edición),
+      wordfreq ya es agnóstico. La UI ya soporta en; faltaría de/fr.
+      Tocaría `languages.py` (perfil = par estudio→base), `translate.py`,
+      `wikdict.py` y el selector de Ajustes.
+- [ ] **Conjugación multi-idioma.** Hoy solo catalán (diccionario de formas de
+      Softcatalà). Los extractos kaikki que ya descargamos para glosas incluyen
+      `forms` por entrada: se puede derivar una tabla de conjugación fr/en/de
+      sin fuentes nuevas. Tocaría `conjugation.py` + quitar el gate `ca` del
+      botón del popup.
+- [x] **v1.1.0** — Whisper multi-idioma real (language del perfil + selector
+      dinámico), lemas basura fuera del panel (TOK_VERSION=2), actualizador
+      integrado en Ajustes (git pull), i18n completa de la UI visible, icono
+      propio, lanzadores Windows/Linux, racha en estadísticas.
