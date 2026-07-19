@@ -656,6 +656,8 @@ function renderOverlay() {
   ca.style.display = HIDE_CA ? "none" : "";
   ca.innerHTML = tokenHtml(SEGS[CUR]);
   bindTokenEvents(ca, CUR);
+  // el popup abierto sigue a su palabra tras el re-render (su span murió)
+  if (POP && POP.anchor && !POP.anchor.isConnected) positionPopup(POP.anchor);
   if (DUAL && !HIDE_ES) fillDual(CUR);
 }
 
@@ -708,6 +710,11 @@ function wakeControls() {
 $("video-wrap").addEventListener("mousemove", wakeControls);
 $("video-wrap").addEventListener("touchstart", wakeControls, { passive: true });
 window.addEventListener("resize", syncCtlH);
+// al abrir el popup se pausa el video → aparecen los controles → el subtítulo
+// sube (lift): re-pegar el popup a la palabra cuando la transición termina
+$("overlay-sub").addEventListener("transitionend", (e) => {
+  if (e.propertyName === "bottom" && POP && POP.anchor) positionPopup(POP.anchor);
+});
 $("video-wrap").addEventListener("mouseleave", () => {
   if (!V.paused) { clearTimeout(CTL_TIMER); $("video-wrap").classList.add("hide-ctl"); }
 });
@@ -956,7 +963,20 @@ async function renderExamples(r) {
 for (const b of $("wp-status").querySelectorAll("button"))
   b.onclick = () => { if (POP) setStatus(POP.lemma, b.dataset.st); };
 
+// si el overlay se re-renderizó (cambio de estado, sync…), el span ancla
+// muere: se relocaliza el token equivalente en el DOM nuevo
+function refindAnchor() {
+  if (!POP || POP.segIndex !== CUR) return null;   // otra frase: no re-pegar
+  return [...document.querySelectorAll("#overlay-ca .t")]
+    .find((e) => e.textContent === POP.selection) || null;
+}
+
 function positionPopup(anchorEl) {
+  if (!anchorEl || !anchorEl.isConnected) {
+    anchorEl = refindAnchor();
+    if (!anchorEl) return;               // sin ancla: conservar posición actual
+    POP.anchor = anchorEl;
+  }
   const pop = $("word-pop");
   const rect = anchorEl.getBoundingClientRect();
   pop.hidden = false;
