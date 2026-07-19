@@ -787,3 +787,15 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   accent-color: var(--vio); width: 17px; height: 17px; cursor: pointer;
 }
 .modal-box input[type="range"] { accent-color: var(--vio); }
+
+/* KPI: valor en tinta de texto, identidad en la marca de color (dataviz) */
+.kpi-v { color: var(--fg) !important; }
+.kpi-dot {
+  width: 8px; height: 8px; border-radius: 3px; display: inline-block;
+  background: var(--kpi-c, var(--vio)); margin-right: 6px;
+  vertical-align: 0;
+}
+.kpi-l { display: flex; align-items: center; justify-content: center; }
+
+/* 5 KPIs en una fila equilibrada (y envuelven limpios en pantallas cortas) */
+.kpi-row { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }

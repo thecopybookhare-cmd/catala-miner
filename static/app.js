@@ -1190,7 +1190,7 @@ function svgBars(data, color = "#8b7cf8") {  // data: [[label, value], ...]
   const bars = data.map(([lab, v], i) => {
     const bh = Math.round((v / max) * (h - 34));
     const x = gap + i * (bw + gap), y = h - 18 - bh;
-    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="6" fill="${color}"/>
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="4" fill="${color}"><title>${lab}: ${v}</title></rect>
       <text x="${x + bw / 2}" y="${y - 4}" text-anchor="middle" class="sv">${v}</text>
       <text x="${x + bw / 2}" y="${h - 4}" text-anchor="middle" class="sl">${lab}</text>`;
   }).join("");
@@ -1201,18 +1201,23 @@ function svgDonut(counts) {  // {status: n}
   const entries = Object.entries(counts).filter(([, v]) => v > 0);
   const total = entries.reduce((a, [, v]) => a + v, 0);
   if (!total) return '<p class="dim">Sin palabras marcadas aún.</p>';
+  // hueco angular entre segmentos: codificación secundaria además del color
+  // (ámbar↔verde quedan a ΔE 7 en visión protán; el gap + etiquetas resuelven)
+  const GAP = entries.length > 1 ? 0.06 : 0;
   let a0 = -Math.PI / 2, paths = "";
   for (const [st, v] of entries) {
     const a1 = a0 + (v / total) * Math.PI * 2;
-    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const g = Math.min(GAP, (a1 - a0) / 3);
+    const large = (a1 - g) - (a0 + g) > Math.PI ? 1 : 0;
     const p = (a) => `${60 + 46 * Math.cos(a)},${60 + 46 * Math.sin(a)}`;
-    paths += `<path d="M ${p(a0)} A 46 46 0 ${large} 1 ${p(a1)}" stroke="${ST_COLORS[st] || "#888"}"
-      stroke-width="16" fill="none"/>`;
+    const pct = Math.round((v / total) * 100);
+    paths += `<path d="M ${p(a0 + g)} A 46 46 0 ${large} 1 ${p(a1 - g)}" stroke="${ST_COLORS[st] || "#888"}"
+      stroke-width="16" fill="none" stroke-linecap="round"><title>${ST_LABEL[st] || st}: ${v} (${pct}%)</title></path>`;
     a0 = a1;
   }
   const legend = entries.map(([st, v]) =>
-    `<span class="leg"><i style="background:${ST_COLORS[st] || "#888"}"></i>${ST_LABEL[st] || st}: ${v}</span>`).join("");
-  return `<div class="donut-row"><svg viewBox="0 0 120 120" width="120">${paths}
+    `<span class="leg"><i style="background:${ST_COLORS[st] || "#888"}"></i>${ST_LABEL[st] || st}: ${v} · ${Math.round((v / total) * 100)}%</span>`).join("");
+  return `<div class="donut-row"><svg viewBox="0 0 120 120" width="120" role="img">${paths}
     <text x="60" y="66" text-anchor="middle" class="sv">${total}</text></svg>
     <div class="legend">${legend}</div></div>`;
 }
@@ -1226,14 +1231,20 @@ function svgArea(points, color = "#4fc383") {  // [{date,total}]
   const y = (v) => h - 18 - (v / max) * (h - 30);
   const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.total).toFixed(1)}`).join(" ");
   const area = `${pad},${h - 18} ${line} ${w - pad},${h - 18}`;
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%" preserveAspectRatio="none">
+  // capa hover: un punto invisible con tooltip nativo por cada dato
+  const hover = points.map((p, i) =>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(p.total).toFixed(1)}" r="9" fill="transparent">
+      <title>${p.date}: ${p.total}</title></circle>`).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%" role="img">
     <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0" stop-color="${color}" stop-opacity=".35"/>
       <stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${pad}" y1="${h - 18}" x2="${w - pad}" y2="${h - 18}" stroke="#262b42" stroke-width="1"/>
     <polygon points="${area}" fill="url(#ga)"/>
-    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
-    <circle cx="${x(points.length - 1)}" cy="${y(max)}" r="4" fill="${color}"/>
-    <text x="${w - pad}" y="14" text-anchor="end" class="sv" fill="${color}">${max}</text>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${x(points.length - 1)}" cy="${y(points[points.length - 1].total)}" r="4" fill="${color}" stroke="#151827" stroke-width="2"/>
+    <text x="${w - pad}" y="14" text-anchor="end" class="sv">${max}</text>
+    ${hover}
   </svg>`;
 }
 
@@ -1252,8 +1263,9 @@ function svgActivity(days, color = "#8b7cf8") {  // [{date,n}]
 }
 
 function kpiTile(value, label, color) {
-  return `<div class="kpi"><div class="kpi-v" style="color:${color}">${value}</div>
-    <div class="kpi-l">${label}</div></div>`;
+  // el valor viste tinta de texto; la identidad la lleva la marca de color
+  return `<div class="kpi" style="--kpi-c:${color}"><div class="kpi-v">${value}</div>
+    <div class="kpi-l"><i class="kpi-dot"></i>${label}</div></div>`;
 }
 
 async function openStats() {
@@ -1266,7 +1278,7 @@ async function openStats() {
     ${kpiTile(sc.known || 0, t("stats.known"), "#4fc383")}
     ${kpiTile(sc.learning || 0, t("stats.learning"), "#e5a04c")}
     ${kpiTile(s.total_cards, t("stats.mined"), "#8b7cf8")}
-    ${kpiTile(s.streak_days || 0, t("stats.streak"), "#e0564d")}
+    ${kpiTile(s.streak_days || 0, t("stats.streak"), "#c678dd")}
     ${kpiTile(s.anki && s.anki.retention !== null ? s.anki.retention + "%" : "—", t("stats.retention"), "#6fb3ff")}
   </div>`;
   let html = kpis + `
