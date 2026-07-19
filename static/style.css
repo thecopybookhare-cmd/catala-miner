@@ -799,3 +799,20 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 
 /* 5 KPIs en una fila equilibrada (y envuelven limpios en pantallas cortas) */
 .kpi-row { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+
+/* ---------- móvil (≤ 480px): sin scroll horizontal jamás ---------- */
+@media (max-width: 480px) {
+  .yt { flex-wrap: wrap; min-width: 0; }
+  .yt input { min-width: 0; flex-basis: 100%; }
+  .yt button { flex: 1; }
+  main { padding: 18px 14px; }
+  header { padding: 10px 14px; }
+  .header-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .hero h2 { font-size: 25px; }
+  #stage { flex-direction: column; }
+  #side-panel { width: 100%; max-height: 45vh; }
+}
+@media (max-width: 480px) {
+  #transcribe-bar { min-width: 0; width: 100%; }
+  #model-select { max-width: 100%; min-width: 0; flex: 1 1 100%; }
+}
