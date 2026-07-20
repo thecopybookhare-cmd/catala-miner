@@ -131,13 +131,14 @@ Pendiente menor: roles ARIA en los badges del header (a11y).
 
 ## 🧭 Próximos grandes (v1.x)
 
-- [ ] **Idioma base configurable (hoy solo español).** Todas las traducciones y
-      glosas son X→es. Para un usuario que no hable español: perfiles de
-      traducción por par (OPUS-MT tiene X→en para ca/fr/de), glosas del
-      Wiktionary del idioma base (kaikki.org publica extractos por edición),
-      wordfreq ya es agnóstico. La UI ya soporta en; faltaría de/fr.
-      Tocaría `languages.py` (perfil = par estudio→base), `translate.py`,
-      `wikdict.py` y el selector de Ajustes.
+- [x] **Idioma base configurable (v1.3.0).** Además de español, **inglés** como
+      base: ca/fr/de → en con OPUS-MT `gaudi/opus-mt-*-en-ctranslate2` (CT2).
+      `languages.translate_spec()` resuelve el par (estudio, base); el caché de
+      traducción por segmento marca `es_b` (invalida al cambiar de base). Con
+      base ≠ es se ocultan las fuentes en español (acepciones Apertium, glosas
+      del Wikcionario) y las etiquetas «ES» de la tarjeta/dual pasan al idioma
+      base. Selector en Ajustes → «Traducir a». Falta (menor): glosas del
+      Wiktionary inglés vía kaikki para recuperar definiciones con base en.
 - [ ] **Conjugación multi-idioma.** Hoy solo catalán (diccionario de formas de
       Softcatalà). Los extractos kaikki que ya descargamos para glosas incluyen
       `forms` por entrada: se puede derivar una tabla de conjugación fr/en/de

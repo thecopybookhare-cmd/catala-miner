@@ -53,7 +53,7 @@ class _Engine:
 
 def model_dir() -> Path:
     from . import languages
-    return config.MODELS_DIR / languages.profile()["translate_dir"]
+    return config.MODELS_DIR / languages.translate_spec()["dir"]
 
 
 def is_downloaded() -> bool:
@@ -64,38 +64,38 @@ def download():
     from huggingface_hub import snapshot_download
 
     from . import languages
-    repo = languages.profile()["translate_repo"]
+    repo = languages.translate_spec()["repo"]
     if repo:
         snapshot_download(repo_id=repo, local_dir=str(model_dir()))
 
 
-_ENGINES: dict = {}       # motor por idioma
-_FAILED_AT: dict = {}     # idioma -> timestamp del último intento fallido
+_ENGINES: dict = {}       # motor por par (estudio, base)
+_FAILED_AT: dict = {}     # par -> timestamp del último intento fallido
 _RETRY_SECS = 60.0        # un corte de red no debe matar el traductor para siempre
 
 
 def translate(text: str) -> str:
-    """Translate →es. Returns '' on any failure (never raises to caller)."""
+    """Traduce al idioma base activo. Returns '' on any failure (never raises)."""
     import time
 
     from . import languages
-    code = languages.active_code()
-    if _ENGINES.get(code) is None:
-        last = _FAILED_AT.get(code, 0.0)
-        if code in _ENGINES and time.time() - last < _RETRY_SECS:
+    key = (languages.active_code(), languages.base_code())
+    if _ENGINES.get(key) is None:
+        last = _FAILED_AT.get(key, 0.0)
+        if key in _ENGINES and time.time() - last < _RETRY_SECS:
             return ""                     # fallo reciente: esperar al reintento
         try:
             if not is_downloaded():
                 download()
-            eos = bool(languages.profile().get("translate_eos"))
-            _ENGINES[code] = _Engine(model_dir(), eos=eos)
-            _FAILED_AT.pop(code, None)
+            eos = bool(languages.translate_spec().get("eos"))
+            _ENGINES[key] = _Engine(model_dir(), eos=eos)
+            _FAILED_AT.pop(key, None)
         except Exception:
-            _ENGINES[code] = None
-            _FAILED_AT[code] = time.time()
+            _ENGINES[key] = None
+            _FAILED_AT[key] = time.time()
             return ""
     try:
-        return _ENGINES[code].translate(text)
+        return _ENGINES[key].translate(text)
     except Exception:
         return ""
 

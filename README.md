@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/thecopybookhare-cmd/lingua-miner/actions/workflows/ci.yml/badge.svg)](https://github.com/thecopybookhare-cmd/lingua-miner/actions)
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![version](https://img.shields.io/badge/version-1.2.2-8b7cf8)
+![version](https://img.shields.io/badge/version-1.3.0-8b7cf8)
 ![python](https://img.shields.io/badge/python-3.12-3776ab)
 
 **Local, Migaku-style flashcard miner — learn languages from the videos you love.**
@@ -21,8 +21,9 @@ frequency. Everything runs **100% locally** — no accounts, no paid APIs.
 - 🖱️ **One-click mining**: click any subtitle word (or drag to select an
   expression) → editable Anki card with segment audio (ffmpeg-trimmed), video
   frame, sentence + translation.
-- 🌍 **Multi-language**: Catalan, French, English and German (glosses and
-  neural OPUS-MT translation into Spanish, offline). Each language downloads
+- 🌍 **Multi-language**: study Catalan, French, English or German. Neural
+  OPUS-MT translation (CTranslate2, offline) into **Spanish or English** —
+  pick the base under ⚙️ *Settings → Translate to*. Each language downloads
   its own translator, spaCy model, Wiktionary glosses and Piper voice on
   first use. Architecture ready for more.
 - 🎨 **Migaku-style word states**: red = new · orange = learning ·
@@ -134,7 +135,7 @@ language is mostly adding one entry there.
 ```bash
 uv pip install -p .venv/bin/python -e . --group dev
 .venv/bin/ruff check app/ tests/     # lint
-.venv/bin/python -m pytest tests/    # 124 tests
+.venv/bin/python -m pytest tests/    # 126 tests
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). CI runs lint + tests on

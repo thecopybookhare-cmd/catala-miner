@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>LinguaMiner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="/favicon.png?v=1.2.2">
+<link rel="icon" href="/favicon.png?v=1.3.0">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0c0d13">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LinguaMiner">
-<link rel="stylesheet" href="/style.css?v=1.2.2">
+<link rel="stylesheet" href="/style.css?v=1.3.0">
 </head>
 <body>
 <!-- sprite de iconos (estilo Lucide: 24×24, trazo 2, sin relleno) -->
@@ -172,10 +172,10 @@
       <aside id="card-panel" hidden>
         <h3 data-i18n="card.new">Nueva tarjeta</h3>
         <div class="row"><label data-i18n="card.word">Palabra</label><input id="c-paraula"></div>
-        <div class="row"><label data-i18n="card.word_es">Palabra ES</label><input id="c-paraula-es"></div>
+        <div class="row"><label id="lbl-word-es">Palabra ES</label><input id="c-paraula-es"></div>
         <div id="senses"></div>
         <div class="row"><label data-i18n="card.sentence">Frase</label><textarea id="c-frase" rows="2"></textarea></div>
-        <div class="row"><label data-i18n="card.sentence_es">Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
+        <div class="row"><label id="lbl-sentence-es">Frase ES</label><textarea id="c-frase-es" rows="2"></textarea></div>
         <div class="row meta"><span id="c-meta"></span></div>
         <div class="row">
           <audio id="c-audio" controls></audio>
@@ -260,6 +260,11 @@
     <section id="set-lang-section" hidden>
       <div class="set-row"><label data-i18n="set.study_lang">Idioma de estudio</label>
         <select id="set-language"></select></div>
+    </section>
+    <section id="set-base-section" hidden>
+      <div class="set-row"><label data-i18n="set.base_lang">Traducir a</label>
+        <select id="set-base"></select></div>
+      <p class="dim" id="set-base-note" data-i18n="set.base_note">Con un idioma base que no sea español, las acepciones del diccionario y las glosas del Wikcionario (en español) se ocultan; la traducción neural sigue disponible.</p>
     </section>
     <section id="update-section" hidden>
       <h3 data-i18n="set.sec_update">Actualizaciones</h3>
@@ -405,7 +410,7 @@
     });
   }
 </script>
-<script src="/i18n.js?v=1.2.2"></script>
-<script src="/app.js?v=1.2.2"></script>
+<script src="/i18n.js?v=1.3.0"></script>
+<script src="/app.js?v=1.3.0"></script>
 </body>
 </html>

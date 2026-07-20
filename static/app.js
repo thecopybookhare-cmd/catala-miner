@@ -318,7 +318,12 @@ async function openSession(sid, opts = {}) {
   }
   for (const k in ES_CACHE) delete ES_CACHE[k];
   for (const k in LOOKUP_CACHE) delete LOOKUP_CACHE[k];
-  SEGS.forEach((seg, i) => { if (seg.text_es) ES_CACHE[i] = seg.text_es; });
+  // solo sirve el cache de traducción del idioma base activo (es histórico si
+  // no está marcado); otra base lo re-traduce bajo demanda
+  const base = SETTINGS?.base_language_effective || "es";
+  SEGS.forEach((seg, i) => {
+    if (seg.text_es && (seg.es_b || "es") === base) ES_CACHE[i] = seg.text_es;
+  });
   $("home").hidden = true; $("player").hidden = false;
   STALLS = [];
   if (s.source_type === "stream") {
@@ -895,9 +900,12 @@ function renderPopupLookup(r) {
   $("wp-level").textContent = `${LEVEL_LABEL[lvl]} ★${lvl}`;
   $("wp-meta").textContent = `${lemmaLabel(r.lemma)}${r.pos ? " · " + r.pos : ""}`;
   $("wp-sentence-es").textContent = r.sentence_es || "";
+  // con base ≠ español no hay acepciones (fuentes en español); no es un fallo
+  const noSenseMsg = (SETTINGS?.base_language_effective || "es") === "es"
+    ? '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>' : "";
   $("wp-senses").innerHTML = (r.senses.length ? r.senses : [])
     .map((s, i) => `<span class="sense${i === r.active ? " active" : ""}" data-es="${esc(s.es)}">${esc(s.es)} <small>${esc(s.pos)}</small></span>`).join("")
-    || '<span class="dim" style="font-size:13px">— sin entrada en el diccionario —</span>';
+    || noSenseMsg;
   for (const sp of $("wp-senses").querySelectorAll(".sense"))
     sp.onclick = () => { POP.chosen = sp.dataset.es; mineFromPopup(); };
   if (r.senses.length && r.active >= 0) POP.active_es = r.senses[r.active].es;
@@ -1353,6 +1361,17 @@ function applySettings() {
   $("set-lang-section").hidden = langs.length <= 1;
   $("set-language").innerHTML = langs.map((l) =>
     `<option value="${l.code}"${l.code === SETTINGS.language ? " selected" : ""}>${l.name}</option>`).join("");
+  // idioma base (traducir a): solo si el idioma de estudio ofrece alternativas
+  const bases = SETTINGS.bases || [{ code: "es", name: "Español" }];
+  const activeBase = SETTINGS.base_language_effective || "es";
+  $("set-base-section").hidden = bases.length <= 1;
+  $("set-base").innerHTML = bases.map((b) =>
+    `<option value="${esc(b.code)}"${b.code === activeBase ? " selected" : ""}>${esc(b.name)}</option>`).join("");
+  // etiquetas «ES» de la tarjeta y del dual → idioma base activo
+  const baseTag = activeBase.toUpperCase();
+  $("lbl-word-es").textContent = t("card.word") + " " + baseTag;
+  $("lbl-sentence-es").textContent = t("card.sentence") + " " + baseTag;
+  $("dual-btn").title = t("dual.title", baseTag);
   // selector de Whisper según el idioma activo (el modelo catalán AINA no
   // debe ofrecerse para transcribir alemán, etc.)
   const wm = SETTINGS.whisper_models || [];
@@ -1572,8 +1591,14 @@ $("set-ui-lang").onchange = () => saveSettings({ ui_lang: $("set-ui-lang").value
 $("set-audio-trim").onchange = () => saveSettings({ audio_trim: $("set-audio-trim").checked });
 $("set-language").onchange = async () => {
   await saveSettings({ language: $("set-language").value });
-  toast("🌍 Idioma cambiado — recarga las sesiones de ese idioma");
+  toast(t("set.lang_changed"));
   loadSessions();
+};
+$("set-base").onchange = async () => {
+  await saveSettings({ base_language: $("set-base").value });
+  toast(t("set.base_changed"));
+  // re-traducir lo visible al nuevo idioma base
+  if (SESSION) openSession(SESSION.id);
 };
 $("set-import").onchange = async (e) => {
   const f = e.target.files[0];
@@ -1585,7 +1610,7 @@ $("set-import").onchange = async (e) => {
       body: JSON.stringify({ statuses: data.statuses || data, overwrite: false }),
     });
     if (r.error) { toast(r.error, "err"); return; }
-    toast(`⬆️ ${r.imported} palabras importadas (${r.skipped} ya existían)`);
+    toast(`${r.imported} palabras importadas (${r.skipped} ya existían)`, "ok");
     if (SESSION) openSession(SESSION.id);
   } catch { toast("JSON inválido", "err"); }
   e.target.value = "";

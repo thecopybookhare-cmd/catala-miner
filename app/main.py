@@ -235,7 +235,10 @@ def _segment_es(sid: str, idx: int) -> str:
     segs = json.loads(s["transcript_json"])
     if not 0 <= idx < len(segs):
         return ""
-    if segs[idx].get("text_es"):
+    base = languages.base_code()
+    # el caché guarda en qué idioma base se tradujo ("es" si no está marcado,
+    # que es lo que eran las traducciones históricas); otra base lo invalida
+    if segs[idx].get("text_es") and segs[idx].get("es_b", "es") == base:
         return segs[idx]["text_es"]
     es = translate.sentence(segs[idx]["text"])
     with db.LOCK:
@@ -246,8 +249,9 @@ def _segment_es(sid: str, idx: int) -> str:
         if (not 0 <= idx < len(segs2)
                 or segs2[idx].get("text") != segs[idx]["text"]):
             return es                      # retranscrito entre medias: no pisar
-        if not segs2[idx].get("text_es"):
+        if not segs2[idx].get("text_es") or segs2[idx].get("es_b", "es") != base:
             segs2[idx]["text_es"] = es
+            segs2[idx]["es_b"] = base
             db.update_transcript(CON, sid, json.dumps(segs2), s2["model_size"],
                                  s2["srt_source"], s2.get("tok_version") or 0)
     return es
@@ -257,7 +261,7 @@ DEFAULT_SETTINGS = {
     "deck": "LinguaMiner::Mining", "anki_port": None, "language": "ca",
     "sub_scale": 1.0, "dual_default": False, "autopause_default": False,
     "speed_default": 1.0, "ipa_enabled": True, "online_enabled": False,
-    "audio_trim": False, "ui_lang": "es",
+    "audio_trim": False, "ui_lang": "es", "base_language": "es",
     "keymap": {"prev": "a", "next": "d", "replay": "s", "mine": "q",
                "subs": "w", "browser": "g", "copy": "c", "dual": "e",
                "autopause": "p", "fullscreen": "f", "recommended": "r"},
@@ -847,14 +851,15 @@ def lookup(req: LookupReq):
     """Instant word info for the Migaku-style popup (no media generated)."""
     lemma, pos = nlp.analyze_selection(req.selection, req.sentence)
     z = nlp.zipf(req.selection)
-    senses = _senses(req.selection, lemma)
+    es_src = languages.spanish_sources_active()   # bidix/glosas son fuentes es
+    senses = _senses(req.selection, lemma) if es_src else []
     word_es = _word_es(req.selection, lemma)
     sentence_es = ""
     if req.session_id and req.segment_index >= 0:
         sentence_es = _segment_es(req.session_id, req.segment_index)
     if not sentence_es and req.sentence:
         sentence_es = translate.sentence(req.sentence)
-    glosses = wikdict.lookup(lemma) or wikdict.lookup(req.selection)
+    glosses = (wikdict.lookup(lemma) or wikdict.lookup(req.selection)) if es_src else []
     userdefs = userdict.lookup(lemma) or userdict.lookup(req.selection)
     return {
         "selection": req.selection,
@@ -972,7 +977,7 @@ def _build_preview(s: dict, segment_index: int, selection: str,
 
     lemma, pos = nlp.analyze_selection(selection, seg["text"])
     z = nlp.zipf(selection)
-    senses = _senses(selection, lemma)
+    senses = _senses(selection, lemma) if languages.spanish_sources_active() else []
     frase_es = translate.sentence(seg["text"])
     word_es = _word_es(selection, lemma)
     return {
@@ -1257,6 +1262,10 @@ def _settings_payload() -> dict:
     prof = languages.profile()
     s["whisper_models"] = list(prof["whisper_models"].keys())
     s["default_whisper"] = prof["default_whisper"]
+    # idiomas base disponibles para el idioma de estudio activo
+    s["bases"] = [{"code": b, "name": languages.BASE_NAMES.get(b, b)}
+                  for b in languages.bases()]
+    s["base_language_effective"] = languages.base_code()
     return s
 
 
@@ -1272,6 +1281,7 @@ _SETTING_TYPES = {
     "sub_scale": (int, float), "dual_default": bool, "autopause_default": bool,
     "speed_default": (int, float), "ipa_enabled": bool, "online_enabled": bool,
     "audio_trim": bool, "ui_lang": str, "keymap": dict,
+    "base_language": str,
 }
 _SETTING_RANGES = {"sub_scale": (0.3, 3.0), "speed_default": (0.25, 3.0),
                    "anki_port": (1, 65535)}
@@ -1296,6 +1306,8 @@ def post_settings(body: dict):
                                 status_code=400)
     if "ui_lang" in body and body["ui_lang"] not in ("es", "ca", "en", "fr"):
         return JSONResponse({"error": "ui_lang no soportado"}, status_code=400)
+    if "base_language" in body and body["base_language"] not in languages.BASE_NAMES:
+        return JSONResponse({"error": "idioma base no soportado"}, status_code=400)
     if "language" in body and body["language"] not in languages.activable():
         return JSONResponse({"error": "idioma no disponible todavía"},
                             status_code=400)

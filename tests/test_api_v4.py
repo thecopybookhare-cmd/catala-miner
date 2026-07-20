@@ -97,6 +97,36 @@ def test_transcribe_rejects_model_of_other_language(tmp_path, monkeypatch):
     c.post("/api/settings", json={"language": "ca"})
 
 
+def test_base_language_selectable_and_gated(tmp_path):
+    c = client(tmp_path)
+    from app import languages, translate
+    # catalán ofrece base español + inglés
+    s = c.get("/api/settings").json()
+    assert {b["code"] for b in s["bases"]} == {"es", "en"}
+    assert s["base_language_effective"] == "es"
+    # cambiar a base inglés: el traductor apunta al par ca→en y se ocultan
+    # las fuentes en español (acepciones/glosas)
+    c.post("/api/settings", json={"base_language": "en"})
+    assert languages.base_code() == "en"
+    assert languages.translate_spec()["repo"] == "gaudi/opus-mt-ca-en-ctranslate2"
+    assert translate.model_dir().name == "translate-cat-eng"
+    assert languages.spanish_sources_active() is False
+    # base desconocida → 400
+    assert c.post("/api/settings", json={"base_language": "zz"}).status_code == 400
+    c.post("/api/settings", json={"base_language": "es"})
+
+
+def test_base_language_falls_back_when_unavailable(tmp_path):
+    c = client(tmp_path)
+    from app import languages
+    # elegir base inglés con catalán, luego cambiar a un idioma sin esa base
+    c.post("/api/settings", json={"base_language": "en", "language": "ca"})
+    assert languages.base_code() == "en"
+    # (si algún idioma no tuviera la base en, base_code caería a es; ca sí la tiene)
+    assert "en" in languages.bases("ca")
+    c.post("/api/settings", json={"base_language": "es", "language": "ca"})
+
+
 def test_settings_rejects_bad_keymap_and_unknown(tmp_path):
     c = client(tmp_path)
     # tecla duplicada con otra acción

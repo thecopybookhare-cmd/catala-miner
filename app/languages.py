@@ -24,6 +24,11 @@ PROFILES = {
                         "kaikki.org-dictionary-Catal%C3%A1n.jsonl"),
         # voz neural Piper (ONNX) para la pronunciación; ruta en rhasspy/piper-voices
         "piper_voice": "ca/ca_ES/upc_ona/x_low/ca_ES-upc_ona-x_low.onnx",
+        # idiomas base alternativos: traductor estudio→base (además del es)
+        "translate_bases": {
+            "en": {"repo": "gaudi/opus-mt-ca-en-ctranslate2",
+                   "dir": "translate-cat-eng", "eos": True},
+        },
     },
     "fr": {
         "name": "Français",
@@ -44,6 +49,10 @@ PROFILES = {
         "wikdict_url": ("https://kaikki.org/eswiktionary/Franc%C3%A9s/"
                         "kaikki.org-dictionary-Franc%C3%A9s.jsonl"),
         "piper_voice": "fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
+        "translate_bases": {
+            "en": {"repo": "gaudi/opus-mt-fr-en-ctranslate2",
+                   "dir": "translate-fra-eng", "eos": True},
+        },
     },
     "en": {
         "name": "English",
@@ -78,8 +87,15 @@ PROFILES = {
         "wikdict_url": ("https://kaikki.org/eswiktionary/Alem%C3%A1n/"
                         "kaikki.org-dictionary-Alem%C3%A1n.jsonl"),
         "piper_voice": "de/de_DE/thorsten/low/de_DE-thorsten-low.onnx",
+        "translate_bases": {
+            "en": {"repo": "gaudi/opus-mt-de-en-ctranslate2",
+                   "dir": "translate-deu-eng", "eos": True},
+        },
     },
 }
+
+# nombres de los idiomas base para la UI
+BASE_NAMES = {"es": "Español", "en": "English"}
 
 
 def available(code: str) -> bool:
@@ -102,3 +118,37 @@ def active_code() -> str:
 
 def profile() -> dict:
     return PROFILES[active_code()]
+
+
+def bases(code: str | None = None) -> list[str]:
+    """Idiomas base disponibles para un idioma de estudio (es siempre)."""
+    p = PROFILES.get(code or active_code()) or {}
+    return ["es", *(p.get("translate_bases") or {})]
+
+
+def base_code() -> str:
+    """Idioma base activo (al que se traduce). Si el guardado no está
+    disponible para el idioma de estudio actual, cae a español."""
+    try:
+        s = json.loads(config.SETTINGS_PATH.read_text())
+        b = s.get("base_language", "es")
+    except Exception:
+        b = "es"
+    return b if b in bases(active_code()) else "es"
+
+
+def translate_spec() -> dict:
+    """repo/dir/eos del traductor del par (estudio, base) activo."""
+    p = profile()
+    b = base_code()
+    alt = (p.get("translate_bases") or {}).get(b)
+    if alt:
+        return alt
+    return {"repo": p.get("translate_repo"), "dir": p["translate_dir"],
+            "eos": bool(p.get("translate_eos"))}
+
+
+def spanish_sources_active() -> bool:
+    """Las acepciones Apertium y las glosas del Wikcionario son fuentes en
+    español: solo tienen sentido con base es."""
+    return base_code() == "es"
