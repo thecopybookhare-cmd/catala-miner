@@ -1,5 +1,6 @@
 """LinguaMiner — FastAPI backend + static frontend."""
 import json
+import logging
 import shutil
 import threading
 import uuid
@@ -88,6 +89,8 @@ async def lifespan(_app):
     threading.Thread(target=_warm_models, daemon=True).start()
     yield
 
+
+_log = logging.getLogger("cards")
 
 app = FastAPI(title="LinguaMiner", lifespan=lifespan)
 
@@ -954,26 +957,57 @@ def _build_preview(s: dict, segment_index: int, selection: str,
     base = uuid.uuid4().hex[:10]
     audio_name, image_name = f"cm-{base}.mp3", f"cm-{base}.jpg"
     clip_name = f"cm-{base}.gif"
+    MAX_GIF = 6.0
+
+    # Streams: descargar UNA ventana local y sacar de ahí captura + GIF. Sin
+    # esto el GIF decodificaba varios segundos de HD desde el stream (minutos)
+    # y agotaba el timeout → la tarjeta caía a solo-imagen «en algunos momentos».
+    win_path = None
+    if s.get("source_type") == "stream":
+        win_dur = min(max(0.1, end - start), MAX_GIF) + 0.5
+        wp = config.MEDIA_DIR / f"cm-{base}-win.mp4"
+        try:
+            media.download_window(src, start, win_dur, str(wp))
+            win_path = str(wp)
+        except Exception as e:
+            _log.warning("ventana de stream falló (%s); intento directo", e)
+
+    video_src = win_path or src
+    # en la ventana los tiempos son relativos (empieza en 0); directo usa originales
+    win_content = min(max(0.1, end - start), MAX_GIF)
+    snap_ts = min(max(0.0, mid - start), win_content - 0.1) if win_path else mid
+    gif_start, gif_end = (0.0, win_content) if win_path else (start, end)
+
     audio_ok = image_ok = clip_ok = True
     try:
         media.cut_audio(src, start, end,
                         str(config.MEDIA_DIR / audio_name),
                         trim=bool(_settings().get("audio_trim")))
-    except Exception:
+    except Exception as e:
+        _log.warning("audio de tarjeta falló: %s", e)
         audio_ok = False
     try:
-        media.snapshot(src, mid, str(config.MEDIA_DIR / image_name))
-    except Exception:
+        media.snapshot(video_src, snap_ts, str(config.MEDIA_DIR / image_name))
+    except Exception as e:
+        _log.warning("captura de tarjeta falló: %s", e)
         image_ok = False
     try:
         # animated clip only makes sense for video sources
         if image_ok:
-            media.animated_clip(src, start, end,
-                                str(config.MEDIA_DIR / clip_name))
+            media.animated_clip(video_src, gif_start, gif_end,
+                                str(config.MEDIA_DIR / clip_name),
+                                timeout=(60 if win_path else 90))
         else:
             clip_ok = False
-    except Exception:
+    except Exception as e:
+        _log.warning("GIF de tarjeta falló: %s", e)
         clip_ok = False
+    finally:
+        if win_path:
+            try:
+                Path(win_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
     lemma, pos = nlp.analyze_selection(selection, seg["text"])
     z = nlp.zipf(selection)

@@ -80,8 +80,23 @@ def clip_cmd(src: str, start: float, end: float, out: str,
             "-loop", "0", out]
 
 
-def animated_clip(src, start, end, out, max_dur=6.0):
-    _run(clip_cmd(src, start, end, out, max_dur))
+def animated_clip(src, start, end, out, max_dur=6.0, timeout=90):
+    _run(clip_cmd(src, start, end, out, max_dur), timeout=timeout)
+
+
+def download_window(src: str, start: float, dur: float, out: str,
+                    timeout: float = 120) -> None:
+    """Copia (sin recodificar) la ventana [start, start+dur] a un mp4 local.
+
+    Para fuentes en streaming: hace UN solo seek de red y deja el material en
+    disco. Sin esto, el GIF (que decodifica varios segundos de vídeo HD desde
+    el stream) tardaba minutos y agotaba el timeout, cayendo a solo-imagen.
+    -avoid_negative_ts make_zero: la ventana empieza en t=0 (offsets relativos).
+    """
+    _run([_exe("ffmpeg"), "-y", "-ss", str(round(max(0.0, start), 3)),
+          "-i", src, "-t", str(round(dur, 3)), "-c", "copy",
+          "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", out],
+         timeout=timeout)
 
 
 # Sin timeout, una URL de stream caducada deja a ffmpeg colgado minutos y
