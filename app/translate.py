@@ -27,11 +27,14 @@ def _find_sp(model_dir: Path) -> Path:
 
 
 class _Engine:
-    def __init__(self, model_dir: Path, eos: bool = False):
+    def __init__(self, model_dir: Path, eos: bool = False,
+                 target_token: str | None = None):
         import ctranslate2
         import sentencepiece as spm
         self.sp = spm.SentencePieceProcessor(model_file=str(_find_sp(model_dir)))
         self.eos = eos                        # OPUS-MT necesita </s> en la fuente
+        # modelos multilingües (romance): token de idioma destino al inicio
+        self.target_token = target_token
         ct2_dir = model_dir
         if not (model_dir / "model.bin").exists():
             cands = list(model_dir.glob("**/model.bin"))
@@ -45,6 +48,8 @@ class _Engine:
         if not text:
             return ""
         toks = self.sp.encode(text, out_type=str)
+        if self.target_token:
+            toks = [self.target_token] + toks
         if self.eos:
             toks = toks + ["</s>"]
         res = self.tr.translate_batch([toks], beam_size=2, max_batch_size=1)
@@ -61,12 +66,41 @@ def is_downloaded() -> bool:
 
 
 def download():
-    from huggingface_hub import snapshot_download
-
     from . import languages
-    repo = languages.translate_spec()["repo"]
-    if repo:
-        snapshot_download(repo_id=repo, local_dir=str(model_dir()))
+    spec = languages.translate_spec()
+    if spec.get("zip"):
+        _download_and_convert(spec["zip"], model_dir())
+    elif spec.get("repo"):
+        from huggingface_hub import snapshot_download
+        snapshot_download(repo_id=spec["repo"], local_dir=str(model_dir()))
+
+
+def _download_and_convert(zip_url: str, dest: Path) -> None:
+    """Descarga un modelo Marian de OPUS-MT (.zip) y lo convierte a CT2 sin
+    torch. Para pares sin CT2 pre-hecho: p. ej. pt→es vía el modelo
+    multilingüe romance itc-itc (no existe un opus-mt-pt-es bilingüe)."""
+    import shutil
+    import tempfile
+    import zipfile
+
+    import requests
+    from ctranslate2.converters import OpusMTConverter
+    dest.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        zpath = tdp / "model.zip"
+        with requests.get(zip_url, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            with open(zpath, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1 << 20):
+                    f.write(chunk)
+        srcdir = tdp / "src"
+        with zipfile.ZipFile(zpath) as z:
+            z.extractall(srcdir)
+        OpusMTConverter(str(srcdir)).convert(str(dest), quantization="int8",
+                                             force=True)
+        # el convertidor no copia el SentencePiece de origen que usa el motor
+        shutil.copy(srcdir / "source.spm", dest / "source.spm")
 
 
 _ENGINES: dict = {}       # motor por par (estudio, base)
@@ -87,8 +121,9 @@ def translate(text: str) -> str:
         try:
             if not is_downloaded():
                 download()
-            eos = bool(languages.translate_spec().get("eos"))
-            _ENGINES[key] = _Engine(model_dir(), eos=eos)
+            spec = languages.translate_spec()
+            _ENGINES[key] = _Engine(model_dir(), eos=bool(spec.get("eos")),
+                                    target_token=spec.get("token"))
             _FAILED_AT.pop(key, None)
         except Exception:
             _ENGINES[key] = None

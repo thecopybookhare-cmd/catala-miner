@@ -131,6 +131,14 @@ Pendiente menor: roles ARIA en los badges del header (a11y).
 
 ## 🧭 Próximos grandes (v1.x)
 
+- [x] **Portugués europeo (v1.4.0).** Estudio pt → base es. No existe un
+      OPUS-MT pt→es bilingüe ni un CT2 pre-hecho, así que se descarga el modelo
+      multilingüe romance **itc-itc** (zip Marian, 223 MB) y se convierte a CT2
+      **sin torch** (`ctranslate2.converters.OpusMTConverter`, ~64 MB int8),
+      con token de destino `>>spa<<`. Voz europea (pt_PT-tugão), glosas del
+      Wikcionario en español, spaCy `pt_core_news_sm`. Abre la puerta a
+      convertir cualquier OPUS-MT sin CT2 pre-hecho.
+
 - [x] **Idioma base configurable (v1.3.0).** Además de español, **inglés** como
       base: ca/fr/de → en con OPUS-MT `gaudi/opus-mt-*-en-ctranslate2` (CT2).
       `languages.translate_spec()` resuelve el par (estudio, base); el caché de

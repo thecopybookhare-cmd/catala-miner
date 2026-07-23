@@ -593,8 +593,35 @@ def test_languages_available_en_de(tmp_path):
     c = client(tmp_path)
     langs = {lang["code"]: lang["available"] for lang in
              c.get("/api/settings").json()["languages"]}
-    for code in ("ca", "fr", "en", "de"):
+    for code in ("ca", "fr", "en", "de", "pt"):
         assert langs.get(code) is True, code
     # cambiar a inglés y a alemán es válido
     assert c.post("/api/settings", json={"language": "en"}).status_code == 200
     assert c.post("/api/settings", json={"language": "de"}).status_code == 200
+
+
+def test_portuguese_profile_and_translator_spec(tmp_path):
+    c = client(tmp_path)
+    from app import languages
+    # portugués es activable pese a no tener CT2 pre-hecho (se convierte del zip)
+    assert "pt" in languages.activable()
+    c.post("/api/settings", json={"language": "pt"})
+    assert languages.active_code() == "pt"
+    # solo base español (el modelo romance itc-itc no hace pt→en)
+    assert languages.bases("pt") == ["es"]
+    spec = languages.translate_spec()
+    assert spec["zip"].endswith(".zip") and spec["token"] == ">>spa<<"
+    assert spec["dir"] == "translate-por-spa"
+    c.post("/api/settings", json={"language": "ca"})
+
+
+def test_translate_download_routes_zip_to_converter(tmp_path, monkeypatch):
+    """Para un idioma con translate_zip, download() convierte (no snapshot)."""
+    from app import languages, translate
+    monkeypatch.setattr(languages, "active_code", lambda: "pt")
+    monkeypatch.setattr(languages, "base_code", lambda: "es")
+    calls = {}
+    monkeypatch.setattr(translate, "_download_and_convert",
+                        lambda url, dest: calls.setdefault("zip", url))
+    translate.download()
+    assert "zip" in calls and calls["zip"].endswith(".zip")

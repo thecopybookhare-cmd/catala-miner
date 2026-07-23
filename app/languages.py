@@ -92,6 +92,30 @@ PROFILES = {
                    "dir": "translate-deu-eng", "eos": True},
         },
     },
+    "pt": {
+        "name": "Português",
+        "wordfreq": "pt",
+        "espeak": "pt",                       # espeak-ng: pt = europeo (pt-br = BR)
+        "spacy": "pt_core_news_sm",
+        "whisper_models": {"large-v3": "large-v3", "small": "small"},
+        "default_whisper": "large-v3",
+        # No existe un OPUS-MT pt→es bilingüe ni un CT2 pre-hecho; se usa el
+        # modelo multilingüe romance (itc-itc): se baja el zip Marian y se
+        # convierte a CT2 (torch-free) con el token de destino >>spa<<.
+        "translate_repo": None,
+        "translate_zip": ("https://object.pouta.csc.fi/Tatoeba-MT-models/"
+                          "itc-itc/opus-2020-07-07.zip"),
+        "translate_token": ">>spa<<",
+        "translate_eos": True,
+        "translate_dir": "translate-por-spa",
+        "bidix_url": None,                    # sentidos vía Wikcionario (español)
+        "bidix_file": "apertium-spa-por.dix",
+        "forms_url": None,                    # spaCy pt_core_news_sm lematiza
+        "wikdict_url": ("https://kaikki.org/eswiktionary/Portugu%C3%A9s/"
+                        "kaikki.org-dictionary-Portugu%C3%A9s.jsonl"),
+        # voz neural europea (pt_PT), no brasileña
+        "piper_voice": "pt/pt_PT/tug%C3%A3o/medium/pt_PT-tug%C3%A3o-medium.onnx",
+    },
 }
 
 # nombres de los idiomas base para la UI
@@ -100,7 +124,7 @@ BASE_NAMES = {"es": "Español", "en": "English"}
 
 def available(code: str) -> bool:
     p = PROFILES.get(code)
-    return bool(p and p.get("translate_repo"))
+    return bool(p and (p.get("translate_repo") or p.get("translate_zip")))
 
 
 def activable() -> list[str]:
@@ -144,7 +168,8 @@ def translate_spec() -> dict:
     alt = (p.get("translate_bases") or {}).get(b)
     if alt:
         return alt
-    return {"repo": p.get("translate_repo"), "dir": p["translate_dir"],
+    return {"repo": p.get("translate_repo"), "zip": p.get("translate_zip"),
+            "token": p.get("translate_token"), "dir": p["translate_dir"],
             "eos": bool(p.get("translate_eos"))}
 
 
